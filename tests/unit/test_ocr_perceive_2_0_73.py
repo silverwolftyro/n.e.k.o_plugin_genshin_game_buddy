@@ -18,9 +18,9 @@ import threading
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from plugin.plugins.multi_game_companion import MultiGameCompanionPlugin
-from plugin.plugins.multi_game_companion.game_registry import PluginOptions
-from plugin.plugins.multi_game_companion.scene_tracker import SceneTracker
+from plugin.plugins.genshin_game_buddy import GenshinGameBuddyPlugin
+from plugin.plugins.genshin_game_buddy.game_registry import PluginOptions
+from plugin.plugins.genshin_game_buddy.scene_tracker import SceneTracker
 
 # ============================================================================
 # Stub 工厂
@@ -32,9 +32,9 @@ def _make_plugin_stub(
     scene_interval: int = 2,
     term_interval: int = 15,
     perception_state: str = "IN_GAME",
-) -> MultiGameCompanionPlugin:
+) -> GenshinGameBuddyPlugin:
     """最小可用 stub——含 SceneTracker + 缓存 + ocr_in_flight 字段。"""
-    plugin = MultiGameCompanionPlugin.__new__(MultiGameCompanionPlugin)
+    plugin = GenshinGameBuddyPlugin.__new__(GenshinGameBuddyPlugin)
     plugin._options = PluginOptions(
         ocr_scene_interval_seconds=scene_interval,
         ocr_term_interval_seconds=term_interval,
@@ -52,7 +52,7 @@ def _make_plugin_stub(
     plugin._last_capture_text = ""
     plugin._last_term_run_monotonic = 0.0
     plugin._light_capture_dhash = lambda: ""
-    plugin._dhash_diff = MultiGameCompanionPlugin._dhash_diff
+    plugin._dhash_diff = GenshinGameBuddyPlugin._dhash_diff
     plugin._scene_tracker = SceneTracker(
         hysteresis_count=3,
         exit_grace_count=5,
@@ -104,7 +104,7 @@ async def test_ocr_perceive__out_of_game_early_return_logs() -> None:
     plugin = _make_plugin_stub(perception_state="OUT_OF_GAME")
 
     # 调 body——应打 INFO 然后 return（不抛）
-    await MultiGameCompanionPlugin._ocr_perceive_body(plugin)
+    await GenshinGameBuddyPlugin._ocr_perceive_body(plugin)
 
     # 找带"early-return"和"OUT_OF_GAME"的 INFO 日志
     # 两个关键字都在格式串（args[0]）里——OUT_OF_GAME 是固定串，不是格式化参数
@@ -156,16 +156,16 @@ async def test_ocr_perceive__text_unchanged_early_return_logs() -> None:
     plugin._ocr.extract_text_from_base64 = _fake_extract
 
     # 用 patch：替换模块里的 capture_active_frame
-    import plugin.plugins.multi_game_companion as _mgc_module
+    import plugin.plugins.genshin_game_buddy as _mgc_module
     original_capture = getattr(_mgc_module, "capture_active_frame", None)
     _mgc_module.capture_active_frame = _fake_capture
     try:
         # 第一次 body：写入 _last_ocr_hash
         plugin._last_ocr_hash = ""
-        await MultiGameCompanionPlugin._ocr_perceive_body(plugin)
+        await GenshinGameBuddyPlugin._ocr_perceive_body(plugin)
         # 第二次 body：text_hash == _last_ocr_hash → 早退
         plugin.logger.reset_mock()
-        await MultiGameCompanionPlugin._ocr_perceive_body(plugin)
+        await GenshinGameBuddyPlugin._ocr_perceive_body(plugin)
     finally:
         if original_capture is not None:
             _mgc_module.capture_active_frame = original_capture
@@ -213,7 +213,7 @@ async def test_heartbeat__exposes_worker_health() -> None:
     plugin._perception_state = "OUT_OF_GAME"
     plugin._manager.current = MagicMock()  # session 不为 None（先过 session check）
 
-    await MultiGameCompanionPlugin._ocr_perceive_body(plugin)
+    await GenshinGameBuddyPlugin._ocr_perceive_body(plugin)
 
     # 找 heartbeat 日志——必须包含 ocr_in_flight / ocr_workers / executor_alive
     heartbeat_calls = [
@@ -258,7 +258,7 @@ async def test_heartbeat__executor_shutdown_shows_zero_workers() -> None:
     plugin._perception_state = "OUT_OF_GAME"
     plugin._manager.current = MagicMock()
 
-    await MultiGameCompanionPlugin._ocr_perceive_body(plugin)
+    await GenshinGameBuddyPlugin._ocr_perceive_body(plugin)
 
     heartbeat_calls = [
         c for c in plugin.logger.info.call_args_list

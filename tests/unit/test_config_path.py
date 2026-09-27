@@ -14,13 +14,13 @@ import threading
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from plugin.plugins.multi_game_companion import MultiGameCompanionPlugin
-from plugin.plugins.multi_game_companion.game_registry import PluginOptions
+from plugin.plugins.genshin_game_buddy import GenshinGameBuddyPlugin
+from plugin.plugins.genshin_game_buddy.game_registry import PluginOptions
 
 
-def _make_plugin_stub(*, config_path: str | None, config_path_raises: bool = False) -> MultiGameCompanionPlugin:
+def _make_plugin_stub(*, config_path: str | None, config_path_raises: bool = False) -> GenshinGameBuddyPlugin:
     """最小 stub——mock self.config 让 path()/dump()/update() 行为可控。"""
-    plugin = MultiGameCompanionPlugin.__new__(MultiGameCompanionPlugin)
+    plugin = GenshinGameBuddyPlugin.__new__(GenshinGameBuddyPlugin)
     # 拍板 2.0.69 测试：用真 PluginOptions（dataclasses.replace 需要真 dataclass）
     plugin._options = PluginOptions()
     plugin._registry = MagicMock()
@@ -83,10 +83,10 @@ def _make_plugin_stub(*, config_path: str | None, config_path_raises: bool = Fal
 @pytest.mark.asyncio
 async def test_startup__logs_config_source_path() -> None:
     """拍板 2.0.69：startup 打 INFO 含 config_source=<path>。"""
-    expected_path = r"C:\Users\alpha\AppData\Local\N.E.K.O\plugins\multi_game_companion\config\plugin.toml"
+    expected_path = r"C:\Users\alpha\AppData\Local\N.E.K.O\plugins\genshin_game_buddy\config\plugin.toml"
     plugin = _make_plugin_stub(config_path=expected_path)
 
-    await MultiGameCompanionPlugin.startup(plugin)
+    await GenshinGameBuddyPlugin.startup(plugin)
 
     info_calls = [str(c) for c in plugin.logger.info.call_args_list]
     # MagicMock 的 call_args 在 str() 里用 repr 显示 path——repr 会把 \ 转义为 \\，
@@ -104,7 +104,7 @@ async def test_startup__config_path_raises__does_not_crash() -> None:
     plugin = _make_plugin_stub(config_path=None, config_path_raises=True)
 
     # 不应抛
-    result = await MultiGameCompanionPlugin.startup(plugin)
+    result = await GenshinGameBuddyPlugin.startup(plugin)
     assert result is not None  # Ok 不是 None
 
     # config_source 应是 <unknown>（MagicMock str() 把 "<unknown>" 用 repr 包成 quotes）
@@ -121,7 +121,7 @@ async def test_startup__hard_resets_ocr_in_flight_count() -> None:
     plugin = _make_plugin_stub(config_path=None)
     plugin._ocr_in_flight_count = 2  # 假装上次崩溃遗留
 
-    await MultiGameCompanionPlugin.startup(plugin)
+    await GenshinGameBuddyPlugin.startup(plugin)
 
     assert plugin._ocr_in_flight_count == 0, (
         f"startup should hard-reset count to 0, got {plugin._ocr_in_flight_count}"
@@ -144,7 +144,7 @@ async def test_config__read_write_consistency() -> None:
     assert hasattr(plugin.config, "update")
 
     # 调用一次 update——验证调用成功 + 没异常（async）
-    await plugin.config.update({"multi_game_companion": {"ocr_worker_threads": 1}})
+    await plugin.config.update({"genshin_game_buddy": {"ocr_worker_threads": 1}})
     assert plugin.config.update.called
 
 

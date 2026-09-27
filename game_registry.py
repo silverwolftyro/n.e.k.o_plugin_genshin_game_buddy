@@ -1,7 +1,7 @@
 """游戏注册表与插件选项（身份真源）。
 
 把宿主下发的生效配置解析成结构化对象：
-  - ``[multi_game_companion]`` → :class:`PluginOptions`（可调项，全部有范围钳制）
+  - ``[genshin_game_buddy]`` → :class:`PluginOptions`（可调项，全部有范围钳制）
   - ``[games.<game_id>]``      → :class:`GameRegistry`（身份，术语文件之前就要能解析）
 
 设计约定（与 plugin.toml 自定义段注释一致）：
@@ -119,7 +119,7 @@ def _as_bool(value: object, default: bool) -> bool:
 
 @dataclass(frozen=True)
 class PluginOptions:
-    """``[multi_game_companion]`` 的解析结果。
+    """``[genshin_game_buddy]`` 的解析结果。
 
     每个字段都有硬范围：清单里写错值不会让插件崩，也不会让预算失控。
     """

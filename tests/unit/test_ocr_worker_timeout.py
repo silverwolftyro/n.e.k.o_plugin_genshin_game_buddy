@@ -23,8 +23,8 @@ import threading
 from unittest.mock import MagicMock
 
 import pytest
-from plugin.plugins.multi_game_companion import MultiGameCompanionPlugin
-from plugin.plugins.multi_game_companion.game_registry import PluginOptions
+from plugin.plugins.genshin_game_buddy import GenshinGameBuddyPlugin
+from plugin.plugins.genshin_game_buddy.game_registry import PluginOptions
 
 
 def _make_plugin_stub(
@@ -32,9 +32,9 @@ def _make_plugin_stub(
     worker_threads: int = 1,
     interval_seconds: int = 0,
     change_driven_enabled: bool = False,
-) -> MultiGameCompanionPlugin:
+) -> GenshinGameBuddyPlugin:
     """最小可用 stub。"""
-    plugin = MultiGameCompanionPlugin.__new__(MultiGameCompanionPlugin)
+    plugin = GenshinGameBuddyPlugin.__new__(GenshinGameBuddyPlugin)
     plugin._options = PluginOptions(
         ocr_perceive_interval_seconds=interval_seconds,
         ocr_worker_threads=worker_threads,
@@ -47,7 +47,7 @@ def _make_plugin_stub(
     plugin._last_real_ocr_monotonic = 0.0
     plugin._last_light_hash = ""
     plugin._light_capture_dhash = lambda: ""
-    plugin._dhash_diff = MultiGameCompanionPlugin._dhash_diff
+    plugin._dhash_diff = GenshinGameBuddyPlugin._dhash_diff
     plugin.logger = MagicMock()
     return plugin
 
@@ -103,7 +103,7 @@ async def test_ocr_perceive__worker_hang__watchdog_releases_count() -> None:
     plugin._ocr_executor = fake_executor
     plugin._ocr_perceive_sync_entry = MagicMock()
 
-    await MultiGameCompanionPlugin.ocr_perceive(plugin)
+    await GenshinGameBuddyPlugin.ocr_perceive(plugin)
 
     # schedule 成功后 count += 1
     assert plugin._ocr_in_flight_count == 1, (
@@ -157,7 +157,7 @@ async def test_ocr_perceive__worker_done_normally__watchdog_no_double_release() 
     plugin._ocr_executor = fake_executor
     plugin._ocr_perceive_sync_entry = MagicMock()
 
-    await MultiGameCompanionPlugin.ocr_perceive(plugin)
+    await GenshinGameBuddyPlugin.ocr_perceive(plugin)
 
     # _on_done 立刻触发（cf_future 已 done），count 应 = 0
     assert plugin._ocr_in_flight_count == 0, (
@@ -218,7 +218,7 @@ async def test_ocr_perceive__on_done_count_release_failure_logged(monkeypatch) -
     plugin._ocr_perceive_sync_entry = MagicMock()
 
     # 调一次 tick——_on_done 注册到 captured_callbacks
-    await MultiGameCompanionPlugin.ocr_perceive(plugin)
+    await GenshinGameBuddyPlugin.ocr_perceive(plugin)
     assert len(captured_callbacks) == 1, (
         f"_on_done not registered; got {len(captured_callbacks)} callbacks"
     )
@@ -260,7 +260,7 @@ async def test_ocr_perceive__schedule_failure_releases_count(monkeypatch) -> Non
 
     # 调一次 tick——不抛
     try:
-        await MultiGameCompanionPlugin.ocr_perceive(plugin)
+        await GenshinGameBuddyPlugin.ocr_perceive(plugin)
     except Exception as exc:
         pytest.fail(f"ocr_perceive must not raise, got {type(exc).__name__}: {exc}")
 

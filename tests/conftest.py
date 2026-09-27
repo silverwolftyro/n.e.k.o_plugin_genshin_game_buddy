@@ -1,4 +1,4 @@
-"""multi_game_companion 测试共享夹具。
+"""genshin_game_buddy 测试共享夹具。
 
 三条硬约束（对应 FIELD_COVERAGE_CHECKLIST 的 E 节）：
   1. **数据根必须重定向到 tmp**：``NEKO_STORAGE_SELECTED_ROOT`` 指向 tmp_path，
@@ -159,7 +159,7 @@ class FakeCtx:
     """满足 ``_is_sdk_context_compatible`` 的最小宿主上下文。"""
 
     def __init__(self, *, config: dict[str, Any], logger: FakeLogger | None = None) -> None:
-        self.plugin_id = "multi_game_companion"
+        self.plugin_id = "genshin_game_buddy"
         self.config_path = str(PLUGIN_DIR / "plugin.toml")
         self.metadata = {
             "config_path": self.config_path,
@@ -244,7 +244,7 @@ def make_config(
         games = {"genshin": dict(GENSHIN_ENTRY), "wuthering_waves": dict(WUWA_ENTRY)}
     return {
         "plugin": {"store": {"enabled": store_enabled}},
-        "multi_game_companion": merged_options,
+        "genshin_game_buddy": merged_options,
         "games": games,
     }
 
@@ -301,13 +301,13 @@ def build_plugin(storage_root: Path, monkeypatch: pytest.MonkeyPatch):
         logger: FakeLogger | None = None,
         receipt: Any = None,
     ):
-        from plugin.plugins.multi_game_companion import MultiGameCompanionPlugin
+        from plugin.plugins.genshin_game_buddy import GenshinGameBuddyPlugin
 
         payload = config if config is not None else make_config()
         ctx = FakeCtx(config=payload, logger=logger)
         if receipt is not None:
             ctx.receipt = receipt
-        plugin = MultiGameCompanionPlugin(ctx)
+        plugin = GenshinGameBuddyPlugin(ctx)
         plugin.config = FakeConfig(payload)
         created.append(plugin)
         return plugin

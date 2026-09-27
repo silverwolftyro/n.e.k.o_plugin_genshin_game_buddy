@@ -23,8 +23,8 @@ def test_plugin_manifest_exists() -> None:
     manifest = root / "plugin.toml"
     assert manifest.is_file()
     text = manifest.read_text(encoding="utf-8")
-    assert 'id = "multi_game_companion"' in text
-    assert 'entry = "plugin.plugins.multi_game_companion:MultiGameCompanionPlugin"' in text
+    assert 'id = "genshin_game_buddy"' in text
+    assert 'entry = "plugin.plugins.genshin_game_buddy:GenshinGameBuddyPlugin"' in text
 
 
 def test_entry_class_importable() -> None:

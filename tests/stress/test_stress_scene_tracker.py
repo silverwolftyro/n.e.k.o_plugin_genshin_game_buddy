@@ -9,7 +9,7 @@ import threading
 import time
 
 import pytest
-from plugin.plugins.multi_game_companion.scene_tracker import (
+from plugin.plugins.genshin_game_buddy.scene_tracker import (
     SceneEventType,
     SceneTracker,
 )

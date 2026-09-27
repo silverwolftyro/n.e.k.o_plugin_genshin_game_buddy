@@ -95,7 +95,7 @@
 **覆盖层**在你的用户数据目录下：
 
 ```
-<用户数据根目录>/plugins/multi_game_companion/data/terms/<游戏>/<维度>.toml
+<用户数据根目录>/plugins/genshin_game_buddy/data/terms/<游戏>/<维度>.toml
 ```
 
 各系统的默认用户数据根目录：
@@ -147,7 +147,7 @@ source = "版本或出处（可选）"
 **第一步：在运行配置里登记游戏。** 打开你的用户数据目录下的运行配置：
 
 ```
-<用户数据根目录>/plugins/multi_game_companion/config/plugin.toml
+<用户数据根目录>/plugins/genshin_game_buddy/config/plugin.toml
 ```
 
 加上一段：
@@ -163,7 +163,7 @@ enabled = true
 **第二步：建术语目录。** 在插件的覆盖层里建对应的四个文件：
 
 ```
-<用户数据根目录>/plugins/multi_game_companion/data/terms/honkai_star_rail/core.toml
+<用户数据根目录>/plugins/genshin_game_buddy/data/terms/honkai_star_rail/core.toml
                                                               /characters.toml
                                                               /systems.toml
                                                               /slang.toml
@@ -209,6 +209,6 @@ brief = "角色所属的体系分类，决定能装备哪些光锥。"
 | 内容 | 位置 | 说明 |
 | --- | --- | --- |
 | 当前登记的游戏的记录 | 插件的存储区 | 重启插件后会自动恢复 |
-| 你写的术语覆盖 | `<用户数据根目录>/plugins/multi_game_companion/data/terms/` | 升级插件不会丢 |
+| 你写的术语覆盖 | `<用户数据根目录>/plugins/genshin_game_buddy/data/terms/` | 升级插件不会丢 |
 | 随插件的默认术语 | 插件目录 `terms/` | 升级插件会被替换 |
 | 日志 | 插件管理器的日志页 | 只记录游戏名与数量，不记录你的对话内容 |

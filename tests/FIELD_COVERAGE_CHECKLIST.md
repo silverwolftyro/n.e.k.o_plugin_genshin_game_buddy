@@ -1,8 +1,8 @@
-# multi_game_companion · 字段覆盖测试清单（L1 MVP）
+# genshin_game_buddy · 字段覆盖测试清单（L1 MVP）
 
 > 状态：**实现已落地并通过**（设计稿仍是本文件；逐条对照见下方"实现状态与偏差"）
 > 对应实现：`game_registry.py` / `term_store.py` / `session.py` / `context_pack.py` / `__init__.py`
-> 运行：`cd plugin/plugins/multi_game_companion && python -m pytest tests -q`
+> 运行：`cd plugin/plugins/genshin_game_buddy && python -m pytest tests -q`
 
 ---
 
@@ -90,7 +90,7 @@ test_<被测模块>__<键或主题>__<被断言的行为>
 
 | # | 键 | 类型/约束 | 读它的模块 | 测试用例名 | 断言要点 |
 |---|---|---|---|---|---|
-| A-01 | `id` | `^[a-z][a-z0-9_]*$`，须等于目录名 | 平台（非本插件代码） | `test_manifest__id__matches_directory_and_lowercase_regex` | `id == "multi_game_companion"` 且等于父目录名；额外断言它同时满足 `init` 的 `^[a-z][a-z0-9_]*$` 与 schema 的 `^[A-Za-z0-9_-]+$`（KB C6 两套正则都要过） |
+| A-01 | `id` | `^[a-z][a-z0-9_]*$`，须等于目录名 | 平台（非本插件代码） | `test_manifest__id__matches_directory_and_lowercase_regex` | `id == "genshin_game_buddy"` 且等于父目录名；额外断言它同时满足 `init` 的 `^[a-z][a-z0-9_]*$` 与 schema 的 `^[A-Za-z0-9_-]+$`（KB C6 两套正则都要过） |
 | A-02 | `name` | 非空字符串 | 平台 | `test_manifest__name__non_empty` | 非空、无前后空白 |
 | A-03 | `type` | 只能 `plugin` / `adapter` | 平台 | `test_manifest__type__is_plugin_not_extension` | 值为 `"plugin"`；显式断言**不是** `"extension"`（KB B1） |
 | A-04 | `description` | 非空字符串 | 平台 Agent 细筛 | `test_manifest__description__non_empty_and_mentions_scope` | 非空；且不宣称"检测游戏/自动操作"（防止描述与实际能力不符） |
@@ -142,7 +142,7 @@ test_<被测模块>__<键或主题>__<被断言的行为>
 | A-20 | `guide.entry` | 相对路径，文件须存在（`.md` → markdown 模式） | 平台 UI 层 | `test_manifest__ui_guide__entry_exists_and_is_markdown` | `plugin_dir / entry` 存在；后缀是 `.md`/`.mdx`；（KB：不存在只报 warning，所以必须由我们自己的测试兜住） |
 | A-21 | `guide.permissions` | 字符串列表，元素在合法集内 | 平台 UI 层 | `test_manifest__ui_permissions__minimal_and_recognized` | 每个元素 ∈ `{state:read, config:read, config:write, action:call, document:parse, logs:read, runs:read}`；且**不包含**本插件用不到的 `config:*` / `action:call` / `document:parse`（KB W1/W5：权限必须最小） |
 
-### A-8 `[multi_game_companion]`（7 个键）— 本插件真正的配置面
+### A-8 `[genshin_game_buddy]`（7 个键）— 本插件真正的配置面
 
 | # | 键 | 默认 | 读它的模块 | 测试用例名 | 断言要点 |
 |---|---|---|---|---|---|
@@ -329,10 +329,10 @@ tests/
 
 | # | 检查项 | 命令 / 期望 |
 |---|---|---|
-| G-01 | 目录名与 `id` 一致 | 目录 `multi_game_companion` == `[plugin].id` |
-| G-02 | `check` 基本门 | `uv run neko-plugin check multi_game_companion` → 0 error |
-| G-03 | `check` 严格门 | `uv run neko-plugin check multi_game_companion --strict` → 0 error（`--strict` 会把缺失的 README.md / tests/test_smoke.py / .vscode/* / verify.yml / .gitignore 升级为 error，这些由 `init` 生成，勿删） |
-| G-04 | 自有测试 | `cd plugin/plugins/multi_game_companion && uv run python -m pytest tests -q` |
+| G-01 | 目录名与 `id` 一致 | 目录 `genshin_game_buddy` == `[plugin].id` |
+| G-02 | `check` 基本门 | `uv run neko-plugin check genshin_game_buddy` → 0 error |
+| G-03 | `check` 严格门 | `uv run neko-plugin check genshin_game_buddy --strict` → 0 error（`--strict` 会把缺失的 README.md / tests/test_smoke.py / .vscode/* / verify.yml / .gitignore 升级为 error，这些由 `init` 生成，勿删） |
+| G-04 | 自有测试 | `cd plugin/plugins/genshin_game_buddy && uv run python -m pytest tests -q` |
 | G-05 | 隐私专项单独跑 | `uv run python -m pytest tests -q -m privacy` |
 | G-06 | 术语内容待办盘点 | `grep -rn "TODO(verify)" terms/ | wc -l` —— 上线前该数字应降到 0 或转为 issue |
 | G-07 | 死配置自查 | 对 A-22 ~ A-33 的每个键，确认 `grep -rn "<key>" *.py` 有生产代码命中（**不是**只命中 tests/） |

@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 from conftest import PLUGIN_DIR, load_manifest, write_dimension, write_terms_tree
-from plugin.plugins.multi_game_companion.term_store import (
+from plugin.plugins.genshin_game_buddy.term_store import (
     CONTEXT_DIMENSIONS,
     DIMENSIONS,
     MAX_BRIEF_CHARS,

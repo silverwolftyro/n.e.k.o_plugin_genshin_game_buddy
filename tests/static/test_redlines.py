@@ -454,7 +454,7 @@ def test_manifest__identity_is_consistent() -> None:
     """A-01 / A-03 / A-07 / A-08：目录名、id、entry、版本必须自洽。"""
     manifest = tomllib.loads(MANIFEST_TEXT)
     plugin = manifest["plugin"]
-    assert plugin["id"] == "multi_game_companion" == PLUGIN_DIR.name
+    assert plugin["id"] == "genshin_game_buddy" == PLUGIN_DIR.name
     assert plugin["type"] == "plugin"
     assert plugin["name"].strip()
     assert plugin["description"].strip()
@@ -544,10 +544,10 @@ def test_manifest__i18n_declared() -> None:
 
 @pytest.mark.static
 def test_manifest__no_dead_custom_keys() -> None:
-    """G-07：``[multi_game_companion]`` 与 ``[games.*]`` 的每个键都要被生产代码读到。"""
+    """G-07：``[genshin_game_buddy]`` 与 ``[games.*]`` 的每个键都要被生产代码读到。"""
     manifest = tomllib.loads(MANIFEST_TEXT)
     blob = executable_blob()
-    for key in manifest["multi_game_companion"]:
+    for key in manifest["genshin_game_buddy"]:
         assert key in blob, f"dead config key: {key}"
     for entry in manifest["games"].values():
         for key in entry:

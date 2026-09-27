@@ -47,7 +47,7 @@ import pytest
 @pytest.fixture(scope="module")
 def sc():
     """screen_capture 模块（并行改造中新增的模块，收集期不 import，失败发生在用例内）。"""
-    return importlib.import_module("plugin.plugins.multi_game_companion.screen_capture")
+    return importlib.import_module("plugin.plugins.genshin_game_buddy.screen_capture")
 
 
 def _png_b64(gray: int) -> str:

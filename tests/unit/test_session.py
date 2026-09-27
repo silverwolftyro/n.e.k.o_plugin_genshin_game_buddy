@@ -8,15 +8,15 @@ from __future__ import annotations
 
 import pytest
 from conftest import FakeLogger, FakeStore
-from plugin.plugins.multi_game_companion.game_registry import GameEntry, GameRegistry, PluginOptions
-from plugin.plugins.multi_game_companion.session import (
+from plugin.plugins.genshin_game_buddy.game_registry import GameEntry, GameRegistry, PluginOptions
+from plugin.plugins.genshin_game_buddy.session import (
     STATE_KEY,
     GameSession,
     GameSessionManager,
     ReinjectCounter,
     SessionPersistence,
 )
-from plugin.plugins.multi_game_companion.term_store import TermEntry, TermLibrary, TermLoadError
+from plugin.plugins.genshin_game_buddy.term_store import TermEntry, TermLibrary, TermLoadError
 
 # =============================================================================
 # 构造辅助

@@ -15,16 +15,16 @@ import time
 from unittest.mock import MagicMock
 
 import pytest
-from plugin.plugins.multi_game_companion import MultiGameCompanionPlugin
-from plugin.plugins.multi_game_companion.game_registry import PluginOptions
+from plugin.plugins.genshin_game_buddy import GenshinGameBuddyPlugin
+from plugin.plugins.genshin_game_buddy.game_registry import PluginOptions
 
 
-def _make_plugin_stub() -> MultiGameCompanionPlugin:
+def _make_plugin_stub() -> GenshinGameBuddyPlugin:
     """构造一个最小可用 stub——只填 _should_push_proactive 需要的字段。
 
     不调 __init__（会触发 super().__init__ 需要 ctx）；用 __new__ 跳过。
     """
-    plugin = MultiGameCompanionPlugin.__new__(MultiGameCompanionPlugin)
+    plugin = GenshinGameBuddyPlugin.__new__(GenshinGameBuddyPlugin)
     plugin._options = PluginOptions()
     plugin._last_pushed_hash = ""
     plugin._last_proactive_at = 0.0

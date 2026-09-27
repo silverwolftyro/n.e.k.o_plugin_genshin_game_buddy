@@ -31,11 +31,11 @@ A companion plugin that switches game context and terminology on demand.
 
 ## 配置 / Configuration
 
-插件清单里的 `[multi_game_companion]` 与 `[games.*]` 都可以被用户运行配置覆盖：
+插件清单里的 `[genshin_game_buddy]` 与 `[games.*]` 都可以被用户运行配置覆盖：
 
 ```text
-<用户数据根目录>/plugins/multi_game_companion/config/plugin.toml   # 登记 / 调整游戏
-<用户数据根目录>/plugins/multi_game_companion/data/terms/<游戏>/   # 覆盖术语（按 key 逐字段合并）
+<用户数据根目录>/plugins/genshin_game_buddy/config/plugin.toml   # 登记 / 调整游戏
+<用户数据根目录>/plugins/genshin_game_buddy/data/terms/<游戏>/   # 覆盖术语（按 key 逐字段合并）
 ```
 
 面向用户的使用说明见 `docs/quickstart.md`（会显示在插件管理器的指南页）。
@@ -45,19 +45,19 @@ A companion plugin that switches game context and terminology on demand.
 The plugin source and its Git repository live at:
 
 ```text
-N.E.K.O/plugin/plugins/multi_game_companion
+N.E.K.O/plugin/plugins/genshin_game_buddy
 ```
 
 插件源码及其 Git 仓库直接位于：
 
 ```text
-N.E.K.O/plugin/plugins/multi_game_companion
+N.E.K.O/plugin/plugins/genshin_game_buddy
 ```
 
 プラグインのソースと Git リポジトリは次の場所にあります：
 
 ```text
-N.E.K.O/plugin/plugins/multi_game_companion
+N.E.K.O/plugin/plugins/genshin_game_buddy
 ```
 
 When publishing to the plugin market, use this GitHub repository name:
@@ -67,7 +67,7 @@ When publishing to the plugin market, use this GitHub repository name:
 プラグインマーケットへ公開する際は、次の GitHub リポジトリ名を使用してください：
 
 ```text
-n.e.k.o_plugin_multi_game_companion
+n.e.k.o_plugin_genshin_game_buddy
 ```
 
 From this plugin repository root:
@@ -79,9 +79,9 @@ uvx ruff==0.12.4 check --ignore-noqa --config ruff.toml .
 From the N.E.K.O repository root / 在 N.E.K.O 仓库根目录中 / N.E.K.O リポジトリのルートで：
 
 ```bash
-uv run --with pip neko-plugin sync multi_game_companion --clean
-uv run neko-plugin check multi_game_companion
-uv run neko-plugin check -r multi_game_companion
+uv run --with pip neko-plugin sync genshin_game_buddy --clean
+uv run neko-plugin check genshin_game_buddy
+uv run neko-plugin check -r genshin_game_buddy
 ```
 
 Python runtime dependencies are declared in `pyproject.toml` and synced into
@@ -107,18 +107,18 @@ Release，然后通知插件市场。
 push し、標準 GitHub Release を待ってからプラグインマーケットへ通知します。
 
 ```bash
-uv run neko-plugin publish multi_game_companion
+uv run neko-plugin publish genshin_game_buddy
 ```
 
 To run only one half explicitly / 如需仅执行一部分 / 一方のみを実行する場合:
 
 ```bash
-uv run neko-plugin publish github multi_game_companion
+uv run neko-plugin publish github genshin_game_buddy
 uv run neko-plugin publish market https://github.com/owner/repo/releases/tag/v0.1.0
 ```
 
 The generated `.github/workflows/release.yml` builds and uploads
-`multi_game_companion.neko-plugin`. The market independently verifies that Release
+`genshin_game_buddy.neko-plugin`. The market independently verifies that Release
 before publishing it.
 
 生成的 `.github/workflows/release.yml` 会构建并上传插件包；Market 会独立验证
@@ -130,5 +130,5 @@ before publishing it.
 ## Entry
 
 ```toml
-entry = "plugin.plugins.multi_game_companion:MultiGameCompanionPlugin"
+entry = "plugin.plugins.genshin_game_buddy:GenshinGameBuddyPlugin"
 ```

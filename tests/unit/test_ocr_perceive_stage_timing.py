@@ -19,13 +19,13 @@ import threading
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from plugin.plugins.multi_game_companion import MultiGameCompanionPlugin
-from plugin.plugins.multi_game_companion.game_registry import PluginOptions
+from plugin.plugins.genshin_game_buddy import GenshinGameBuddyPlugin
+from plugin.plugins.genshin_game_buddy.game_registry import PluginOptions
 
 
-def _make_plugin_stub(*, ocr_worker_threads: int = 1) -> MultiGameCompanionPlugin:
+def _make_plugin_stub(*, ocr_worker_threads: int = 1) -> GenshinGameBuddyPlugin:
     """最小可用 stub——_ocr_perceive_body 用的字段。"""
-    plugin = MultiGameCompanionPlugin.__new__(MultiGameCompanionPlugin)
+    plugin = GenshinGameBuddyPlugin.__new__(GenshinGameBuddyPlugin)
     plugin._options = PluginOptions(
         ocr_worker_threads=ocr_worker_threads,
         change_driven_enabled=False,
@@ -37,7 +37,7 @@ def _make_plugin_stub(*, ocr_worker_threads: int = 1) -> MultiGameCompanionPlugi
     plugin._last_real_ocr_monotonic = 0.0
     plugin._last_light_hash = ""
     plugin._light_capture_dhash = lambda: ""
-    plugin._dhash_diff = MultiGameCompanionPlugin._dhash_diff
+    plugin._dhash_diff = GenshinGameBuddyPlugin._dhash_diff
     plugin._last_ocr_hash = ""
     plugin._last_ocr_hit = False
     plugin._last_pushed_hash = ""
@@ -80,8 +80,8 @@ async def test_ocr_perceive_body__logs_body_enter_and_body_exit() -> None:
     plugin._last_detected_game = ""
 
     # 让 capture 返回失败（no_window）→ 走 bus.frames 回退路径——简化后续
-    import plugin.plugins.multi_game_companion.screen_capture as sc_mod
-    from plugin.plugins.multi_game_companion.screen_capture import CaptureResult
+    import plugin.plugins.genshin_game_buddy.screen_capture as sc_mod
+    from plugin.plugins.genshin_game_buddy.screen_capture import CaptureResult
 
     async def _capture_returns_fail():
         return (CaptureResult(False, None, 0, 0, "", "no_window", -1.0), "foreground")
@@ -97,7 +97,7 @@ async def test_ocr_perceive_body__logs_body_enter_and_body_exit() -> None:
 
     try:
         # bus.frames 不需要（capture 已成功，不走 bus 回退）；只设必要的 mock
-        await MultiGameCompanionPlugin._ocr_perceive_body(plugin)
+        await GenshinGameBuddyPlugin._ocr_perceive_body(plugin)
     finally:
         asyncio.to_thread = orig_to_thread
 
@@ -122,13 +122,13 @@ async def test_ocr_perceive_body__stage_capture_done_logged() -> None:
     plugin._manager = MagicMock()
     plugin._manager.current = MagicMock()
 
-    from plugin.plugins.multi_game_companion.screen_capture import CaptureResult
+    from plugin.plugins.genshin_game_buddy.screen_capture import CaptureResult
 
     # patch asyncio.to_thread
     orig_to_thread = asyncio.to_thread
 
     async def _fake_to_thread(fn, *args, **kwargs):
-        from plugin.plugins.multi_game_companion.screen_capture import capture_active_frame
+        from plugin.plugins.genshin_game_buddy.screen_capture import capture_active_frame
         if fn is capture_active_frame:
             return (CaptureResult(False, None, 0, 0, "", "no_window", -1.0), "foreground")
         return await orig_to_thread(fn, *args, **kwargs)
@@ -139,7 +139,7 @@ async def test_ocr_perceive_body__stage_capture_done_logged() -> None:
         # capture 已失败（no_window）但 bus.frames 也需要——bus 是 read-only property，
         # 不能直接赋值。改走 patch：
         # 简单做法：直接让 capture 返回 ok（不是 fail）——避免走 bus 回退路径
-        await MultiGameCompanionPlugin._ocr_perceive_body(plugin)
+        await GenshinGameBuddyPlugin._ocr_perceive_body(plugin)
     finally:
         asyncio.to_thread = orig_to_thread
 
@@ -159,13 +159,13 @@ async def test_ocr_perceive_body__stage_ocr_done_logged() -> None:
     plugin._manager = MagicMock()
     plugin._manager.current = MagicMock()
 
-    from plugin.plugins.multi_game_companion.screen_capture import CaptureResult
+    from plugin.plugins.genshin_game_buddy.screen_capture import CaptureResult
 
     # patch capture + OCR（OCR 返回非空文本避免 black_frame early-return）
     orig_to_thread = asyncio.to_thread
 
     async def _fake_to_thread(fn, *args, **kwargs):
-        from plugin.plugins.multi_game_companion.screen_capture import capture_active_frame
+        from plugin.plugins.genshin_game_buddy.screen_capture import capture_active_frame
         if fn is capture_active_frame:
             return (CaptureResult(True, "fake_b64_data", 100, 100, "mss", "", 100.0), "foreground")
         return await orig_to_thread(fn, *args, **kwargs)
@@ -190,7 +190,7 @@ async def test_ocr_perceive_body__stage_ocr_done_logged() -> None:
         plugin._push_proactive = MagicMock()
         plugin._last_detected_game = ""
 
-        await MultiGameCompanionPlugin._ocr_perceive_body(plugin)
+        await GenshinGameBuddyPlugin._ocr_perceive_body(plugin)
     finally:
         asyncio.to_thread = orig_to_thread
 
@@ -210,12 +210,12 @@ async def test_ocr_perceive_body__stage_detect_done_logged() -> None:
     plugin._manager = MagicMock()
     plugin._manager.current = MagicMock()
 
-    from plugin.plugins.multi_game_companion.screen_capture import CaptureResult
+    from plugin.plugins.genshin_game_buddy.screen_capture import CaptureResult
 
     orig_to_thread = asyncio.to_thread
 
     async def _fake_to_thread(fn, *args, **kwargs):
-        from plugin.plugins.multi_game_companion.screen_capture import capture_active_frame
+        from plugin.plugins.genshin_game_buddy.screen_capture import capture_active_frame
         if fn is capture_active_frame:
             return (CaptureResult(True, "fake_b64_data", 100, 100, "mss", "", 100.0), "foreground")
         return await orig_to_thread(fn, *args, **kwargs)
@@ -239,7 +239,7 @@ async def test_ocr_perceive_body__stage_detect_done_logged() -> None:
         plugin._push_proactive = MagicMock()
         plugin._last_detected_game = ""
 
-        await MultiGameCompanionPlugin._ocr_perceive_body(plugin)
+        await GenshinGameBuddyPlugin._ocr_perceive_body(plugin)
     finally:
         asyncio.to_thread = orig_to_thread
 
@@ -261,7 +261,7 @@ async def test_ocr_perceive_body__no_session_early_return_logs_body_enter_only()
     plugin._manager = MagicMock()
     plugin._manager.current = None  # no_session → early-return
 
-    await MultiGameCompanionPlugin._ocr_perceive_body(plugin)
+    await GenshinGameBuddyPlugin._ocr_perceive_body(plugin)
 
     info_calls = [str(c) for c in plugin.logger.info.call_args_list]
     # body_enter 应被记（即使 early-return）

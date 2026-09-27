@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import pytest
 from conftest import GENSHIN_ENTRY, WUWA_ENTRY, make_config
-from plugin.plugins.multi_game_companion.game_registry import (
+from plugin.plugins.genshin_game_buddy.game_registry import (
     GameRegistry,
     PluginOptions,
     as_section,
@@ -211,7 +211,7 @@ def test_options__ocr_profile__case_insensitive() -> None:
 @pytest.mark.unit
 def test_options__ocr_profile_defaults_constant() -> None:
     """拍板 2.0.66：3 档预设默认值稳定（面板 UI 和 Python 都依赖）。"""
-    from plugin.plugins.multi_game_companion.game_registry import OCR_PROFILE_DEFAULTS
+    from plugin.plugins.genshin_game_buddy.game_registry import OCR_PROFILE_DEFAULTS
     assert OCR_PROFILE_DEFAULTS == {
         "eco":         {"interval": 30, "threads": 1},
         "balanced":    {"interval": 15, "threads": 1},
@@ -222,7 +222,7 @@ def test_options__ocr_profile_defaults_constant() -> None:
 @pytest.mark.unit
 def test_options__ocr_profile_profiles_constant() -> None:
     """拍板 2.0.66：5 个合法档位枚举稳定。"""
-    from plugin.plugins.multi_game_companion.game_registry import OCR_PROFILES
+    from plugin.plugins.genshin_game_buddy.game_registry import OCR_PROFILES
     assert OCR_PROFILES == ("auto", "eco", "balanced", "performance", "custom")
 
 

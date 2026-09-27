@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from plugin.plugins.multi_game_companion.scene_store import load_scenes
+from plugin.plugins.genshin_game_buddy.scene_store import load_scenes
 
 
 def test_load_scenes_normal(scratch: Path) -> None:

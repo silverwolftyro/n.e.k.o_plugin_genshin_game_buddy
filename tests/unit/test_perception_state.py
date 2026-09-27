@@ -16,9 +16,9 @@ from dataclasses import replace
 from typing import Any
 
 from conftest import make_config
-from plugin.plugins.multi_game_companion import MultiGameCompanionPlugin
-from plugin.plugins.multi_game_companion.game_registry import GameRegistry
-from plugin.plugins.multi_game_companion.term_store import TermEntry, TermLibrary
+from plugin.plugins.genshin_game_buddy import GenshinGameBuddyPlugin
+from plugin.plugins.genshin_game_buddy.game_registry import GameRegistry
+from plugin.plugins.genshin_game_buddy.term_store import TermEntry, TermLibrary
 
 
 def _setup_registry(plugin: Any) -> None:
@@ -88,7 +88,7 @@ def test_screen_activate__single_char_alias_does_not_match() -> None:
         aliases=("莹",),
     )
     lib = _make_lib(term)
-    screen_matched, _slang = MultiGameCompanionPlugin._scan_screen_activate_terms("CV: 谢莹", lib)
+    screen_matched, _slang = GenshinGameBuddyPlugin._scan_screen_activate_terms("CV: 谢莹", lib)
     assert "荧" not in screen_matched
 
 
@@ -102,7 +102,7 @@ def test_screen_activate__two_char_alias_does_match() -> None:
         aliases=("公子",),
     )
     lib = _make_lib(term)
-    screen_matched, _slang = MultiGameCompanionPlugin._scan_screen_activate_terms("公子来了", lib)
+    screen_matched, _slang = GenshinGameBuddyPlugin._scan_screen_activate_terms("公子来了", lib)
     assert "达达利亚" in screen_matched
 
 

@@ -9,14 +9,14 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from plugin.plugins.multi_game_companion.context_pack import (
+from plugin.plugins.genshin_game_buddy.context_pack import (
     build_context_block,
     build_lookup_block,
     clip_text,
     render_term_card,
     select_context_terms,
 )
-from plugin.plugins.multi_game_companion.term_store import load_library
+from plugin.plugins.genshin_game_buddy.term_store import load_library
 
 HEADER = "【当前陪聊游戏】原神"
 TONE = "口吻：熟悉提瓦特大陆"
@@ -209,7 +209,7 @@ def test_context_pack__auto_selection_limit_zero_yields_nothing(terms_root: Path
 
 
 def _entry(**overrides):
-    from plugin.plugins.multi_game_companion.term_store import TermEntry
+    from plugin.plugins.genshin_game_buddy.term_store import TermEntry
 
     values = {
         "key": "元素反应",

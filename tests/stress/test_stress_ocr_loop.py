@@ -23,8 +23,8 @@ from concurrent.futures import Future as ConcurrentFuture
 from unittest.mock import MagicMock
 
 import pytest
-from plugin.plugins.multi_game_companion import MultiGameCompanionPlugin
-from plugin.plugins.multi_game_companion.game_registry import PluginOptions
+from plugin.plugins.genshin_game_buddy import GenshinGameBuddyPlugin
+from plugin.plugins.genshin_game_buddy.game_registry import PluginOptions
 
 # =============================================================================
 # 加速器：把 60s 看门狗 + mss/winrt sleep 压成 ~0.05s
@@ -71,9 +71,9 @@ def _fake_timer(monkeypatch):
 # =============================================================================
 
 
-def _make_stub(*, worker_threads: int = 1, interval_seconds: int = 0) -> MultiGameCompanionPlugin:
+def _make_stub(*, worker_threads: int = 1, interval_seconds: int = 0) -> GenshinGameBuddyPlugin:
     """最小可用 stub——ocr_perceive 调度路径所需的字段。"""
-    plugin = MultiGameCompanionPlugin.__new__(MultiGameCompanionPlugin)
+    plugin = GenshinGameBuddyPlugin.__new__(GenshinGameBuddyPlugin)
     # 拍板 2.0.71：tick 间隔走 ocr_scene_interval_seconds；ocr_perceive_interval_seconds 仍保留作 legacy
     plugin._options = PluginOptions(
         ocr_perceive_interval_seconds=interval_seconds,
@@ -89,7 +89,7 @@ def _make_stub(*, worker_threads: int = 1, interval_seconds: int = 0) -> MultiGa
     plugin._last_real_ocr_monotonic = 0.0
     plugin._last_light_hash = ""
     plugin._light_capture_dhash = lambda: ""
-    plugin._dhash_diff = MultiGameCompanionPlugin._dhash_diff
+    plugin._dhash_diff = GenshinGameBuddyPlugin._dhash_diff
     plugin.logger = MagicMock()
     plugin._ocr_perceive_sync_entry = MagicMock()
     return plugin
@@ -120,7 +120,7 @@ async def test_stress__1000_ticks_count_never_leaks() -> None:
     plugin._ocr_executor = fake_executor
 
     for _ in range(1000):
-        await MultiGameCompanionPlugin.ocr_perceive(plugin)
+        await GenshinGameBuddyPlugin.ocr_perceive(plugin)
 
     assert plugin._ocr_in_flight_count == 0, (
         f"after 1000 ticks count should be 0, got {plugin._ocr_in_flight_count}"
@@ -138,7 +138,7 @@ async def test_stress__100_body_exceptions_count_never_leaks() -> None:
     plugin._ocr_executor = fake_executor
 
     for _ in range(100):
-        await MultiGameCompanionPlugin.ocr_perceive(plugin)
+        await GenshinGameBuddyPlugin.ocr_perceive(plugin)
 
     assert plugin._ocr_in_flight_count == 0, (
         f"after 100 ticks count should be 0, got {plugin._ocr_in_flight_count}"
@@ -164,7 +164,7 @@ async def test_stress__executor_submit_raises_count_released() -> None:
     plugin._ocr_executor = fake_executor
 
     for _ in range(100):
-        await MultiGameCompanionPlugin.ocr_perceive(plugin)
+        await GenshinGameBuddyPlugin.ocr_perceive(plugin)
 
     assert plugin._ocr_in_flight_count == 0, (
         f"executor.submit 100x boom should keep count=0, got {plugin._ocr_in_flight_count}"
@@ -187,7 +187,7 @@ async def test_stress__mss_hang_60s_watchdog_fires(monkeypatch) -> None:
     fake_executor.submit = MagicMock(return_value=pending)
     plugin._ocr_executor = fake_executor
 
-    await MultiGameCompanionPlugin.ocr_perceive(plugin)
+    await GenshinGameBuddyPlugin.ocr_perceive(plugin)
     assert plugin._ocr_in_flight_count == 1, "after schedule count should be 1"
 
     # 60s 看门狗应注册（delay=60.0）
@@ -221,7 +221,7 @@ async def test_stress__winrt_ocr_hang_watchdog_fires() -> None:
     fake_executor.submit = MagicMock(return_value=pending)
     plugin._ocr_executor = fake_executor
 
-    await MultiGameCompanionPlugin.ocr_perceive(plugin)
+    await GenshinGameBuddyPlugin.ocr_perceive(plugin)
     assert plugin._ocr_in_flight_count == 1
 
     await asyncio.sleep(0.15)
@@ -238,7 +238,7 @@ async def test_stress__push_hang_watchdog_fires() -> None:
     fake_executor.submit = MagicMock(return_value=pending)
     plugin._ocr_executor = fake_executor
 
-    await MultiGameCompanionPlugin.ocr_perceive(plugin)
+    await GenshinGameBuddyPlugin.ocr_perceive(plugin)
     assert plugin._ocr_in_flight_count == 1
     await asyncio.sleep(0.15)
     assert plugin._ocr_in_flight_count == 0
@@ -254,7 +254,7 @@ async def test_stress__detect_game_hang_watchdog_fires() -> None:
     fake_executor.submit = MagicMock(return_value=pending)
     plugin._ocr_executor = fake_executor
 
-    await MultiGameCompanionPlugin.ocr_perceive(plugin)
+    await GenshinGameBuddyPlugin.ocr_perceive(plugin)
     assert plugin._ocr_in_flight_count == 1
     await asyncio.sleep(0.15)
     assert plugin._ocr_in_flight_count == 0
@@ -278,7 +278,7 @@ async def test_stress__watchdog_and_on_done_no_double_release() -> None:
     fake_executor.submit = MagicMock(return_value=done_fut)
     plugin._ocr_executor = fake_executor
 
-    await MultiGameCompanionPlugin.ocr_perceive(plugin)
+    await GenshinGameBuddyPlugin.ocr_perceive(plugin)
     # _on_done 立刻触发（cf_future 已 done），count 应 = 0
     assert plugin._ocr_in_flight_count == 0
 
@@ -301,7 +301,7 @@ async def test_stress__cancel_after_callback_no_double_release() -> None:
     fake_executor.submit = MagicMock(return_value=done_fut)
     plugin._ocr_executor = fake_executor
 
-    await MultiGameCompanionPlugin.ocr_perceive(plugin)
+    await GenshinGameBuddyPlugin.ocr_perceive(plugin)
     assert plugin._ocr_in_flight_count == 0
 
     # 手动 cancel（模拟 worker hang 死之后 watchdog cancel + worker 终于完成）
@@ -333,7 +333,7 @@ async def test_stress__3_threads_concurrent_no_race() -> None:
     def _worker():
         try:
             for _ in range(100):
-                asyncio.run(MultiGameCompanionPlugin.ocr_perceive(plugin))
+                asyncio.run(GenshinGameBuddyPlugin.ocr_perceive(plugin))
         except Exception as exc:
             errors.append(exc)
 
@@ -362,7 +362,7 @@ async def test_stress__1000_ticks_no_thread_leak() -> None:
     threads_before = threading.active_count()
 
     for _ in range(1000):
-        await MultiGameCompanionPlugin.ocr_perceive(plugin)
+        await GenshinGameBuddyPlugin.ocr_perceive(plugin)
 
     # 等所有 FakeTimer 完成
     await asyncio.sleep(0.2)
@@ -395,7 +395,7 @@ async def test_stress__worker_count_overshoot_bounded() -> None:
     # 模拟已有 2 个在跑（已满）
     plugin._ocr_in_flight_count = 2
 
-    await MultiGameCompanionPlugin.ocr_perceive(plugin)
+    await GenshinGameBuddyPlugin.ocr_perceive(plugin)
     # count 应仍 = 2（闸拒绝，因为 2 >= 2）
     assert plugin._ocr_in_flight_count == 2, (
         f"worker闸 should reject; expected 2, got {plugin._ocr_in_flight_count}"
@@ -403,7 +403,7 @@ async def test_stress__worker_count_overshoot_bounded() -> None:
 
     # 模拟释放 1 个 → 闸 1 < 2 → 新一轮能进
     plugin._ocr_in_flight_count = 1
-    await MultiGameCompanionPlugin.ocr_perceive(plugin)
+    await GenshinGameBuddyPlugin.ocr_perceive(plugin)
     # 闸放行 → count += 1 = 2（pending future 不触发 _on_done）
     assert plugin._ocr_in_flight_count == 2, (
         f"after release 1 + new schedule should be 2, got {plugin._ocr_in_flight_count}"
@@ -412,7 +412,7 @@ async def test_stress__worker_count_overshoot_bounded() -> None:
     # 释放 1 个，触发 watchdog（pending future 永不会 done，但 Timer 会 fire）
     plugin._ocr_in_flight_count = 1
     # 模拟 worker 1 完成 → count=1 → 但闸 1 < 2 → 还能进 → count=2
-    await MultiGameCompanionPlugin.ocr_perceive(plugin)
+    await GenshinGameBuddyPlugin.ocr_perceive(plugin)
     assert plugin._ocr_in_flight_count == 2
 
 
@@ -431,7 +431,7 @@ async def test_stress__100_watchdog_cascade_all_fire() -> None:
     plugin._ocr_executor = fake_executor
 
     for _ in range(100):
-        await MultiGameCompanionPlugin.ocr_perceive(plugin)
+        await GenshinGameBuddyPlugin.ocr_perceive(plugin)
 
     assert len(_FakeTimer.instances) == 100, (
         f"100 ticks should register 100 timers, got {len(_FakeTimer.instances)}"
@@ -461,7 +461,7 @@ async def test_stress__interval_not_reached_no_schedule() -> None:
     plugin._ocr_executor = fake_executor
 
     for _ in range(100):
-        await MultiGameCompanionPlugin.ocr_perceive(plugin)
+        await GenshinGameBuddyPlugin.ocr_perceive(plugin)
 
     assert plugin._ocr_in_flight_count == 0, (
         f"interval gate should prevent schedule, got count={plugin._ocr_in_flight_count}"
@@ -487,7 +487,7 @@ async def test_stress__rapid_tick_alternating_done_pending() -> None:
     plugin._ocr_executor = fake_executor
 
     for _ in range(200):
-        await MultiGameCompanionPlugin.ocr_perceive(plugin)
+        await GenshinGameBuddyPlugin.ocr_perceive(plugin)
         # 等所有 Timer
         await asyncio.sleep(0.01)
 
@@ -512,7 +512,7 @@ async def test_stress__on_done_with_real_logger_fakectx() -> None:
     plugin._ocr_executor = fake_executor
 
     for _ in range(50):
-        await MultiGameCompanionPlugin.ocr_perceive(plugin)
+        await GenshinGameBuddyPlugin.ocr_perceive(plugin)
 
     # logger.info 应被调用（tick begin / tick done / 等）
     info_calls = [str(c) for c in plugin.logger.info.call_args_list]
@@ -542,7 +542,7 @@ async def test_stress__schedule_exception_does_not_propagate() -> None:
 
     for _ in range(40):
         # 不抛 = 通过
-        await MultiGameCompanionPlugin.ocr_perceive(plugin)
+        await GenshinGameBuddyPlugin.ocr_perceive(plugin)
 
     # 全部 schedule 失败 → count 必须 = 0（不卡死）
     assert plugin._ocr_in_flight_count == 0, (

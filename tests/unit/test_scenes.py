@@ -13,11 +13,11 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from plugin.plugins.multi_game_companion.scene_store import load_scenes
+from plugin.plugins.genshin_game_buddy.scene_store import load_scenes
 
 
 def _plugin_dir() -> Path:
-    # tests/unit/ → tests/ → multi_game_companion/
+    # tests/unit/ → tests/ → genshin_game_buddy/
     return Path(__file__).resolve().parents[2]
 
 

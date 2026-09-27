@@ -1,4 +1,4 @@
-"""multi_game_companion —— 原神游戏搭子（L1 MVP）
+"""genshin_game_buddy —— 原神游戏搭子（L1 MVP）
 
 范围（只做四件事）：
   ① 声明"我现在在玩 XX 游戏"  ② 加载该游戏的术语库
@@ -139,7 +139,7 @@ _DESKTOP_MARKERS_BUILTIN: tuple[str, ...] = (
 
 
 @neko_plugin
-class MultiGameCompanionPlugin(NekoPluginBase):
+class GenshinGameBuddyPlugin(NekoPluginBase):
     """原神游戏搭子插件。
 
     职责边界（L1 MVP）：登记当前游戏 → 加载术语库 → 注入语境 → 支持切换。
@@ -233,11 +233,11 @@ class MultiGameCompanionPlugin(NekoPluginBase):
         try:
             raw = await self.config.dump(timeout=5.0)
         except Exception:
-            self.logger.warning("multi_game_companion: config dump failed, falling back to defaults")
+            self.logger.warning("genshin_game_buddy: config dump failed, falling back to defaults")
             raw = {}
         cfg = raw if isinstance(raw, Mapping) else {}
 
-        options = PluginOptions.from_section(as_section(cfg, "multi_game_companion"))
+        options = PluginOptions.from_section(as_section(cfg, "genshin_game_buddy"))
         registry = GameRegistry.from_config(cfg)
         with self._state_lock:
             self._options = options
@@ -248,7 +248,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
         self._manager.set_options(options)
 
         for issue in registry.issues:
-            self.logger.warning("multi_game_companion: manifest issue: {}", issue)
+            self.logger.warning("genshin_game_buddy: manifest issue: {}", issue)
         self._ensure_store_enabled(cfg)
         return cfg
 
@@ -263,7 +263,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
         store_section = as_section(as_section(cfg, "plugin"), "store")
         if bool(store_section.get("enabled")):
             self.store.enabled = True
-            self.logger.info("multi_game_companion: store enabled from effective config")
+            self.logger.info("genshin_game_buddy: store enabled from effective config")
 
     async def _ensure_config_ready(self) -> None:
         with self._state_lock:
@@ -291,7 +291,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
         except Exception:
             cfg_path = "<unknown>"
         self.logger.info(
-            "multi_game_companion: config_source={} "
+            "genshin_game_buddy: config_source={} "
             "(apply_settings writes back to this file; user edits take effect on next startup)",
             cfg_path,
         )
@@ -318,12 +318,12 @@ class MultiGameCompanionPlugin(NekoPluginBase):
                     ocr_perceive_interval_seconds=0.3,
                 )
                 self.logger.warning(
-                    "multi_game_companion: STRESS MODE ENABLED rate=fast "
+                    "genshin_game_buddy: STRESS MODE ENABLED rate=fast "
                     "interval=0.3s duration=unlimited — do not run in production"
                 )
             else:
                 self.logger.warning(
-                    "multi_game_companion: STRESS MODE ENABLED rate=long "
+                    "genshin_game_buddy: STRESS MODE ENABLED rate=long "
                     "metrics every 60s — RSS/threads/handles/total_ocr logged"
                 )
         else:
@@ -342,7 +342,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
                     ocr_worker_threads=defaults["threads"],
                 )
                 self.logger.info(
-                    "multi_game_companion: ocr_profile auto-detected={} (cpu={} mem={:.1f}GB) "
+                    "genshin_game_buddy: ocr_profile auto-detected={} (cpu={} mem={:.1f}GB) "
                     "interval={} threads={}",
                     detected, cpu, mem_gb,
                     defaults["interval"], defaults["threads"],
@@ -355,11 +355,11 @@ class MultiGameCompanionPlugin(NekoPluginBase):
         self._load_scenes_for_current()
         result = await self._manager.restore(self._registry)
         if result is None:
-            self.logger.info("multi_game_companion: started, no current game")
+            self.logger.info("genshin_game_buddy: started, no current game")
             return Ok({"status": "ready", "game_id": "", "term_count": 0, "notes": []})
         self._init_anchors(result.session, result.library)
         self.logger.info(
-            "multi_game_companion: restored game {} ({} terms)",
+            "genshin_game_buddy: restored game {} ({} terms)",
             result.session.game_id,
             result.library.size(),
         )
@@ -388,7 +388,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
             library = self._manager.library
             if library is not None:
                 self._init_anchors(current, library)
-        self.logger.info("multi_game_companion: config change handled ({})", outcome)
+        self.logger.info("genshin_game_buddy: config change handled ({})", outcome)
         return Ok(
             {
                 "status": "reloaded",
@@ -408,7 +408,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
             threads = threading.active_count()
             handles = self._stress_handle_count()
             self.logger.warning(
-                "multi_game_companion: STRESS FINAL elapsed={:.1f}s "
+                "genshin_game_buddy: STRESS FINAL elapsed={:.1f}s "
                 "total_ocr={} errors={} timeouts={} "
                 "rss={}mb threads={} handles={}",
                 elapsed,
@@ -427,7 +427,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
             self._ocr_executor = None
         with self._state_lock:
             self._activation.clear_all()
-        self.logger.info("multi_game_companion: shutdown")
+        self.logger.info("genshin_game_buddy: shutdown")
         return Ok({"status": "stopped"})
 
     # ==================================================================
@@ -514,7 +514,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
                 "elapsed": now - self._stress_metrics["started_at"],
             }
         self.logger.warning(
-            "multi_game_companion: stress_metrics elapsed={:.0f}s "
+            "genshin_game_buddy: stress_metrics elapsed={:.0f}s "
             "total_ocr={} errors={} timeouts={} "
             "rss={}mb threads={} handles={}",
             snapshot["elapsed"],
@@ -758,11 +758,11 @@ class MultiGameCompanionPlugin(NekoPluginBase):
                 "desktop_markers_extra": list(new_opts.desktop_markers_extra),
             }
 
-            # 拍板 2.0.66：持久化——写回 plugin.toml 的 [multi_game_companion] 段
-            # 注意：写整个 multi_game_companion 子树以保证一致
+            # 拍板 2.0.66：持久化——写回 plugin.toml 的 [genshin_game_buddy] 段
+            # 注意：写整个 genshin_game_buddy 子树以保证一致
             try:
                 await self.config.update({
-                    "multi_game_companion": {
+                    "genshin_game_buddy": {
                         "ocr_profile": new_opts.ocr_profile,
                         "ocr_perceive_interval_seconds": new_opts.ocr_perceive_interval_seconds,
                         "ocr_worker_threads": new_opts.ocr_worker_threads,
@@ -777,12 +777,12 @@ class MultiGameCompanionPlugin(NekoPluginBase):
                     },
                 })
                 self.logger.info(
-                    "multi_game_companion: apply_settings persisted to plugin.toml (11 fields)",
+                    "genshin_game_buddy: apply_settings persisted to plugin.toml (11 fields)",
                 )
             except Exception as persist_err:
                 # 拍板 2.0.66：持久化失败不静默——返回 Err 给面板显示"保存失败"
                 self.logger.exception(
-                    "multi_game_companion: apply_settings persist failed",
+                    "genshin_game_buddy: apply_settings persist failed",
                 )
                 return Err(SdkError(
                     code="PERSIST_FAILED",
@@ -793,14 +793,14 @@ class MultiGameCompanionPlugin(NekoPluginBase):
             # wait=False + cancel_futures=True 让正在跑的 OCR 自然结束、排队的被取消。
             if self._ocr_executor is not None and new_workers != old_workers:
                 self.logger.info(
-                    "multi_game_companion: apply_settings rebuild executor workers={}->{}",
+                    "genshin_game_buddy: apply_settings rebuild executor workers={}->{}",
                     old_workers, new_workers,
                 )
                 self._ocr_executor.shutdown(wait=False, cancel_futures=True)
                 self._ocr_executor = None  # 下次 tick 懒重建
 
             self.logger.info(
-                "multi_game_companion: apply_settings applied profile={} (was={}) workers={}->{}",
+                "genshin_game_buddy: apply_settings applied profile={} (was={}) workers={}->{}",
                 new_opts.ocr_profile, old_profile, old_workers, new_workers,
             )
             return Ok({
@@ -814,7 +814,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
                 "persisted": True,
             })
         except Exception as exc:
-            self.logger.exception("multi_game_companion: apply_settings failed")
+            self.logger.exception("genshin_game_buddy: apply_settings failed")
             return Err(SdkError(code="APPLY_FAILED", message=str(exc)))
 
     # ==================================================================
@@ -1118,7 +1118,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
             )
         injected = self._push_context(session, announce_switch=False)
         self.logger.info(
-            "multi_game_companion: periodic reinject (every {} messages, submitted={})",
+            "genshin_game_buddy: periodic reinject (every {} messages, submitted={})",
             every_n,
             injected,
         )
@@ -1236,7 +1236,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
         await self._ensure_config_ready()
         text = query.strip() if isinstance(query, str) else ""
         # 隐私红线：只记长度，绝不记 query 原文。
-        self.logger.info("multi_game_companion: lookup_game_term received query_len={}", len(text))
+        self.logger.info("genshin_game_buddy: lookup_game_term received query_len={}", len(text))
 
         session = self._manager.current
         if session is None:
@@ -1260,7 +1260,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
         matches = library.match(text, self._options.lookup_max_matches)
         if not matches:
             self.logger.info(
-                "multi_game_companion: lookup_game_term miss (game={}, query_len={})",
+                "genshin_game_buddy: lookup_game_term miss (game={}, query_len={})",
                 session.game_id,
                 len(text),
             )
@@ -1284,7 +1284,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
             for entry in matches
         ]
         self.logger.info(
-            "multi_game_companion: lookup_game_term hit {} (game={}, query_len={})",
+            "genshin_game_buddy: lookup_game_term hit {} (game={}, query_len={})",
             len(matches),
             session.game_id,
             len(text),
@@ -1313,7 +1313,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
         return self._t("errors.terms_load_failed")
 
     def _warn_dev(self, note: str) -> None:
-        self.logger.warning("multi_game_companion: {}", note)
+        self.logger.warning("genshin_game_buddy: {}", note)
 
     def _load_library_for(self, entry: GameEntry) -> TermLibrary:
         """默认层读插件目录，覆盖层读 data_path()（KB：不得自拼数据根）。"""
@@ -1359,7 +1359,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
         match = self._registry.resolve(raw)
         if not match.found or match.game is None:
             self.logger.info(
-                "multi_game_companion: register miss (input_len={})",
+                "genshin_game_buddy: register miss (input_len={})",
                 len(raw) if isinstance(raw, str) else 0,
             )
             return "not_found", None
@@ -1370,19 +1370,19 @@ class MultiGameCompanionPlugin(NekoPluginBase):
             result = await self._manager.switch(entry)
         except TermLoadError as exc:
             self.logger.warning(
-                "multi_game_companion: term library unavailable for game {} ({})",
+                "genshin_game_buddy: term library unavailable for game {} ({})",
                 entry.game_id,
                 exc.code,
             )
             return exc.code, None
         except Exception:
-            self.logger.exception("multi_game_companion: unexpected failure while switching game")
+            self.logger.exception("genshin_game_buddy: unexpected failure while switching game")
             return "internal", None
         self._load_scenes_for_current()
         self._init_anchors(result.session, result.library)
         # game_id 不是用户隐私，允许进日志（E-21）；用户原文与 query 一律不记。
         self.logger.info(
-            "multi_game_companion: registered game {} ({} terms, persisted={})",
+            "genshin_game_buddy: registered game {} ({} terms, persisted={})",
             entry.game_id,
             result.library.size(),
             result.persisted,
@@ -1432,11 +1432,11 @@ class MultiGameCompanionPlugin(NekoPluginBase):
         with self._state_lock:
             self._scene_store = scenes
         for w in warnings:
-            self.logger.warning("multi_game_companion: scene load: {}", w)
+            self.logger.warning("genshin_game_buddy: scene load: {}", w)
         # 拍板 2.0.72：明确打"restored"——startup 自动恢复场景是关键路径
         # （区别于 set_game 触发的 reload/手动重载）
         self.logger.info(
-            "multi_game_companion: restored {} scene(s) for {}",
+            "genshin_game_buddy: restored {} scene(s) for {}",
             len(scenes), session.game_id,
         )
 
@@ -1465,7 +1465,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
                     extra_keys.append(k)
         if missing:
             self.logger.warning(
-                "multi_game_companion: context_terms has {} unknown key(s) for game {}",
+                "genshin_game_buddy: context_terms has {} unknown key(s) for game {}",
                 len(missing), session.game_id,
             )
         all_keys = core_layer_keys + extra_keys
@@ -1709,7 +1709,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
         if removed:
             text += " 移除：{}".format(" / ".join(removed[:5]))
         receipt = self.push_message(
-            source="multi_game_companion",
+            source="genshin_game_buddy",
             visibility=[],
             ai_behavior="respond",
             parts=[{"type": "text", "text": text}],
@@ -1757,7 +1757,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
             self._activation.activate_terms(matched, source="query", ttl_seconds=float(self._options.query_activation_ttl_seconds))
         newly = [k for k in matched if k not in old_keys]
         self.logger.info(
-            "multi_game_companion: on_chat_message query-activate keys={} count={}",
+            "genshin_game_buddy: on_chat_message query-activate keys={} count={}",
             newly or matched, len(matched),
         )
         if not newly or len(matched) > 8:
@@ -1765,7 +1765,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
         hint = self._render_query_hint(newly)
         current = self._manager.current
         self.push_message(
-            source="multi_game_companion",
+            source="genshin_game_buddy",
             visibility=[],
             ai_behavior="read",
             parts=[{"type": "text", "text": hint}],
@@ -1829,7 +1829,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
                         new_hash = await asyncio.to_thread(self._light_capture_dhash)
                     except Exception:
                         self.logger.exception(
-                            "multi_game_companion: ocr_perceive change_detect dhash await failed "
+                            "genshin_game_buddy: ocr_perceive change_detect dhash await failed "
                             "(fall through to interval gate)"
                         )
                         new_hash = ""
@@ -1846,7 +1846,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
             if not trigger_reason and now_mono - self._last_real_ocr_monotonic < interval:
                 # 拍板 2.0.68：每个 early-return 必打 INFO（带 elapsed vs interval）
                 self.logger.info(
-                    "multi_game_companion: ocr_perceive skip reason=interval_not_reached "
+                    "genshin_game_buddy: ocr_perceive skip reason=interval_not_reached "
                     "elapsed={:.1f}s interval={}s state_change={}",
                     now_mono - self._last_real_ocr_monotonic,
                     interval,
@@ -1860,7 +1860,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
                 if self._ocr_in_flight_count >= self._options.ocr_worker_threads:
                     # 拍板 2.0.68：worker 闸被挡也打 INFO（防"沉默卡死"再次发生）
                     self.logger.info(
-                        "multi_game_companion: ocr_perceive skip reason=worker_busy "
+                        "genshin_game_buddy: ocr_perceive skip reason=worker_busy "
                         "in_flight={} workers={}",
                         self._ocr_in_flight_count,
                         self._options.ocr_worker_threads,
@@ -1870,7 +1870,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
 
             self._last_real_ocr_monotonic = now_mono
             self.logger.info(
-                "multi_game_companion: ocr_perceive tick begin reason={}",
+                "genshin_game_buddy: ocr_perceive tick begin reason={}",
                 trigger_reason or "interval",
             )
 
@@ -1918,7 +1918,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
                     except Exception:
                         # 拍板 2.0.70：绝不让 count 减失败变成静默
                         self.logger.exception(
-                            "multi_game_companion: _on_done count release failed "
+                            "genshin_game_buddy: _on_done count release failed "
                             "(cf_future done but count may leak; watchdog will retry-release)"
                         )
 
@@ -1932,7 +1932,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
                     try:
                         if not cf_future.done():
                             self.logger.warning(
-                                "multi_game_companion: ocr worker timeout after 60s; "
+                                "genshin_game_buddy: ocr worker timeout after 60s; "
                                 "force-cancelling and releasing slot (likely mss deadlock, "
                                 "winrt OCR hang, or await block in _ocr_perceive_body — "
                                 "see stage= timing logs in 2.0.70+ to locate which stage stuck)"
@@ -1945,7 +1945,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
                         _release_count()  # 即使 cf_future 已 done，flag 兜底也再调一次（no-op）
                     except Exception:
                         self.logger.exception(
-                            "multi_game_companion: worker watchdog callback failed "
+                            "genshin_game_buddy: worker watchdog callback failed "
                             "(count may leak; next tick may stall at worker闸)"
                         )
 
@@ -1957,7 +1957,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
                 with self._ocr_in_flight_lock:
                     self._ocr_in_flight_count -= 1
                 self.logger.exception(
-                    "multi_game_companion: ocr_perceive schedule failed (count released, timer continues)"
+                    "genshin_game_buddy: ocr_perceive schedule failed (count released, timer continues)"
                 )
                 # 拍板 2.0.70：stress mode 计数（getattr 防 stubs 缺字段）
                 if getattr(self, "_stress_mode", "off") != "off" and getattr(self, "_stress_metrics", None) is not None:
@@ -1967,7 +1967,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
             # 拍板 2.0.68：最外层兜底——任何意外异常都不能逃逸出 timer 协程，
             # 否则宿主 timer 装饰器可能停止调度后续 tick。
             self.logger.exception(
-                "multi_game_companion: ocr_perceive tick outer exception (tick dropped, timer keeps running)"
+                "genshin_game_buddy: ocr_perceive tick outer exception (tick dropped, timer keeps running)"
             )
 
     def _ocr_perceive_sync_entry(self) -> None:
@@ -1980,7 +1980,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
         try:
             asyncio.run(self._ocr_perceive_body())
         except Exception:
-            self.logger.exception("multi_game_companion: _ocr_perceive_body crashed")
+            self.logger.exception("genshin_game_buddy: _ocr_perceive_body crashed")
 
     async def _ocr_perceive_body(self) -> None:
         """拍板 2.0.65：OCR 感知主体（OCR 抓屏 → 识别 → 归属 → 激活 → 推）。
@@ -2001,7 +2001,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
         """
         import hashlib
         t0 = time.monotonic()
-        self.logger.info("multi_game_companion: stage=body_enter")
+        self.logger.info("genshin_game_buddy: stage=body_enter")
         # 拍板 2.0.71：SceneTracker 心跳——每 30s 打一次 snapshot（不论 body 走完整链路还是 early-return）
         # 解决"2 分钟日志只有 body_enter/exit，没有 scene_tracker"问题：状态机一直在跑，只是没切换就不打日志
         # 拍板 2.0.73：心跳附加 ocr_in_flight / ocr_workers / executor_alive——便于排查 worker 卡死。
@@ -2027,7 +2027,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
                     if _executor_alive else 0
                 )
                 self.logger.info(
-                    "multi_game_companion: scene_tracker heartbeat "
+                    "genshin_game_buddy: scene_tracker heartbeat "
                     "current={} pending={} pending_count={} exit_pending_count={} "
                     "ocr_in_flight={} ocr_workers={} executor_alive={}",
                     _snap["current"] or "(none)",
@@ -2050,7 +2050,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
                 session = self._manager.current
                 state = self._perception_state
             if session is None:
-                self.logger.info("multi_game_companion: ocr_perceive early-return: no_session")
+                self.logger.info("genshin_game_buddy: ocr_perceive early-return: no_session")
                 return
             if state == "OUT_OF_GAME":
                 # 隐私闸：判定已离开游戏，停止抓屏（D5）
@@ -2058,7 +2058,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
                 # 真机 2.0.72 暴露：3 分钟日志只有 heartbeat 没有 body_exit，
                 # 根因就是这里静默 return。下一拍板必须能一眼看出"body 走到这步早退了"。
                 self.logger.info(
-                    "multi_game_companion: ocr_perceive early-return: state=OUT_OF_GAME "
+                    "genshin_game_buddy: ocr_perceive early-return: state=OUT_OF_GAME "
                     "(privacy gate; next tick will re-check; if persists → perception_state stuck at OUT_OF_GAME)"
                 )
                 return
@@ -2068,7 +2068,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
             result, capture_path = await asyncio.to_thread(capture_active_frame)
             t_capture = time.monotonic()
             self.logger.info(
-                "multi_game_companion: stage=capture_done dt={:.3f}s",
+                "genshin_game_buddy: stage=capture_done dt={:.3f}s",
                 t_capture - t_capture_start,
             )
             b64 = ""
@@ -2078,13 +2078,13 @@ class MultiGameCompanionPlugin(NekoPluginBase):
                 self._last_capture_b64 = b64
                 self._last_capture_at_monotonic = t_capture
                 self.logger.info(
-                    "multi_game_companion: ocr_perceive capture_path={} method={} bytes={} luma={:.1f}",
+                    "genshin_game_buddy: ocr_perceive capture_path={} method={} bytes={} luma={:.1f}",
                     capture_path, result.method, len(b64), result.avg_luma,
                 )
             else:
                 err = getattr(result, "error", "") if result else ""
                 self.logger.info(
-                    "multi_game_companion: ocr_perceive capture unavailable path={} error={}",
+                    "genshin_game_buddy: ocr_perceive capture unavailable path={} error={}",
                     capture_path, err or "none",
                 )
                 # 辅助信号（D3）：主动抓屏失败时回退 bus.frames
@@ -2094,7 +2094,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
                 except Exception:
                     frames = None
                 self.logger.info(
-                    "multi_game_companion: stage=bus_fallback_done dt={:.3f}s",
+                    "genshin_game_buddy: stage=bus_fallback_done dt={:.3f}s",
                     time.monotonic() - t_bus_start,
                 )
                 if isinstance(frames, Err):
@@ -2110,29 +2110,29 @@ class MultiGameCompanionPlugin(NekoPluginBase):
                         if age < self._options.ocr_term_interval_seconds * 2:
                             b64 = self._last_capture_b64
                             self.logger.info(
-                                "multi_game_companion: ocr_perceive term-round reuse-cached-capture "
+                                "genshin_game_buddy: ocr_perceive term-round reuse-cached-capture "
                                 "age={:.1f}s (current capture failed)",
                                 age,
                             )
                     if not b64:
                         tag = "no_genshin_window" if err == "no_window" else "no_frame"
-                        self.logger.info("multi_game_companion: ocr_perceive early-return: {}", tag)
+                        self.logger.info("genshin_game_buddy: ocr_perceive early-return: {}", tag)
                         return
 
             t_ocr_start = time.monotonic()
             text = await self._ocr.extract_text_from_base64(b64)
             self.logger.info(
-                "multi_game_companion: stage=ocr_done dt={:.3f}s",
+                "genshin_game_buddy: stage=ocr_done dt={:.3f}s",
                 time.monotonic() - t_ocr_start,
             )
             text_hash = hashlib.md5(text.encode("utf-8", errors="replace")).hexdigest()
             self.logger.info(
-                "multi_game_companion: ocr_perceive text_len={} hash={} prev={}",
+                "genshin_game_buddy: ocr_perceive text_len={} hash={} prev={}",
                 len(text), text_hash[:8], (self._last_ocr_hash or "")[:8],
             )
             if len(text) == 0 and is_black_frame(b64):
                 # 黑帧/无信号：不计入 miss（D6），也不做后续激活/推送
-                self.logger.info("multi_game_companion: ocr_perceive early-return: black_frame")
+                self.logger.info("genshin_game_buddy: ocr_perceive early-return: black_frame")
                 return
 
             # 拍板 2.0.71：缓存 OCR 文本——term 轮次复用（虽然现在 term round 自己也会 OCR；
@@ -2147,7 +2147,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
                 # 拍板 2.0.73：早退也打 INFO——文本未变是合法跳过，但 2.0.72 真机 3 分钟
                 # 没 body_exit 日志时无法区分"卡死"和"OCR 一直返回同一帧"——必须留痕。
                 self.logger.info(
-                    "multi_game_companion: ocr_perceive early-return: text_unchanged hash={} prev={}",
+                    "genshin_game_buddy: ocr_perceive early-return: text_unchanged hash={} prev={}",
                     text_hash[:8], (self._last_ocr_hash or "")[:8],
                 )
                 return
@@ -2158,7 +2158,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
             t_detect_start = time.monotonic()
             detected = await self.detect_game(text)
             self.logger.info(
-                "multi_game_companion: stage=detect_done dt={:.3f}s detected={}",
+                "genshin_game_buddy: stage=detect_done dt={:.3f}s detected={}",
                 time.monotonic() - t_detect_start, detected,
             )
             ocr_hit = detected != "none"
@@ -2173,7 +2173,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
                     )
                 if cleared:
                     self.logger.info(
-                        "multi_game_companion: ocr_perceive transition-clear "
+                        "genshin_game_buddy: ocr_perceive transition-clear "
                         "from={} to={} cleared={}",
                         self._last_detected_game, detected, cleared,
                     )
@@ -2223,7 +2223,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
                         self._activation.activate_terms(slang_matched, source="screen_slang", ttl_seconds=180.0)
                     if screen_matched or slang_matched:
                         self.logger.info(
-                            "multi_game_companion: ocr_perceive screen-activate keys={} slang_keys={} count={}",
+                            "genshin_game_buddy: ocr_perceive screen-activate keys={} slang_keys={} count={}",
                             screen_matched, slang_matched, len(screen_matched) + len(slang_matched),
                         )
                     # 拍板 2.0.71：term 轮跑完 → 更新 last_term_run（用当前 monotonic 即可）
@@ -2233,7 +2233,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
             if not ocr_hit:
                 # 拍板 5：不中 → early-return no_game_detected
                 self.logger.info(
-                    "multi_game_companion: ocr_perceive early-return: no_game_detected detected_game={}",
+                    "genshin_game_buddy: ocr_perceive early-return: no_game_detected detected_game={}",
                     detected,
                 )
                 return
@@ -2249,7 +2249,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
                 if primary != self._last_scene_for_proactive:
                     scene_switched = True
                     self.logger.info(
-                        "multi_game_companion: ocr_perceive scene-switch "
+                        "genshin_game_buddy: ocr_perceive scene-switch "
                         "from={} to={} cooldown={}s",
                         self._last_scene_for_proactive or "(none)",
                         primary,
@@ -2267,7 +2267,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
             if scene_event.type == SceneEventType.SCENE_SWITCHED:
                 primary = scene_event.to_scene
                 self.logger.info(
-                    "multi_game_companion: scene_tracker scene-switch from={} to={} elapsed_in_old={:.1f}s",
+                    "genshin_game_buddy: scene_tracker scene-switch from={} to={} elapsed_in_old={:.1f}s",
                     scene_event.from_scene or "(none)",
                     primary,
                     scene_event.elapsed_in_old,
@@ -2277,7 +2277,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
             elif scene_event.type == SceneEventType.SCENE_EXITED:
                 # 退出场景——可选：标记 OUT_OF_GAME（隐私闸）。这里只记日志，避免激进切回 OUT_OF_GAME。
                 self.logger.info(
-                    "multi_game_companion: scene_tracker scene-exited from={} elapsed_in_old={:.1f}s",
+                    "genshin_game_buddy: scene_tracker scene-exited from={} elapsed_in_old={:.1f}s",
                     scene_event.from_scene or "(none)",
                     scene_event.elapsed_in_old,
                 )
@@ -2309,7 +2309,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
                     scene = self._scene_store.get(primary)
                     if scene is not None and scene.prompt:
                         self.push_message(
-                            source="multi_game_companion",
+                            source="genshin_game_buddy",
                             visibility=[],
                             ai_behavior="read",
                             parts=[{"type": "text", "text": f"【当前场景：{primary}】\n{scene.prompt}"}],
@@ -2320,7 +2320,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
                             },
                         )
                         self.logger.info(
-                            "multi_game_companion: ocr_perceive scene-prompt-push scene={} chars={}",
+                            "genshin_game_buddy: ocr_perceive scene-prompt-push scene={} chars={}",
                             primary, len(scene.prompt),
                         )
                         self._last_scene_pushed_at = time.monotonic()
@@ -2329,7 +2329,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
                 self._last_scene_pushed = ""
 
             self.logger.info(
-                "multi_game_companion: ocr_perceive state={} hit={} scenes={} active={} detected_game={}",
+                "genshin_game_buddy: ocr_perceive state={} hit={} scenes={} active={} detected_game={}",
                 self._perception_state, ocr_hit, len(matched_scenes), len(new_keys), detected,
             )
             # 拍板 2.0.70：stage=body_exit 打点——若卡死，日志停在某个 stage=xxx_done 之前 = 根因
@@ -2339,7 +2339,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
             if _st is not None:
                 _st_snap = _st.snapshot()
                 self.logger.info(
-                    "multi_game_companion: stage=body_exit total={:.3f}s scene_tracker current={} pending={} pending_count={}",
+                    "genshin_game_buddy: stage=body_exit total={:.3f}s scene_tracker current={} pending={} pending_count={}",
                     time.monotonic() - t0,
                     _st_snap["current"] or "(none)",
                     _st_snap["pending"] or "(none)",
@@ -2347,11 +2347,11 @@ class MultiGameCompanionPlugin(NekoPluginBase):
                 )
             else:
                 self.logger.info(
-                    "multi_game_companion: stage=body_exit total={:.3f}s",
+                    "genshin_game_buddy: stage=body_exit total={:.3f}s",
                     time.monotonic() - t0,
                 )
         except Exception:
-            self.logger.exception("multi_game_companion: _ocr_perceive_body tick failed")
+            self.logger.exception("genshin_game_buddy: _ocr_perceive_body tick failed")
 
     def _push_context(self, session: GameSession, *, announce_switch: bool = True) -> bool:
         """把语境块送进对话上下文。返回是否真的提交成功（失败绝不谎报）。
@@ -2398,7 +2398,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
         # visibility=[] → 用户看不到原始语境块；ai_behavior="read" → 进模型上下文
         # 但**不**立即触发回复 turn（respond 会造成自我触发）。
         receipt = self.push_message(
-            source="multi_game_companion",
+            source="genshin_game_buddy",
             visibility=[],
             ai_behavior="read",
             parts=[{"type": "text", "text": block}],
@@ -2407,7 +2407,7 @@ class MultiGameCompanionPlugin(NekoPluginBase):
         )
         if isinstance(receipt, Mapping) and receipt.get("submitted") is False:
             self.logger.warning(
-                "multi_game_companion: context injection not submitted ({})", receipt.get("reason")
+                "genshin_game_buddy: context injection not submitted ({})", receipt.get("reason")
             )
             return False
         return True

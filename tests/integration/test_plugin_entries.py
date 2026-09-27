@@ -10,7 +10,7 @@ from typing import Any
 
 import pytest
 from conftest import GENSHIN_ENTRY, WUWA_ENTRY, FakeLogger, make_config
-from plugin.plugins.multi_game_companion import MultiGameCompanionPlugin
+from plugin.plugins.genshin_game_buddy import GenshinGameBuddyPlugin
 from plugin.sdk.plugin import Err
 
 QUERY_MARKER = "MARKER9f3a"
@@ -38,11 +38,11 @@ def err_message(result: Any) -> str:
     return str(error) if error is not None else str(result)
 
 
-async def declare(plugin: MultiGameCompanionPlugin, name: str) -> dict[str, Any]:
+async def declare(plugin: GenshinGameBuddyPlugin, name: str) -> dict[str, Any]:
     return ok_value(await plugin.set_game(game=name))
 
 
-def context_blocks(plugin: MultiGameCompanionPlugin) -> list[str]:
+def context_blocks(plugin: GenshinGameBuddyPlugin) -> list[str]:
     return [part["text"] for pushed in plugin.ctx.pushed for part in pushed["parts"]]
 
 

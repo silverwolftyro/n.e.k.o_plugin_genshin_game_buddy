@@ -191,7 +191,7 @@
    - 校验 + clamp（复用 `PluginOptions.from_section`）
    - profile 自适应（选预设档 → 强制 interval/threads；手填 → 切 custom）
    - 内存更新（`self._options = new_opts`）
-   - 持久化（`await self.config.update({"multi_game_companion": {8 字段}})`）
+   - 持久化（`await self.config.update({"genshin_game_buddy": {8 字段}})`）
    - 如 worker 线程数变 → 重建 ThreadPoolExecutor
 4. 面板收到响应：
    - `Ok` → 显示"已保存到 plugin.toml · 时间戳" + 顶部 badge 刷新

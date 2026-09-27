@@ -1,5 +1,5 @@
 # =============================================================================
-# multi_game_companion — 原神游戏搭子（L1 MVP）
+# genshin_game_buddy — 原神游戏搭子（L1 MVP）
 # -----------------------------------------------------------------------------
 # 范围：仅做四件事
 #   ① 用户/模型声明"我现在在玩 XX 游戏"
@@ -12,12 +12,12 @@
 # 与 KB 的关系：
 #   - 只用 type = "plugin"（默认），不写 type = "extension"，不写 [plugin.host]
 #   - 不声明 [plugin.database] / [plugin_state] / [plugin.install]
-#   - 自定义配置放顶层 [multi_game_companion] 与 [games.*]（KB W6 认可自定义段）
+#   - 自定义配置放顶层 [genshin_game_buddy] 与 [games.*]（KB W6 认可自定义段）
 #   - 不往 [plugin] 里塞平台不认识的键
 # =============================================================================
 
 [plugin]
-id = "multi_game_companion"
+id = "genshin_game_buddy"
 name = "原神游戏搭子"
 type = "plugin"
 
@@ -40,8 +40,8 @@ keywords = [
     "wuthering",
 ]
 
-version = "2.0.73"
-entry = "plugin.plugins.multi_game_companion:MultiGameCompanionPlugin"
+version = "2.0.73b0"
+entry = "plugin.plugins.genshin_game_buddy:GenshinGameBuddyPlugin"
 
 [plugin.author]
 # 作者名（显示在插件管理器）
@@ -110,7 +110,7 @@ permissions = ["state:read"]
 #    （直接针对 sts2 那 14 个"清单里声明、代码里零命中"的死配置键教训）
 # =============================================================================
 
-[multi_game_companion]
+[genshin_game_buddy]
 # 未登记任何游戏时的兜底 game_id；空字符串 = 无兜底（首次使用必须显式声明）
 default_game = ""
 
@@ -204,7 +204,7 @@ desktop_markers_extra = []
 #   enabled        可选  默认 true；false 可临时下架而不删文件
 #   context_terms  可选  强制常驻语境块的术语 key 列表；缺省则按 context_inject_max_terms 自动选取
 #
-# 用户可通过运行配置（<用户数据>/plugins/multi_game_companion/config/plugin.toml）
+# 用户可通过运行配置（<用户数据>/plugins/genshin_game_buddy/config/plugin.toml）
 # 覆盖或新增游戏，无需改动本清单。
 # =============================================================================
 

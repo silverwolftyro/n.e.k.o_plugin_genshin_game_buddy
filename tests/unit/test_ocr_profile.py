@@ -9,7 +9,7 @@
 from __future__ import annotations
 
 import pytest
-from plugin.plugins.multi_game_companion import _detect_profile_from_system
+from plugin.plugins.genshin_game_buddy import _detect_profile_from_system
 
 
 @pytest.mark.unit

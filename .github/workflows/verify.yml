@@ -14,6 +14,6 @@ jobs:
   verify:
     uses: Project-N-E-K-O/N.E.K.O/.github/workflows/plugin-market-verify.yml@main
     with:
-      plugin-id: multi_game_companion
+      plugin-id: genshin_game_buddy
       neko-repository: Project-N-E-K-O/N.E.K.O
       neko-ref: main

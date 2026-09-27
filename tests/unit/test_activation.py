@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import time
 
-from plugin.plugins.multi_game_companion.activation import (
+from plugin.plugins.genshin_game_buddy.activation import (
     MAX_ACTIVE,
     SCENE_MISS_THRESHOLD,
     ActivationState,

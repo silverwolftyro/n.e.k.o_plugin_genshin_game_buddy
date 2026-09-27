@@ -17,7 +17,7 @@ import threading
 import time
 
 import pytest
-from plugin.plugins.multi_game_companion import screen_capture
+from plugin.plugins.genshin_game_buddy import screen_capture
 
 
 @pytest.mark.unit

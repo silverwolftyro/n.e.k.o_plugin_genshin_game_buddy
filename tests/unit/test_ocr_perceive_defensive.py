@@ -9,7 +9,7 @@
   ② 外层 try/except 吞掉任何异常（timer 协程自身不抛）
   ③ early-return 路径有 INFO 日志（不能静默卡死）
 
-不构造完整 plugin——用 `MultiGameCompanionPlugin.__new__` 跳过 __init__，
+不构造完整 plugin——用 `GenshinGameBuddyPlugin.__new__` 跳过 __init__，
 只填 ocr_perceive 用的字段：_options / _state_lock / _perception_state /
 _ocr_executor / _ocr_in_flight_lock / _ocr_in_flight_count /
 _last_real_ocr_monotonic / _light_capture_dhash / _dhash_diff / logger /
@@ -22,8 +22,8 @@ import threading
 from unittest.mock import MagicMock
 
 import pytest
-from plugin.plugins.multi_game_companion import MultiGameCompanionPlugin
-from plugin.plugins.multi_game_companion.game_registry import PluginOptions
+from plugin.plugins.genshin_game_buddy import GenshinGameBuddyPlugin
+from plugin.plugins.genshin_game_buddy.game_registry import PluginOptions
 
 
 def _make_plugin_stub(
@@ -32,9 +32,9 @@ def _make_plugin_stub(
     interval_seconds: int = 3,
     worker_threads: int = 1,
     change_driven_enabled: bool = False,
-) -> MultiGameCompanionPlugin:
+) -> GenshinGameBuddyPlugin:
     """最小可用 stub——只填 ocr_perceive 用的字段。"""
-    plugin = MultiGameCompanionPlugin.__new__(MultiGameCompanionPlugin)
+    plugin = GenshinGameBuddyPlugin.__new__(GenshinGameBuddyPlugin)
     plugin._options = PluginOptions(
         ocr_perceive_interval_seconds=interval_seconds,
         ocr_worker_threads=worker_threads,
@@ -48,7 +48,7 @@ def _make_plugin_stub(
     plugin._last_light_hash = ""
     # light dhash mock
     plugin._light_capture_dhash = lambda: light_dhash_returns
-    plugin._dhash_diff = MultiGameCompanionPlugin._dhash_diff
+    plugin._dhash_diff = GenshinGameBuddyPlugin._dhash_diff
     # logger mock——记录 INFO 调用便于断言
     plugin.logger = MagicMock()
     # executor mock + sync entry mock
@@ -80,7 +80,7 @@ async def test_ocr_perceive__schedule_failure_releases_count(monkeypatch) -> Non
     monkeypatch.setattr(asyncio, "get_running_loop", lambda: _FakeLoop())
 
     # 调一次 tick
-    await MultiGameCompanionPlugin.ocr_perceive(plugin)
+    await GenshinGameBuddyPlugin.ocr_perceive(plugin)
 
     # 关键断言：count 必须为 0（已释放），不卡死后续 tick
     with plugin._ocr_in_flight_lock:
@@ -108,7 +108,7 @@ async def test_ocr_perceive__outer_exception_swallowed() -> None:
 
     # 调一次 tick——不应抛
     try:
-        await MultiGameCompanionPlugin.ocr_perceive(plugin)
+        await GenshinGameBuddyPlugin.ocr_perceive(plugin)
     except Exception as exc:
         pytest.fail(f"ocr_perceive must not raise, got {type(exc).__name__}: {exc}")
 
@@ -137,7 +137,7 @@ async def test_ocr_perceive__early_return_interval_logged(monkeypatch) -> None:
     plugin._last_real_ocr_monotonic = base  # 推过瞬间
     monkeypatch.setattr(_time, "monotonic", lambda: base + 3.0)
 
-    await MultiGameCompanionPlugin.ocr_perceive(plugin)
+    await GenshinGameBuddyPlugin.ocr_perceive(plugin)
 
     # 必有 INFO 日志含 "interval_not_reached"
     info_calls = [str(c) for c in plugin.logger.info.call_args_list]
@@ -161,7 +161,7 @@ async def test_ocr_perceive__early_return_worker_busy_logged() -> None:
     plugin._ocr_in_flight_count = 1  # 已经 1 个在跑
     plugin._last_real_ocr_monotonic = 0.0  # interval 已过 → 进 worker 闸分支
 
-    await MultiGameCompanionPlugin.ocr_perceive(plugin)
+    await GenshinGameBuddyPlugin.ocr_perceive(plugin)
 
     # 必有 INFO 日志含 "worker_busy"
     info_calls = [str(c) for c in plugin.logger.info.call_args_list]
@@ -196,7 +196,7 @@ async def test_ocr_perceive__normal_path_logs_tick_begin(monkeypatch) -> None:
 
     plugin._last_real_ocr_monotonic = 0.0  # interval 已过 → tick begin 应触发
 
-    await MultiGameCompanionPlugin.ocr_perceive(plugin)
+    await GenshinGameBuddyPlugin.ocr_perceive(plugin)
 
     info_calls = [str(c) for c in plugin.logger.info.call_args_list]
     assert any("tick begin" in s for s in info_calls), (
@@ -227,7 +227,7 @@ async def test_ocr_perceive__change_detect_dhash_await_failure_swallowed(monkeyp
     monkeypatch.setattr(asyncio, "to_thread", _boom_to_thread)
 
     # interval 已过（_last_real_ocr_monotonic=0 + now >> 15）→ 应走 interval 触发
-    await MultiGameCompanionPlugin.ocr_perceive(plugin)
+    await GenshinGameBuddyPlugin.ocr_perceive(plugin)
 
     # change_detect dhash await failed 应被记
     exception_calls = [str(c) for c in plugin.logger.exception.call_args_list]
@@ -259,7 +259,7 @@ async def test_ocr_perceive__two_consecutive_ticks_no_count_leak(monkeypatch) ->
     plugin._ocr_executor = fake_executor
     plugin._ocr_perceive_sync_entry = MagicMock()
 
-    await MultiGameCompanionPlugin.ocr_perceive(plugin)
+    await GenshinGameBuddyPlugin.ocr_perceive(plugin)
     assert plugin._ocr_in_flight_count == 0, "tick 1 failed but count leaked"
 
     # 第 2 次成功
@@ -271,5 +271,5 @@ async def test_ocr_perceive__two_consecutive_ticks_no_count_leak(monkeypatch) ->
         ocr_perceive_interval_seconds=15,
         change_driven_enabled=False,  # 简化路径
     )
-    await MultiGameCompanionPlugin.ocr_perceive(plugin)
+    await GenshinGameBuddyPlugin.ocr_perceive(plugin)
     assert plugin._ocr_in_flight_count == 1, "tick 2 should schedule"

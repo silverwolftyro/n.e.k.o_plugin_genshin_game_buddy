@@ -16,9 +16,9 @@ import time
 from unittest.mock import MagicMock
 
 import pytest
-from plugin.plugins.multi_game_companion import MultiGameCompanionPlugin
-from plugin.plugins.multi_game_companion.game_registry import PluginOptions
-from plugin.plugins.multi_game_companion.scene_tracker import (
+from plugin.plugins.genshin_game_buddy import GenshinGameBuddyPlugin
+from plugin.plugins.genshin_game_buddy.game_registry import PluginOptions
+from plugin.plugins.genshin_game_buddy.scene_tracker import (
     SceneEventType,
     SceneTracker,
 )
@@ -30,9 +30,9 @@ def _make_plugin_stub(
     term_interval: int = 15,
     worker_threads: int = 1,
     hysteresis_count: int = 3,
-) -> MultiGameCompanionPlugin:
+) -> GenshinGameBuddyPlugin:
     """最小可用 stub——含 SceneTracker + 缓存字段。"""
-    plugin = MultiGameCompanionPlugin.__new__(MultiGameCompanionPlugin)
+    plugin = GenshinGameBuddyPlugin.__new__(GenshinGameBuddyPlugin)
     plugin._options = PluginOptions(
         ocr_scene_interval_seconds=scene_interval,
         ocr_term_interval_seconds=term_interval,
@@ -51,7 +51,7 @@ def _make_plugin_stub(
     plugin._last_capture_text = ""
     plugin._last_term_run_monotonic = 0.0
     plugin._light_capture_dhash = lambda: ""
-    plugin._dhash_diff = MultiGameCompanionPlugin._dhash_diff
+    plugin._dhash_diff = GenshinGameBuddyPlugin._dhash_diff
     plugin._scene_tracker = SceneTracker(
         hysteresis_count=hysteresis_count,
         exit_grace_count=5,
@@ -121,7 +121,7 @@ async def test_split__scene_interval_replaces_legacy() -> None:
     # 刚跑过——scene_interval=10s 未到 → 早退
     plugin._last_real_ocr_monotonic = time.monotonic()
 
-    await MultiGameCompanionPlugin.ocr_perceive(plugin)
+    await GenshinGameBuddyPlugin.ocr_perceive(plugin)
 
     info_calls = [str(c) for c in plugin.logger.info.call_args_list]
     assert any("interval_not_reached" in s for s in info_calls), (
