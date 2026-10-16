@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 #:   这里刻意复制一份而不是去读 plugin.toml：模块顶层不做 IO（插件红线 R8），
 #:   而 plugin.toml 里那份是给宿主看的。两份不一致时以 plugin.toml 为准，
 #:   所以**改版本号时这两个地方都要改**。
-PLUGIN_VERSION = "3.1.16"
+PLUGIN_VERSION = "3.1.18"
 
 
 def plugin_version() -> str:

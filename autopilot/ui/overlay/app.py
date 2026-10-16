@@ -845,8 +845,17 @@ class OverlayApp:
 
         border = theme.ACCENT_ERROR if panic else theme.BORDER
         self.root.configure(bg=border)
-        for lbl, line in zip(self._lines, model.lines):
-            lbl.configure(text=line.text, fg=line.color)
+        # ★ 2026-10-16（B2）：行数会变少了（通道行只在有话可说时出现），
+        #   所以**必须显式清空多余的 Label**。
+        #   原来的 `zip(self._lines, model.lines)` 只会写到 len(lines) 为止，
+        #   多出来的 Label 保留**上一次**的文本 —— 表现是「通道那一行怎么
+        #   还在」，而且它只在内容变化的分支里跑，现象飘忽、极难自查。
+        for i, lbl in enumerate(self._lines):
+            line = model.lines[i] if i < len(model.lines) else None
+            lbl.configure(
+                text=line.text if line is not None else "",
+                fg=line.color if line is not None else theme.BG,
+            )
         self._toast_lbl.configure(text=model.toast or "",
                                  fg=model.toast_color)
         # 底色跟着边框走，营造"描边"效果（比放真边框控件省一个 widget）

@@ -180,7 +180,7 @@ def apply_turn(
     heading_deg: float,
     current_heading: float,
     *,
-    humanizer: Humanizer | None = None,
+    humanizer: "Humanizer | None" = None,
     dpi_gain: float = 1.0,
     move_key: int | None = None,
     sim: "object | None" = None,
@@ -201,7 +201,167 @@ def apply_turn(
     return (current_heading + sum(steps)) % 360.0
 
 
+# ==================================================================
+# 节奏门（2026-10-16 加，B1）
+# ==================================================================
+
+#: 默认受节奏门管辖的动作。
+#:
+#: ★ 为什么只管这一个
+#:   B1 的现象是「连击像机器」—— 355 次普攻 / 76.8 秒，均值 0.217s、
+#:   **标准差仅 0.089s**。那是普攻独有的问题：
+#:     · 闪避/技能本来就带冷却（traits 里 1500ms 之类），天然不均匀；
+#:     · 移动是持续按住，本来就没有"节奏"可言。
+#:   把它们一起管只会平白增加延迟，不改任何观感。
+#:
+#: ⚠️ **刻意不含任何有冷却语义的动作**：节奏门只决定"这一 tick 要不要打"，
+#:    不参与也不改变冷却。两者是独立的闸门，串在一起会出现
+#:    "冷却刚结束又被节奏门挡一次"的双重等待。
+DEFAULT_GATED_ACTIONS: frozenset[str] = frozenset({"NORMAL_ATTACK"})
+
+
+@dataclass(frozen=True)
+class CadenceConfig:
+    """连击节奏门参数。
+
+    ★ 分布形状（这是全部意义所在）
+    ------------------------------
+    真机实测的连击间隔标准差只有 0.089s —— 几乎是一台节拍器。
+    要让它像人，**不需要**均值变，只需要**方差变大**：
+    大部分间隔短而均匀，偶尔来一次长的（手酸、换目标、重新对准）。
+
+    ★ 为什么 ``lo_ms`` 默认是 0 而不是 200（2026-10-16 实测后改的）
+    -------------------------------------------------------
+    主循环是 200ms 的**离散栅格**：门抽一个间隔，实际只能在
+    「下一个 tick」(200ms) 或「下下个 tick」(400ms) 里挑。
+
+    于是区间下界放在哪里，决定了「有多少比例走 1 个 tick」：
+
+    ==============  ==================================  ==========
+    区间           走 1 tick 的比例                        实际均值
+    ==============  ==================================  ==========
+    U(200, 350)    **≈0**（只有恰好 200 才走 1 tick）      ≈400ms
+    U(0, 300)      2/3                                    ≈290ms
+    ==============  ==================================  ==========
+
+    最初按「200~350ms 随机分布」直接写成 ``U(200, 350)``，结果**攻击频率
+    直接砍半**（实测 2.13 倍慢），被
+    ``tests/unit/test_cadence_gate.py::test_human_cadence_does_not_collapse_the_dps``
+    拦下来了。所以 ``lo_ms = 0`` 的含义是「不额外等待，走下一个 tick」。
+
+    ⚠️ 栅格量化是**固有的**，不是实现瑕疵：想要方差就必须有「跨过一个 tick」
+       的时刻，而那必然拉长均值。本门把均值拉长控制在 1.5 倍以内，
+       攻击频率仍有 3 次/秒以上 —— 比真人连打快，但观感不再是节拍器。
+
+    :param lo_ms: 间隔下界。**0 = 不额外等待**
+    :param hi_ms: 间隔上界
+    :param fatigue_p: 出现一次"喘口气"的概率
+    :param fatigue_lo_ms: 喘口气的间隔下界
+    :param fatigue_hi_ms: 喘口气的间隔上界
+    """
+
+    enabled: bool = True
+    lo_ms: int = 0
+    hi_ms: int = 300
+    fatigue_p: float = 0.05
+    fatigue_lo_ms: int = 450
+    fatigue_hi_ms: int = 950
+
+    def __post_init__(self) -> None:
+        # 参数写反时宁可夹住也不要静默产生负区间
+        if self.lo_ms > self.hi_ms:
+            raise ValueError(
+                f"CadenceConfig: lo_ms({self.lo_ms}) 不能大于 hi_ms({self.hi_ms})")
+        if self.fatigue_lo_ms > self.fatigue_hi_ms:
+            raise ValueError(
+                f"CadenceConfig: fatigue_lo_ms({self.fatigue_lo_ms}) "
+                f"不能大于 fatigue_hi_ms({self.fatigue_hi_ms})")
+        if not 0.0 <= self.fatigue_p <= 1.0:
+            raise ValueError(
+                f"CadenceConfig: fatigue_p({self.fatigue_p}) 必须在 0~1 之间")
+
+
+class CadenceGate:
+    """按动作记录"下一次允许发招的时刻"。
+
+    ★ 两段式 API，而且 ``allows`` 是**纯函数**
+    --------------------------------------------
+    :meth:`allows` 只回答"现在到点了没"，**绝不推进状态**；
+    真正推进发生在 :meth:`note_fired`，由调用方在**动作真的发出之后**调用。
+
+    为什么要拆开：规则的求值顺序是「先判条件、再决定发不发」。
+    如果 ``allows`` 自己推进，那么"条件为假"的那一轮也会白白消耗掉一次
+    机会 —— 敌人一消失，下次打出来就得多等一个完整间隔，手感会莫名其妙变慢。
+    只在真发出时记账，才是"上一次出招到现在过了多久"的真实语义。
+
+    ★ 主循环的 tick 是 200ms，所以实际间隔是 200ms 的倍数
+    --------------------------------------------------
+    抽出来的是连续值，落到 200ms 栅格上只有 200 / 400 / 600… 三档。
+    **这不是缺陷**：目标从来不是"精确命中 350ms"，而是把
+    「恒 200ms」变成「多数 200、偶尔 400、偶尔 600+」的混合分布。
+    真正决定观感的是**标准差**，不是均值。量化带来的均值代价见
+    :class:`CadenceConfig` 的类文档。
+
+    ⚠️ 跨 run 不重置是**对的**：停了十分钟再启动，`now` 远大于
+    ``next_due``，第一次调用直接放行，不需要额外状态。
+    """
+
+    def __init__(
+        self,
+        config: CadenceConfig | None = None,
+        *,
+        actions: frozenset[str] | None = None,
+        rng: random.Random | None = None,
+    ) -> None:
+        self.cfg = config or CadenceConfig()
+        self.actions = actions if actions is not None else DEFAULT_GATED_ACTIONS
+        self._rng = rng or random.Random()
+        #: 动作 -> 下一次允许发招的绝对时刻（ms）
+        self._next_due_ms: dict[str, int] = {}
+
+    # ------------------------------------------------------------------
+    def governs(self, action: str) -> bool:
+        """这个动作是否受本门管辖。"""
+        return self.cfg.enabled and action in self.actions
+
+    def allows(self, action: str, now_ms: int) -> bool:
+        """现在允许发这个动作吗？**纯判断，不改状态。**"""
+        if not self.governs(action):
+            return True
+        due = self._next_due_ms.get(action)
+        # 从没打过 -> 立刻放行（暖机）。第一下不能等。
+        return due is None or int(now_ms) >= due
+
+    def note_fired(self, action: str, now_ms: int) -> None:
+        """动作**真的发出**了，记账并抽下一次的时刻。"""
+        if not self.governs(action):
+            return
+        c = self.cfg
+        if self._rng.random() < c.fatigue_p:
+            gap = self._rng.randint(c.fatigue_lo_ms, c.fatigue_hi_ms)
+        else:
+            gap = self._rng.randint(c.lo_ms, c.hi_ms)
+        self._next_due_ms[action] = int(now_ms) + gap
+
+    # ------------------------------------------------------------------
+    def next_due_ms(self, action: str) -> int | None:
+        """下一次允许的时刻；``None`` = 从没打过。给诊断用。"""
+        return self._next_due_ms.get(action)
+
+    def describe(self) -> str:
+        if not self.cfg.enabled:
+            return "节奏门：关闭"
+        c = self.cfg
+        return (
+            f"节奏门：开  常规 {c.lo_ms}~{c.hi_ms}ms  "
+            f"喘气 {c.fatigue_p:.0%}→{c.fatigue_lo_ms}~{c.fatigue_hi_ms}ms  "
+            f"管辖 {','.join(sorted(self.actions)) or '（无）'}"
+        )
+
+
 __all__ = [
+    "CadenceConfig",
+    "CadenceGate",
     "Humanizer",
     "HumanizerConfig",
     "angle_diff",

@@ -515,6 +515,63 @@ def test_manifest__identity_is_consistent() -> None:
 
 
 @pytest.mark.static
+def test_manifest__bridge_version_matches_manifest() -> None:
+    """A-09：`autopilot_bridge.PLUGIN_VERSION` 必须等于 manifest 的 version。
+
+    ★ 为什么这条必须单独立一条（2026-10-16 加）
+      ``autopilot_bridge.py`` 刻意**复制**了一份版本号 —— 模块顶层不做 IO
+      （插件红线 R8），读不了 plugin.toml。它自己的注释写着「两份不一致时
+      以 plugin.toml 为准，所以改版本号时这两个地方都要改」。
+
+      但「记得改」不是机制。2026-10-16 实测就漂了：
+      plugin.toml = 3.1.18 / pyproject = 3.1.18 / bridge = 3.1.16 /
+      neko_console = 3.1.16 —— 而上面那条 ``identity_is_consistent``
+      **照样绿**，因为它只比 manifest 与 pyproject。
+      这条把它补上，让复制的那份也进断言范围。
+    """
+    manifest = tomllib.loads(MANIFEST_TEXT)
+    declared = manifest["plugin"]["version"]
+
+    bridge = PLUGIN_DIR / "autopilot_bridge.py"
+    assert bridge.is_file(), "autopilot_bridge.py 不见了"
+    text = bridge.read_text(encoding="utf-8")
+    m = re.search(r'^PLUGIN_VERSION\s*=\s*"([^"]+)"', text, re.M)
+    assert m, "autopilot_bridge.py 里找不到 PLUGIN_VERSION 字面量赋值"
+    assert m.group(1) == declared, (
+        f"autopilot_bridge.PLUGIN_VERSION={m.group(1)} != plugin.toml {declared}"
+    )
+
+
+@pytest.mark.static
+def test_manifest__version_comment_matches_declared() -> None:
+    """A-10：版本号注释里的三段式说明必须与实际 version 对得上。
+
+    ★ 同源问题（2026-10-16 加）
+      plugin.toml 里有一段注释把版本号拆成「3 / 1 / 18 = 3.1.18」。
+      注释里的数字不会自动跟着 version 变 —— 实测就出现过注释写 16、
+      下面写 18。注释骗人的代价比代码漂移更难查，因为读代码的人
+      会以为注释描述的是当前状态。
+    """
+    manifest = tomllib.loads(MANIFEST_TEXT)
+    declared = manifest["plugin"]["version"]
+    parts = declared.split(".")
+    assert len(parts) >= 3, f"版本号 {declared} 不是三段式"
+
+    text = MANIFEST_TEXT
+    m = re.search(
+        r"^#\s+" + re.escape(parts[0]) + r"\s+= .*?\n"
+        r"^#\s+" + re.escape(parts[1]) + r"\s+= .*?\n"
+        r"^#\s+(\d+)\s+= 小迭代号",
+        text,
+        re.M,
+    )
+    assert m, "plugin.toml 里找不到版本号三段式注释"
+    assert m.group(1) == parts[2], (
+        f"plugin.toml 注释里的小迭代号是 {m.group(1)}，实际 version 是 {declared}"
+    )
+
+
+@pytest.mark.static
 def test_manifest__description_does_not_overclaim() -> None:
     """A-04：描述不得声称"检测游戏 / 自动操作"这类不存在的能力。"""
     manifest = tomllib.loads(MANIFEST_TEXT)

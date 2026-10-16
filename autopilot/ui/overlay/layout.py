@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -112,6 +113,21 @@ SESSION_STATE_MAX_AGE_S = 90.0
 
 #: 插件侧的续写间隔。与上面的 TTL 配套（3 倍余量，容忍偶发延迟）。
 SESSION_HEARTBEAT_S = 30.0
+
+#: 面板里要不要显示 Hz / P95 这两个性能数字（2026-10-16，B2）。
+#:
+#: ★ 为什么默认关
+#:   它们是给开发者看的。观众看到「4.8 Hz · 223ms P95」只会得到一个
+#:   模糊的印象：这数字是好还是坏？解释成本远大于信息量。
+#:   而它们原本挤在**第一行**（最显眼的位置），把「会话 · 状态」压得
+#:   只剩半行 —— 真正该一眼看到的东西被两个诊断数字挤掉了。
+#:
+#: ★ 为什么走环境变量而不是配置项
+#:   这是**排障时临时打开**的开关，不是用户要配置的东西。
+#:   放配置文件里等于承诺「这是个正经设置项」，而它其实不是。
+#:   设 ``NEKO_OVERLAY_METRICS=1`` 即可临时打开。
+SHOW_METRICS = os.environ.get("NEKO_OVERLAY_METRICS", "").strip() not in (
+    "", "0", "false", "False", "no", "off")
 
 
 def load_session_state(max_age_s: float = SESSION_STATE_MAX_AGE_S) -> dict | None:
@@ -580,7 +596,6 @@ def build_panel(snap: Any, *, toast: str | None = None,
                           toast=toast,
                           toast_color=theme.severity_color(toast_sev),
                           panic=panic)
-
     # 通道三级兜底：快照当前值 -> 上一次见到的值 -> 破折号。
     # run_loop 停止会释放 capturer，capture.active 随之变空，直接显示
     # "—" 会让用户以为从来没成功用过截图通道。
@@ -623,14 +638,27 @@ def build_panel(snap: Any, *, toast: str | None = None,
     scene_txt = "未知" if scene == "UNKNOWN" else scene
 
     lines = [
-        Line(f"● {sess_txt} · {state_txt}   {hz:.1f} Hz   {p95:.0f}ms P95",
-             head_color, head_color),
+        Line(f"● {sess_txt} · {state_txt}", head_color, head_color),
         Line(f"场景: {scene_txt}", theme.FG),
         Line(f"意图: {intent_txt}", theme.FG),
-        Line(f"通道: {cap_txt}",
-             theme.ACCENT_WARN if deg else theme.FG),
-        Line(f"急停: {panic_key}", theme.DIM),
     ]
+    # ★ 通道只在**有话可说**时占一行（2026-10-16，B2）
+    #   原来是常驻的 `通道: —`。而演示粗糙度审计把「通道: —」和
+    #   橙字「已停止」并列为 A6 级问题：观众读到破折号只会理解成
+    #   「这一项坏了」，而不是「这一项暂时没内容」。
+    #   现在只在真的抓到过通道、或发生了降级时才显示。
+    if cap_txt != "—":
+        lines.append(Line(f"通道: {cap_txt}",
+                          theme.ACCENT_WARN if deg else theme.FG))
+    lines.append(Line(f"急停: {panic_key}", theme.DIM))
+
+    # ★ Hz / P95 默认**不进面板**（2026-10-16，B2）
+    #   这两个是给开发者看的性能数字，对观众零信息量，却占了整个
+    #   headline 行的三分之二 —— 挤得「会话 · 状态」都读不全。
+    #   需要时打开 SHOW_METRICS（走环境变量，不进 UI）。
+    if SHOW_METRICS:
+        lines.insert(1, Line(f"{hz:.1f} Hz · {p95:.0f}ms P95", theme.DIM))
+
     return PanelModel(lines=lines, height=5 * theme.LINE_HEIGHT,
                       toast=toast,
                       toast_color=theme.severity_color(toast_sev),

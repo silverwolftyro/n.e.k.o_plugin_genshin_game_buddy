@@ -30,6 +30,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from ..actuator.humanizer import CadenceConfig, CadenceGate
 from ..contracts.events import Event, EventCategory, Severity
 from ..contracts.intent_packet import ActionType, IntentPacket
 from ..contracts.state_packet import SCENE_UNKNOWN, StatePacket
@@ -138,6 +139,7 @@ class LocalPolicyTree:
         emit_event: EmitFn | None = None,
         signals: PolicySignals | None = None,
         now_fn: Callable[[], int] | None = None,
+        cadence: CadenceConfig | None = None,
     ) -> None:
         if name:
             self.name = name
@@ -160,6 +162,11 @@ class LocalPolicyTree:
             load_rules_from_dir(self._dir, only=rule_files, evaluator=self._eval)
         )
         self._last_fire_ms: dict[str, int] = {}
+        #: ★ 连击节奏门（2026-10-16，B1）。同样**必须存在这里而不是 PolicyContext**
+        #:   ——理由与下面 _pick_marks 完全一样：PolicyContext 每 tick 重建。
+        #:   真机实测连击标准差只有 0.089s，看着像节拍器；这个门把
+        #:   「恒 200ms」变成「多数 200、偶尔 400、偶尔 600+」。
+        self._cadence = CadenceGate(config=cadence)
         #: 「刚按过 F 的位置」标记。**必须存在这里而不是 PolicyContext** ——
         #:   PolicyContext 每 tick 由 from_state 重建一次，实例变量活不过一轮。
         #:   LocalPolicyTree 由 create_policy_source 建一次、用到进程结束。
@@ -258,6 +265,21 @@ class LocalPolicyTree:
                 trace.entries.append(t)
                 continue
 
+            # ★ 节奏门（2026-10-16，B1）。位置**紧跟冷却之后、求值之前**：
+            #   顺序有讲究 —— 先挡掉明显不该发的（冷却），再挡节奏，
+            #   最后才跑 DSL 求值。反过来的话每个 tick 都要白求值一次。
+            #
+            #   ⚠️ 与冷却是两个独立的闸门，**不是**同一个机制：
+            #     冷却是规则作者写的硬下限（有它的道理：技能 CD），
+            #     节奏门是拟人化的分布。前者不能被后者改写，反之亦然。
+            #   这里只做「纯判断」，真正的记账在命中之后。
+            action_name = rule.action.value
+            if not self._cadence.allows(action_name, now):
+                due = self._cadence.next_due_ms(action_name) or now
+                t.reason = f"节奏门控中（还需 {max(0, due - now)}ms）"
+                trace.entries.append(t)
+                continue
+
             # ★ 求值。异常转事件后继续，绝不静默也绝不让一条坏规则毁整棵树
             try:
                 out: EvalOutcome = self._eval.evaluate(
@@ -306,6 +328,10 @@ class LocalPolicyTree:
             #   不一定只有一个，按最近拾取的可交互分组实体记。
             if rule.action.value == "USE_PICKUP":
                 self._remember_pick(ctx, now)
+            # ★ 节奏门记账（2026-10-16，B1）。**命中才记账**，与上面的
+            #   pick_mark 同一个理由：条件为假的那几轮不该消耗掉一次机会，
+            #   否则敌人一消失，下次打出来就莫名多等一个间隔，手感变慢。
+            self._cadence.note_fired(action_name, now)
             # ★ 命中即停：后面的规则这一轮不再评估（原则 3）
             trace.skipped_by_shortcircuit = len(self._rules) - idx - 1
             break

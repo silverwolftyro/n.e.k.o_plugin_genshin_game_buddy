@@ -19,6 +19,7 @@ overlay 10Hz 轮询，如果每次都 ``open + read + pydantic.parse``，
 from __future__ import annotations
 
 import logging
+import time
 from pathlib import Path
 
 from pydantic import ValidationError
@@ -33,6 +34,20 @@ from .protocol import (
 from .schema import StateEvent, StateSnapshot
 
 logger = logging.getLogger(__name__)
+
+#: 快照超过这么久没更新就算陈旧（2026-10-16 补，集成审计 F3）。
+#:
+#: ★ 为什么 overlay / 面板侧也需要它
+#:   本类的全部设计动机是「省电」：stat 没变就零 IO 直接返回缓存。于是
+#:   「引擎已经死了、文件停在最后一次的内容」与「引擎活着、这一轮恰好没变化」
+#:   在调用方眼里**完全一样**。
+#:
+#:   后果实测过（集成审计 F4）：overlay 可以在引擎**根本没启动**的情况下
+#:   拉起卡片，把上次遗留的快照当成当前状态显示 —— 帧率、场景、意图数
+#:   全是几分钟前的。观众看到的是一个「看起来在跑但其实没跑」的引擎。
+#:
+#: 取 5.0s：引擎 5Hz 写，5s 是 25 个周期的余量，正常绝不会误判。
+STALE_AFTER_S = 5.0
 
 
 class ChannelReader:
@@ -93,6 +108,37 @@ class ChannelReader:
     def cached_snapshot(self) -> StateSnapshot | None:
         """最近一次成功读到的快照（不做任何 IO）。"""
         return self._snap
+
+    # ==================================================================
+    # 陈旧判定（2026-10-16 补，集成审计 F3/F4）
+    # ==================================================================
+    def snapshot_age_s(self) -> float:
+        """快照文件**最后修改**距今多少秒。
+
+        ★ 用文件的 mtime，不信快照里的时间戳
+          引擎每 200ms 原子替换一次快照，mtime 就是「它还在动」的可靠证据；
+          而 ``StateSnapshot`` 内部时间字段的语义随 producer 变化，
+          出错时恰好是最需要它准的时候。
+
+        读不到文件返回 ``inf``（= 最陈旧），让调用方统一走「不可信」分支。
+        """
+        try:
+            return max(0.0, time.time() - (self.dir / SNAPSHOT_NAME).stat().st_mtime)
+        except OSError:
+            return float("inf")
+
+    def is_snapshot_stale(self) -> bool:
+        """手上这份快照是否已陈旧（超过 :data:`STALE_AFTER_S` 没更新）。
+
+        ★ 与 ``cached_snapshot is None`` 是两件事
+          那个只说明「从没读到过」。**读到过之后引擎死掉**仍然返回上一份 ——
+          而那一份可能已经很旧。调用方要判断「这份还能不能信」必须问这里。
+
+        ⚠️ 一条刻意的设计：这里**不做 stat 短路**，每次调用都真的 stat。
+           它和 ``read_snapshot`` 是两条独立路径 —— 后者省电靠 stamp 比对，
+           这个要的是「此刻」的真值，两者不能互相污染。
+        """
+        return self.snapshot_age_s() > STALE_AFTER_S
 
     # ==================================================================
     # 事件流
@@ -166,4 +212,4 @@ class ChannelReader:
         return self._run_id or None
 
 
-__all__ = ["ChannelReader"]
+__all__ = ["STALE_AFTER_S", "ChannelReader"]

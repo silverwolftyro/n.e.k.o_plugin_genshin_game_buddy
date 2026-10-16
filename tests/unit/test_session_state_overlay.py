@@ -194,8 +194,138 @@ def test_line1_shows_game_name_when_session_active(session_file):
     head = model.lines[0].text
     assert "原神" in head
     assert "运行中" in head
-    assert "12.5 Hz" in head
     assert "无会话" not in head
+
+
+# ==================================================================
+# B2：headline 精简（2026-10-16）
+# ==================================================================
+
+def test_headline_has_no_performance_numbers(session_file):
+    """★ B2：Hz / P95 不再占第一行。
+
+    它们原本把「会话 · 状态」挤掉大半 —— 而那两个诊断数字对观众
+    零信息量。观众看到「4.8 Hz」只会问「这是好还是坏」。
+    """
+    p = _plugin(_FakeManager(_FakeSession("genshin", "原神")))
+    p._publish_session(reason="test")
+
+    model = layout.build_panel(_snap(), session=layout.load_session_state())
+    head = model.lines[0].text
+    assert "Hz" not in head
+    assert "P95" not in head
+    # 真正该一眼看到的东西现在独占第一行
+    assert head.strip().startswith("●")
+
+
+def test_headline_carries_no_dangling_spacing(session_file):
+    """去掉数字之后不能留一串尾随空格 —— 视觉上会看出「少了点什么」。"""
+    p = _plugin(_FakeManager(_FakeSession("genshin", "原神")))
+    p._publish_session(reason="test")
+
+    model = layout.build_panel(_snap(), session=layout.load_session_state())
+    assert model.lines[0].text == model.lines[0].text.rstrip()
+
+
+def test_performance_numbers_come_back_under_the_flag(session_file, monkeypatch):
+    """排障时能临时把它们找回来（``NEKO_OVERLAY_METRICS=1``）。"""
+    monkeypatch.setattr(layout, "SHOW_METRICS", True)
+    p = _plugin(_FakeManager(_FakeSession("genshin", "原神")))
+    p._publish_session(reason="test")
+
+    model = layout.build_panel(_snap(), session=layout.load_session_state())
+    assert "12.5 Hz" in model.lines[1].text
+    assert "P95" in model.lines[1].text
+
+
+def test_channel_line_is_hidden_when_there_is_nothing_to_say(session_file):
+    """★ B2：没有通道时**不占一行**。
+
+    原来是常驻的「通道: —」，而破折号会被观众读成「这一项坏了」。
+    真出过问题的 run 里，那一行和橙字「已停止」一起被列为 A6 级粗糙点。
+    """
+    p = _plugin(_FakeManager(_FakeSession("genshin", "原神")))
+    p._publish_session(reason="test")
+
+    snap = _snap()
+    snap.capture.active = ""          # 快照里没有通道，也没见过
+    model = layout.build_panel(snap, session=layout.load_session_state())
+    texts = [l.text for l in model.lines]
+    assert not any("通道" in t for t in texts), texts
+
+
+def test_channel_line_appears_once_a_channel_was_seen(session_file):
+    """抓到过通道就显示出来 —— 「有内容」比「一直占位」有用。"""
+    p = _plugin(_FakeManager(_FakeSession("genshin", "原神")))
+    p._publish_session(reason="test")
+
+    snap = _snap()
+    snap.capture.active = ""          # 当前没在抓，但之前抓到过 wgc
+    model = layout.build_panel(snap, session=layout.load_session_state(),
+                               last_channel="wgc")
+    texts = [l.text for l in model.lines]
+    assert any("通道: wgc" in t for t in texts), texts
+
+
+def test_snapshot_channel_wins_over_the_remembered_one(session_file):
+    """★ 快照里的当前值优先于「上一次见到的」—— 三级兜底的顺序不能反。
+
+    通道从 wgc 降级到 dxcam 时，显示「dxcam」才对；显示 wgc 会让人
+    以为还在走更好的那条路。
+    """
+    p = _plugin(_FakeManager(_FakeSession("genshin", "原神")))
+    p._publish_session(reason="test")
+
+    model = layout.build_panel(_snap(), session=layout.load_session_state(),
+                               last_channel="wgc")
+    texts = [l.text for l in model.lines]
+    assert any("通道: dxcam" in t for t in texts), texts
+
+
+def test_intent_count_is_always_visible(session_file):
+    """★ 用户明确要求保留「意图: N 次」—— 唯一的动态状态。"""
+    p = _plugin(_FakeManager(_FakeSession("genshin", "原神")))
+    p._publish_session(reason="test")
+
+    model = layout.build_panel(_snap(), session=layout.load_session_state())
+    assert any("意图:" in l.text for l in model.lines)
+
+
+def test_panel_never_exceeds_the_widget_budget(session_file):
+    """★ 行数必须 ≤ overlay 预建的 Label 数，否则多出来的行渲染不出来。
+
+    ``OverlayApp.text_rows = 5``（app.py）决定预建几个 Label；模型行数
+    超过它时渲染循环会静默截断，最后一行直接看不见。
+
+    这里写死 5 而不是 import OverlayApp：那个类 import tkinter，
+    而本文件是**无头**跑的（离屏/无 GUI），引进来会把一个纯布局测试
+    变成依赖桌面环境的测试。
+    """
+    p = _plugin(_FakeManager(_FakeSession("genshin", "原神")))
+    p._publish_session(reason="test")
+
+    no_channel = _snap()
+    no_channel.capture.active = ""
+
+    cases = (
+        dict(session=layout.load_session_state()),
+        dict(session=None),
+        dict(session=None, last_channel="wgc"),
+        dict(session=layout.load_session_state(), last_channel="wgc"),
+    )
+    for kwargs in cases:
+        model = layout.build_panel(_snap(), **kwargs)
+        assert len(model.lines) <= 5, (
+            f"{kwargs} 产出了 {len(model.lines)} 行，超过 OverlayApp.text_rows")
+
+    for state in ("RUNNING", "PAUSED", "STOPPED"):
+        model = layout.build_panel(_snap(state=state),
+                                   session=layout.load_session_state())
+        assert len(model.lines) <= 5, f"{state} 产出了 {len(model.lines)} 行"
+
+    model = layout.build_panel(_snap(health="OFFLINE"),
+                               session=layout.load_session_state())
+    assert len(model.lines) <= 5, f"OFFLINE 产出了 {len(model.lines)} 行"
 
 
 def test_line1_shows_no_session_when_missing(session_file):
