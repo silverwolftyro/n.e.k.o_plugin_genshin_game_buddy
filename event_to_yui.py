@@ -51,6 +51,53 @@ DEFAULT_POLL_SECONDS = 2.0
 #: 默认节流窗口（秒）
 DEFAULT_THROTTLE_SECONDS = 5.0
 
+#: ★ 同一条台词在一次 run 里最多说几次（2026-10-16 补）
+#:
+#: 节流解决的是「**太快**」，解决不了「**太久**」。
+#: 真机两个 run 的实测（离线按 SKIP_CODES + 5s 节流模拟）：
+#:
+#:     20261010_225316  207s  「画面有点看不清，先停一下」 x 39
+#:     20261011_180732  155s  「这个动作我没敢做」       x 31
+#:
+#: 也就是**每 5.1 秒重复同一句，连讲 3.5 分钟**。5 秒节流把它从
+#: 「像卡带」变成了「慢速卡带」—— 观感没救回来。
+#: 同一句话第 3 次起不再开口：观众听到前两次就知道出事了，
+#: 第 39 次只是在消耗注意力。
+MAX_LINES_PER_RUN = 2
+
+#: ★ 同槽位互斥：同一个 slot 在一次 run 里只让**第一条**开口（2026-10-16 补）
+#:
+#: 槽位表解决的是「同一件事被拆成两个 code 上报」的情况
+#: （``RUN_STOPPING`` 与 ``RUN_STOPPED``）。
+#:
+#: 开场的 ``CORE_STARTED`` / ``RUN_STARTED`` **不走这里** —— 走
+#: :data:`SKIP_CODES` 直接不播。原因是槽位是「先到先得」，而真机
+#: ``CORE_STARTED`` 永远排 seq=1，它会抢到槽位，于是观众听到的是
+#: 「引擎起来了」而不是更口语的「启动了」。「引擎」正是审计里
+#: 「台词全是工程黑话」的典型来源，不能靠时序碰运气。
+SPEECH_SLOTS: dict[str, str] = {
+    "RUN_STOPPING": "lifecycle.stop",
+    "RUN_STOPPED": "lifecycle.stop",
+    "CORE_STOPPED": "lifecycle.stop",
+}
+
+#: 这些台词里不该出现的枚举值 —— 原样念出来就是工程黑话。
+#: ``UNKNOWN`` 是内部场景枚举，观众听到「场景换成了UNKNOWN」只会觉得
+#: 「是不是没做完」。真机 2026-10-14 run 结尾正是这条。
+_SUPPRESS_CTX_VALUES = frozenset({"UNKNOWN", "NONE", "NULL", ""})
+#: 其余 code（RUN_STARTED / ENEMY_DETECTED 等）本来就低频或有语义变化，
+#: 不受上限约束。
+REPEAT_PRONE_CODES = frozenset({
+    "PERCEPTION_DOWN",     # 暂停态下感知继续跑，一个 run 能发几百条
+    "INTENT_REJECTED",     # 意图被拒时每 tick 一条
+    "BLACK_FRAME",         # 已在 SKIP_CODES，这里兜底
+    "SCREENSHOT_FAIL",
+    "CAPTURE_FAILED",
+    "OCR_FAILED",
+    "YOLO_UNAVAILABLE",
+    "ENTITY_DETECTOR_UNAVAILABLE",
+})
+
 #: 无模板时用的兜底前缀（``EventCode`` 是开放集合，读侧不许崩）
 FALLBACK_PREFIX = "游戏那边"
 
@@ -109,8 +156,7 @@ EVENT_TO_SPEECH: dict[str, str] = {
     "RUN_STOPPED": "歇下了",
     # ---- 通道 ----
     "CHANNEL_DEGRADED": "截图通道不太顺啊，切了个备用的",
-    "CHANNEL_RECOVERED": "截图恢复了",
-    # ---- 急停 ----
+    "CHANNEL_RECOVERED": "截图恢复了",    # ---- 急停 ----
     "PANIC_TRIGGERED": "先停一下！",
     "PANIC_CLEARED": "没事了，继续",
     # ---- 熔断 ----
@@ -199,6 +245,17 @@ BUSINESS_CODES = (
 #:      会让这张表看着在拦、实际一点用没有。
 SKIP_CODES: frozenset[str] = frozenset({
     "INTENT_EXECUTED",
+    # ★★ CORE_STARTED / CORE_STOPPED（2026-10-16 补，A4）
+    #   这两条与 RUN_STARTED / RUN_STOPPED 是**同一件事的两次上报**，
+    #   真机在 t=0.00s 同时触发（两个不同 code，各走各的节流窗口，
+    #   压不住互相），于是开场连着两句「引擎起来了 / 启动了」——
+    #   观众只会听到一句，且「引擎」是工程词。
+    #
+    #   为什么进 SKIP_CODES 而不是靠 SPEECH_SLOTS 抢槽：
+    #   槽位是**先到先得**，而 CORE_STARTED 恒为 seq=1，
+    #   抢到的必然是「引擎起来了」。这里必须显式跳过。
+    "CORE_STARTED",
+    "CORE_STOPPED",
     # ★★ BLACK_FRAME（2026-10-11）：**绝不能播**。
     #   真机一个 run 实测发了 2655 条 —— 因为引擎 tick 3 就 PERCEPTION_DOWN
     #   进入 CORE_PAUSED，而**暂停态下感知继续跑**，于是每 tick 都发一条
@@ -261,6 +318,10 @@ class EventToYui:
         #: ``_last_spoke`` 分开**是刻意的：一个是 code 粒度、一个是动作
         #: 粒度，共用一张表会让「开宝箱」和「刷怪」互相偷走窗口。
         self._last_action_spoke: dict[str, float] = {}
+        #: ★ 本 run 内每个槽位是否已被占用（见 :data:`SPEECH_SLOTS`）。
+        self._slot_used: set[str] = set()
+        #: ★ 本 run 内每个 code 已说过几次（见 :data:`MAX_LINES_PER_RUN`）。
+        self._repeat_count: dict[str, int] = {}
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._handled = 0
@@ -291,6 +352,13 @@ class EventToYui:
         if path != self._stream:
             self._stream = path
             self._offset = 0            # 换 run = 换文件，从头读
+            # ★ 换 run 必须把**播报计数**一起清掉。
+            #   槽位/重复上限都是「一次 run 内」的语义；不清的话第二个 run
+            #   开场的「启动了」会被上一个 run 占掉的槽位直接压制掉，
+            #   而故障台词的上限也会被上一个 run 用光 —— 表现为
+            #   「第一次跑会说话，第二次跑一声不吭」。
+            self._slot_used.clear()
+            self._repeat_count.clear()
         try:
             size = os.stat(path).st_size
         except OSError:
@@ -349,6 +417,53 @@ class EventToYui:
         if code in SKIP_CODES and override is None:
             self.log.debug("SKIP_CODES 命中，不播报：%s", code)
             return None
+
+        # ★★ A2：ENEMY_DETECTED 的 count<=0 不播（2026-10-16）
+        #   真机 2026-10-14 run 的 count 序列是 0→2→1→1→1→0。
+        #   count=0 时模板照样渲染成「有怪！0个，小心点」——
+        #   这句话是**全片唯一的亮点台词**，重复播两次伤害翻倍。
+        #
+        #   ★ 只压「**能解析成数字且 <=0**」，**不碰缺失**。
+        #     缺 count 时仍然走原来的 _SafeDict 退化路径（渲染成
+        #     「有怪！个，小心点」），那是被 test_yui_speech_templates
+        #     刻意钉住的**已知退化**：只有手工造的事件才会走到，
+        #     真实写方恒带 count。它要修的是数据源，不是这个模板。
+        if code == "ENEMY_DETECTED" and ctx.get("count") is not None:
+            try:
+                if int(ctx["count"]) <= 0:
+                    self.log.debug("敌人数为 %r，不播报（有怪！0个）",
+                                   ctx["count"])
+                    return None
+            except (TypeError, ValueError):
+                pass            # 解析不了就当缺失，走退化路径
+
+        # ★★ A3：SCENE_CHANGED 的 to=UNKNOWN 不播（2026-10-16）
+        #   UNKNOWN 是内部场景枚举，原样念出来等于「暴露内部实现」。
+        if code == "SCENE_CHANGED":
+            to = str(ctx.get("to") or "").strip().upper()
+            if to in _SUPPRESS_CTX_VALUES:
+                self.log.debug("场景目标为 %r，不播报（工程枚举）", to)
+                return None
+
+        # ★★ A4：槽位互斥（2026-10-16）
+        #   开场/收尾各只让一句话出口，见 :data:`SPEECH_SLOTS`。
+        #   **只查不占** —— 占位推迟到确认要开口之后，否则一次渲染失败
+        #   就会白白烧掉这个槽位（开场那句话可能就再也不会说了）。
+        slot = SPEECH_SLOTS.get(code)
+        if slot is not None and slot in self._slot_used:
+            self.log.debug("槽位 %s 已被占用，压制 %s", slot, code)
+            return None
+
+        # ★★ A1：同一句在一次 run 里最多说 N 次（2026-10-16）
+        #   只约束 REPEAT_PRONE_CODES —— 那些是「持续态」code，
+        #   第 3 次起纯噪音。RUN_STARTED / ENEMY_DETECTED 不受限。
+        #   同理：只查不增，增量放在成功之后。
+        if code in REPEAT_PRONE_CODES:
+            if self._repeat_count.get(code, 0) >= MAX_LINES_PER_RUN:
+                self.log.debug("同句已达上限 %d 次，压制 %s",
+                               MAX_LINES_PER_RUN, code)
+                return None
+
         if override is not None:
             now = time.monotonic()
             last_a = self._last_action_spoke.get(action)
@@ -388,6 +503,13 @@ class EventToYui:
             self._last_spoke[code] = now
             return None
         self._last_spoke[code] = now
+        # ★ 到这里才**确认要开口**，此刻才占槽位 / 计重复次数。
+        #   放早一步会让一次渲染失败白白烧掉配额（开场那句话可能
+        #   就此永远说不出口）。
+        if slot is not None:
+            self._slot_used.add(slot)
+        if code in REPEAT_PRONE_CODES:
+            self._repeat_count[code] = self._repeat_count.get(code, 0) + 1
         return text
 
     # ---------------------------------------------------------------- 推送
@@ -466,5 +588,8 @@ class EventToYui:
 __all__ = [
     "RUN_ID_NAME", "DEFAULT_POLL_SECONDS", "DEFAULT_THROTTLE_SECONDS",
     "ACTION_SPEECH", "ACTION_THROTTLE_S",
-    "BUSINESS_CODES", "EVENT_TO_SPEECH", "SKIP_CODES", "EventToYui",
+    "BUSINESS_CODES", "EVENT_TO_SPEECH", "SKIP_CODES",
+    # 2026-10-16 新增（demo 出厂前粗糙度修复 A1/A3/A4）
+    "MAX_LINES_PER_RUN", "REPEAT_PRONE_CODES", "SPEECH_SLOTS",
+    "EventToYui",
 ]

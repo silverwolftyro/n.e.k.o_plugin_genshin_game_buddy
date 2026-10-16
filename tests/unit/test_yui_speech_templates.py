@@ -69,11 +69,48 @@ def test_position_changed__dist_is_substituted() -> None:
     assert got == ["跑了30.0米了"], got
 
 
-def test_count_zero_is_not_dropped() -> None:
-    """★★ ``count=0`` 是**有效值**，不能被当成「缺失」而清空。"""
+def test_count_zero_is_dropped_instead_of_saying_zero_enemies() -> None:
+    """★★ ``count=0`` **不播报**（2026-10-16 改）。
+
+    ⚠️ 这条断言**方向在本轮翻了过来**。原断言是「``count=0`` 是有效值，
+    不能被当成缺失而清空」，渲染出 ``有怪！0个，小心点``。
+
+    那是 demo 出厂前粗糙度审计的 A1 级问题：真机 2026-10-14 run 的
+    ``ENEMY_DETECTED`` count 序列是 ``0→2→1→1→1→0``，两次 count=0
+    都会原样播出去——**「有怪！0个，小心点」**。这是全片唯一的亮点台词，
+    说自己看见 0 个怪，比不说伤害大得多。
+
+    所以现在区分两种 0：
+
+    * ``count=0``（**明说有 0 个**）-> 不播。观众不需要被告知「没怪」。
+    * ``count`` **缺失**（见下一个测试）-> 仍走退化路径，
+      因为那是数据源问题，要修写方而不是改模板。
+
+    两者刻意不同：一个是「说的内容是废话」，一个是「说的内容是残句」，
+    后者由 ``_SafeDict`` 兜住，不在本次范围内。
+    """
     got = _render([{"code": "ENEMY_DETECTED", "message": "没有敌人",
                     "context": {"count": 0}}])
-    assert got == ["有怪！0个，小心点"], got
+    assert got == [], got
+
+
+def test_negative_count_is_also_dropped() -> None:
+    """★ count 为负（异常值）同样不播 —— 「有怪！-1个」比 0 更荒唐。"""
+    got = _render([{"code": "ENEMY_DETECTED", "message": "?",
+                    "context": {"count": -1}}])
+    assert got == [], got
+
+
+def test_count_zero_does_not_consume_the_repeat_budget() -> None:
+    """★ count=0 被压掉**不该**占用重复上限的配额。
+
+    否则一次故障里几十条 ``count=0`` 会把「有怪」这条的预算吃光，
+    真看见 3 只怪时反而播不出来。
+    """
+    assert _render([
+        {"code": "ENEMY_DETECTED", "message": "0", "context": {"count": 0}},
+        {"code": "ENEMY_DETECTED", "message": "3", "context": {"count": 3}},
+    ]) == ["有怪！3个，小心点"]
 
 
 def test_producer_always_sets_count() -> None:

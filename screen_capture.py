@@ -18,6 +18,33 @@ _LOGGER = logging.getLogger(__name__)
 
 BLACK_FRAME_LUMA_THRESHOLD = 12.0
 
+#: 「死像素」占比阈值 —— 超过它就判黑，**不看**平均亮度（2026-10-16 加）。
+#:
+#: ★ 为什么只看平均亮度不够（残帧 = 静默通过的黑帧）
+#:   某些通道（BitBlt 实锤）在窗口尺寸与 GDI DC 对不上时只 blit 出画面的一部分，
+#:   其余是**未绘制的纯黑 padding**。这种"残帧"的全图平均亮度被亮的那部分拉高到
+#:   18~25，**稳稳越过** :data:`BLACK_FRAME_LUMA_THRESHOLD`=12，被判成"不是黑帧"
+#:   原样送进 OCR —— OCR 只看得到左上角那一块，识不出东西。
+#:   用户侧表现就是「实际上有画面，但 OCR 说黑屏」。
+#:
+#: ★ 实测分布（``autopilot/_runtime/capmatrix_*.png``，2026-10-13 抓取矩阵）
+#:   ------------------------------------------------------------------
+#:   完整帧   capmatrix_normal_wgc    dead 0.0%
+#:            capmatrix_normal_dxcam  dead 0.2%
+#:            capmatrix_normal_mss    dead 2.8%
+#:   残帧     capmatrix_normal_bitblt    dead 54.6%  (luma 21.26 —— 越过 12!)
+#:            capmatrix_minimize_bitblt  dead 55.6%  (luma 18.66)
+#:            capmatrix_offscreen_bitblt  dead 53.9%  (luma 20.19)
+#:   ------------------------------------------------------------------
+#:   两侧各有 **30 个百分点以上**余量（最坏完整帧 2.8% vs 最轻残帧 53.9%），
+#:   所以 0.20 不是拍出来的，是夹在两个实测簇中间。
+#:
+#: ⚠️ 已知边界：真正很暗的场景（夜晚/洞里）dead% 也会偏高，**可能被误判成黑**。
+#:    缓解：``is_black_frame(..., ocr_len=...)`` 那条严格判据（0 个字即判黑）
+#:    在交互轮次优先生效，暗场景里有 UI 文字就不会被误杀；
+#:    且误判方向是"这张不要、下一张"，不会污染状态。
+BLACK_FRAME_DEAD_FRAC_THRESHOLD = 0.20
+
 # 拍板 2.0.69：mss 全局锁——mss.mss() 官方文档明确非线程安全（grab 会改共享内部缓冲）。
 # 真机 2.0.68 暴露：2 worker 并发抓屏时 mss 内部死锁，_ocr_in_flight_count 永远 = workers，
 # 后续所有 tick 被 worker 闸静默挡掉 → OCR 完全停滞。所有 mss.mss() 调用都必须走 _MSS_LOCK。
@@ -84,14 +111,35 @@ class CaptureResult:
     avg_luma: float  # 0-255 平均亮度，未知填 -1.0
 
 
-def _img_luma(img: Any) -> float:
-    """PIL Image -> 平均亮度(0-255)。失败返回 -1.0。"""
+def _luma_stats(img: Any) -> Tuple[float, float]:
+    """PIL Image -> ``(平均亮度, 死像素占比)``。
+
+    * 平均亮度 —— 0~255，与 :data:`BLACK_FRAME_LUMA_THRESHOLD` 同尺度。
+    * 死像素占比 —— 0.0~1.0，与 :data:`BLACK_FRAME_DEAD_FRAC_THRESHOLD` 同尺度。
+
+    「死像素」= 亮度 < :data:`BLACK_FRAME_LUMA_THRESHOLD` 的像素，
+    与平均亮度**同源同一个阈值**，不另立标准。
+
+    统计前先缩到 32x32：够判"是不是大面积黑"，又不会因为几万个像素
+    把解码开销拖进抓屏热路径。
+
+    失败返回 ``(-1.0, 1.0)`` —— 「解不出来」按「全黑」处理，
+    宁可丢帧也不能把一张读不懂的图送进 OCR。
+    """
     try:
         gray = img.convert("L").resize((32, 32))
         px = list(gray.getdata())
-        return float(sum(px)) / float(max(1, len(px)))
+        n = max(1, len(px))
+        luma = float(sum(px)) / float(n)
+        dead = sum(1 for p in px if p < BLACK_FRAME_LUMA_THRESHOLD) / float(n)
+        return luma, dead
     except Exception:
-        return -1.0
+        return -1.0, 1.0
+
+
+def _img_luma(img: Any) -> float:
+    """PIL Image -> 平均亮度(0-255)。失败返回 -1.0。"""
+    return _luma_stats(img)[0]
 
 
 def _encode(img: Any, fmt: str = "JPEG") -> Tuple[str, int, int]:
@@ -106,27 +154,43 @@ def _encode(img: Any, fmt: str = "JPEG") -> Tuple[str, int, int]:
         return "", 0, 0
 
 
-def _avg_luma_from_b64(image_base64: str) -> float:
-    """裸 base64 图 -> 平均亮度。解码失败返回 -1.0。"""
+def _stats_from_b64(image_base64: str) -> Tuple[float, float]:
+    """裸 base64 图 -> ``(平均亮度, 死像素占比)``。解码失败返回 ``(-1.0, 1.0)``。"""
     try:
         from PIL import Image  # lazy: 第三方
 
         raw = base64.b64decode(image_base64)
         img = Image.open(io.BytesIO(raw))
-        return _img_luma(img)
+        return _luma_stats(img)
     except Exception:
-        return -1.0
+        return -1.0, 1.0
+
+
+def _avg_luma_from_b64(image_base64: str) -> float:
+    """裸 base64 图 -> 平均亮度。解码失败返回 -1.0。"""
+    return _stats_from_b64(image_base64)[0]
 
 
 def is_black_frame(image_base64: str, ocr_len: Optional[int] = None) -> bool:
-    """黑帧判定。
+    """黑帧判定。两条判据，任一命中即判黑（2026-10-16 起）。
 
-    * 给了 ``ocr_len``（严格 D6 判据）：0 个字即判黑，非 0 判非黑，覆盖亮度。
-    * 未给 ``ocr_len``：平均亮度 < BLACK_FRAME_LUMA_THRESHOLD 判黑。
+    * 给了 ``ocr_len``（严格 D6 判据）：0 个字即判黑，非 0 判非黑，**覆盖下面两条**。
+    * 没给 ``ocr_len``：``luma < 12`` **或** ``dead% > 0.20``。
+
+    ★ 为什么必须有第二条（残帧）
+      ``luma`` 是**全图平均**。一张「左上角 45% 有画面、右下 55% 是未绘制黑区」
+      的残帧，均值能被亮的部分拉到 21 —— 越过 12 这道门槛，被判成"不是黑帧"。
+      实测三张 BitBlt 残帧 luma 只有 18.66~21.26，而死像素占比是 53.9%~55.6%。
+      单看均值永远抓不住它，必须看**比例**。
+      依据与实测数据见 :data:`BLACK_FRAME_DEAD_FRAC_THRESHOLD` 的注释。
+
+    ⚠️ 已知边界：真正很暗的场景（夜晚/洞里）dead% 偏高，可能被误判。
+      给了 ``ocr_len`` 的调用点走的是严格判据，不受影响。
     """
     if ocr_len is not None:
         return int(ocr_len) == 0
-    return _avg_luma_from_b64(image_base64) < BLACK_FRAME_LUMA_THRESHOLD
+    luma, dead = _stats_from_b64(image_base64)
+    return luma < BLACK_FRAME_LUMA_THRESHOLD or dead > BLACK_FRAME_DEAD_FRAC_THRESHOLD
 
 
 def _process_name(pid: Any) -> str:
@@ -519,6 +583,8 @@ def capture_active_frame() -> Tuple[CaptureResult, str]:
     本地：PrintWindow→mss→bridge 降级链。
     前景：mss 主屏（云游戏整屏即画面，不需要精确知道是哪个窗口）→ 宿主抓屏桥
     （HTTP 抓宿主自己的屏，宿主 UI 线程必有访问权，绕过宿主营养不良的 win32 上下文）。
+    前景两条路**都要过 is_black_frame**（残帧守卫，2026-10-16 补的）——
+    此前前景路径直接 ``if result.ok: return``，是全模块唯一不看黑帧的出口。
     前景错误统一归 capture_failed（附 mss/bridge 两路子错误），不再有 no_hwnd/no_rect。
     find_foreground_window / _enum_large_visible_windows 仍保留作可选 helper，
     本函数不再调用（宿主沙箱里 win32gui 拿不到桌面窗口，详见诊断报告）。
@@ -544,17 +610,36 @@ def capture_active_frame() -> Tuple[CaptureResult, str]:
                 int(mon["left"]) + int(mon["width"]),
                 int(mon["top"]) + int(mon["height"]))
         result = _capture_mss(rect)
-        if result.ok:
-            return result, "foreground"
-        mss_sub = _strip(result.error or "unknown")
+        # ★ 残帧守卫（2026-10-16）。本地分支的 capture_window_base64 三路都过
+        #   is_black_frame，唯独前景路径此前**一道检查都没有**——mss 抓到啥就是啥，
+        #   全黑/残帧也照样 ok=True 直接返回，OCR 于是拿着一张废图去识别。
+        #   这里与本地分支对齐：判黑（或压根没图）就继续往下走 bridge。
+        if result.ok and result.image_base64:
+            if not is_black_frame(result.image_base64):
+                return result, "foreground"
+            mss_sub = "black_frame"
+        elif result.ok:
+            mss_sub = "no_image"
+        else:
+            mss_sub = _strip(result.error or "unknown")
     except Exception as exc:
         mss_sub = type(exc).__name__
 
     # 前景路径 2：宿主抓屏桥（HTTP，宿主 UI 线程一定有访问权）
     bridge = _capture_bridge(0, "")
-    if bridge.ok:
-        return bridge, "foreground"
-    bridge_sub = _strip(bridge.error or "unknown")
+    if bridge.ok and bridge.image_base64:
+        if not is_black_frame(bridge.image_base64):
+            return bridge, "foreground"
+        # ★ 最后一路也是黑的/残的。返回 ok=False 而不是那张废图 ——
+        #   与本地分支 capture_window_base64「三路全黑 → ok=False」保持一致。
+        #   若在此返回 ok=True，ocr_perceive 会拿它去 OCR，拿到 0 个字，
+        #   而 __init__.py:3020 的兜底 is_black_frame 对残帧（luma≈21）不生效，
+        #   空文本就被当成真帧推进状态机 —— 正是这次要修的那个洞。
+        bridge_sub = "black_frame"
+    elif bridge.ok:
+        bridge_sub = "no_image"
+    else:
+        bridge_sub = _strip(bridge.error or "unknown")
 
     # 都失败 → capture_failed（附两路子错误）
     err = f"capture_failed:mss={mss_sub}|bridge={bridge_sub}"

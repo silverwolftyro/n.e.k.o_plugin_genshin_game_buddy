@@ -983,6 +983,12 @@ class GenshinGameBuddyPlugin(NekoPluginBase):
         alive = autopilot_bridge.is_console_alive(bridge)
         engine = bridge.get("engine") if isinstance(bridge, dict) else None
         overlay = bridge.get("overlay") if isinstance(bridge, dict) else None
+        # ★ pathfind（2026-10-16 补）
+        #   桥接 payload 之前只有 console/engine/overlay —— 面板因此**不知道寻路
+        #   在跑**，显示「引擎已停止」时寻路可能正在注入按键。两侧已同改。
+        #   ⚠️ 老版 Console（没这个字段）读到 None，面板显示「未知」而不是
+        #   谎称「未运行」—— 契约不匹配时要看得见，不静默兜底成假值。
+        pathfind = bridge.get("pathfind") if isinstance(bridge, dict) else None
         stats = bridge.get("stats") if isinstance(bridge, dict) else None
         exists = chosen is not None
 
@@ -1005,6 +1011,9 @@ class GenshinGameBuddyPlugin(NekoPluginBase):
             if isinstance(engine, dict) else "unknown",
             "overlay_state": (overlay or {}).get("state", "unknown")
             if isinstance(overlay, dict) else "unknown",
+            # ★ 寻路状态。老版 Console 没这个键 -> "unknown"，**不谎称"stopped"**。
+            "pathfind_state": (pathfind or {}).get("state", "unknown")
+            if isinstance(pathfind, dict) else "unknown",
             "stats": stats if isinstance(stats, dict) else None,
             # 面板顶部那行"插件 vX · 主控台 vY"的两半来源。
             # ★ 两半都透出来是有意的：用户判断"我这套代码跑起来了吗"

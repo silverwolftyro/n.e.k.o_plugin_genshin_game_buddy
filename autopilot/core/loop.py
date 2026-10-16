@@ -57,6 +57,11 @@ from typing import Any
 from ..contracts.events import Event, EventCategory, Severity
 from ..contracts.intent_packet import IntentPacket
 from ..contracts.state_packet import StatePacket
+# 敌人判据**只用这一份**。2026-10-15 之前，本文件曾用 `kind` + `.y`
+# 自己抄了一份，而 WorldEntity 根本没有 `.y` 字段，`getattr` 兜底成 1.0
+# 让条件恒假 —— `health_bar` 永远计不进 ENEMY_DETECTED，规则却照常开火。
+# 详见 policy/context.py::is_enemy_evidence 的长注释。
+from ..policy.context import count_enemy_entities
 from .runtime import (
     IllegalTransition,
     RuntimeContext,
@@ -958,13 +963,14 @@ class CoreLoop:
         # ---- 敌人：数量**变化**时才报（0->3 值得说，3->3 不用）-------
         _ents = getattr(self.ctx.builder, "last_world_entities", None)
         if _ents is not None:               # None = 没跑（不算 False）
-            _c = 0
-            for _e in _ents:
-                _k = str(getattr(_e, "kind", "") or "")
-                if _k == "enemy_identify" or (
-                        _k == "health_bar"
-                        and float(getattr(_e, "y", 1.0)) < 0.5):
-                    _c += 1
+            _c, _bad_bbox = count_enemy_entities(_ents)
+            # ★ 缺失不是「当作不成立」，是「不知道」——
+            #   静默按 1.0 处理会让这批实体整批消失在计数里，
+            #   而现象只是 YUI 少说了一句话，排查时毫无线索。
+            if _bad_bbox:
+                logger.warning(
+                    "敌人数统计：%d 个实体缺 bbox/坐标，按「不可判读」处理",
+                    _bad_bbox)
             if _c != self._biz_last_enemy_count:
                 _first = self._biz_last_enemy_count < 0
                 self._biz_last_enemy_count = _c

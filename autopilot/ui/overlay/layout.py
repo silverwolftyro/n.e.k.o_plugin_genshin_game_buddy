@@ -599,10 +599,33 @@ def build_panel(snap: Any, *, toast: str | None = None,
     #   那种状态用绿色显示会让人以为一切正常 —— 这正是今天踩的坑。
     head_color = theme.phase_color(state) if sess_color == theme.ACCENT_RUN else sess_color
 
+    # ★★ A6（2026-10-16，demo 出厂前）：把「正常跑完」和「崩了」分开显示。
+    #
+    #   粗糙度审计的 A1 级问题：真机 2026-10-14 run 结束后，留给观众
+    #   视网膜上的**最后一帧**是这样的：
+    #
+    #       ● 无会话 · 已停止   4.8 Hz   223ms P95     ← 橙色（无会话）
+    #       场景: UNKNOWN
+    #       意图: 355 次
+    #       通道: —
+    #
+    #   橙字「已停止」+「UNKNOWN」+「通道 —」，观众读作「演示崩了」。
+    #   而那一次的 health 其实是 **OK** —— 引擎是自己正常结束的。
+    #
+    #   判据用 health 而不是「用户有没有点停止」：health=OK 且无会话
+    #   才算「跑完了」；崩溃时 health 会是别的值，仍然显示红色「已停止」。
+    completed = state == "STOPPED" and health == "OK" and not session
+    state_txt = "已完成" if completed else _state_text(state)
+    if completed:
+        head_color = theme.ACCENT_RUN
+
+    # 场景枚举同理：UNKNOWN 是内部值，观众看到只会以为没做完
+    scene_txt = "未知" if scene == "UNKNOWN" else scene
+
     lines = [
-        Line(f"● {sess_txt} · {_state_text(state)}   {hz:.1f} Hz   {p95:.0f}ms P95",
+        Line(f"● {sess_txt} · {state_txt}   {hz:.1f} Hz   {p95:.0f}ms P95",
              head_color, head_color),
-        Line(f"场景: {scene}", theme.FG),
+        Line(f"场景: {scene_txt}", theme.FG),
         Line(f"意图: {intent_txt}", theme.FG),
         Line(f"通道: {cap_txt}",
              theme.ACCENT_WARN if deg else theme.FG),

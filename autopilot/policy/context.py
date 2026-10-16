@@ -463,25 +463,9 @@ class PolicyContext:
                 "has_nearby_enemy",
                 "本帧无世界实体信息（未注入检测器或场景不允许）")
 
-        for e in self.world_entities:
-            kind = getattr(e, "kind", None)
-            if kind is None:
-                continue
-            group = getattr(e, "group", kind)
-
-            if group == "enemy":
-                return True
-
-            if group == "combat":
-                bb = getattr(e, "bbox", None)
-                # ⚠️ bbox 缺失/损坏时**跳过**而不是当成敌人 ——
-                #    读不到位置就开火是危险的静默走错。
-                if not bb or len(bb) < 2:
-                    continue
-                if float(bb[1]) < ENEMY_HEALTH_BAR_Y_MAX:
-                    return True
-
-        return False
+        # 判据本体在 :func:`is_enemy_evidence`（全仓唯一出处）。
+        # 这里只负责「有没有」——三态里的 UNKNOWN 由上面判掉。
+        return any(is_enemy_evidence(e) for e in self.world_entities)
 
     def has_nearby_chest(self) -> bool | UnknownValue:
         """附近是否有宝箱（``chest`` + ``locked_chest``）。"""
@@ -699,11 +683,65 @@ FUNCTION_NAMES: frozenset[str] = frozenset(_FUNCTION_TABLE)
 ENEMY_HEALTH_BAR_Y_MAX: float = 0.5
 
 
+#: 累计有多少个「像敌人但坐标不可判读」的实体（见 :func:`is_enemy_evidence`）。
+#: 单元素 list 纯粹为了可写；计数器本身不是状态契约的一部分。
+BAD_BBOX_COUNTER: list[int] = [0]
+
+
+def is_enemy_evidence(entity: object) -> bool:
+    """单个世界实体是否构成「有敌人」的证据。
+
+    ★ **全仓唯一的敌人判据**（2026-10-16 抽出）
+      判据此前被抄成了两处：
+
+        * :meth:`PolicyContext.has_nearby_enemy` —— 用 ``group`` + ``bbox[1]``
+        * ``core/loop.py`` 的 ``ENEMY_DETECTED`` 计数 —— 用 ``kind`` + ``.y``
+
+      而 :class:`~autopilot.perception.world_entities.WorldEntity`
+      **压根没有 ``.y`` 字段**（只有 ``kind/bbox/confidence/screen_pos``），
+      于是 loop 那边的 ``getattr(e, "y", 1.0)`` 恒得 1.0、条件恒假，
+      ``health_bar`` 永远计不进事件 —— 规则照常开火，事件却报 0 个敌人。
+      真机 run ``20261014_215401`` 的 355 次普攻就是这么打出来的。
+
+      抄两遍判据是这次出事的**结构原因**，所以抽成单一出处，
+      两处都改为调用它，之后不可能再漂。
+
+    判据内容见 :meth:`PolicyContext.has_nearby_enemy` 的长注释
+    （A 敌人标识 / B 上半屏血条，以及 y<0.5 分界的实测依据）。
+
+    :returns: True = 算一个敌人。坐标不可判读时返回 False 并累加
+        :data:`BAD_BBOX_COUNTER` —— **跳过但不静默**。
+    """
+    kind = getattr(entity, "kind", None)
+    if kind is None:
+        return False
+    group = getattr(entity, "group", kind)
+    if group == "enemy":
+        return True
+    if group != "combat":
+        return False
+    bb = getattr(entity, "bbox", None)
+    if not bb or len(bb) < 2:
+        BAD_BBOX_COUNTER[0] += 1
+        return False
+    return float(bb[1]) < ENEMY_HEALTH_BAR_Y_MAX
+
+
+def count_enemy_entities(entities) -> tuple[int, int]:
+    """:func:`is_enemy_evidence` 的批量版。返回 ``(敌人数, 不可判读数)``。"""
+    before = BAD_BBOX_COUNTER[0]
+    n = sum(1 for e in entities if is_enemy_evidence(e))
+    return n, BAD_BBOX_COUNTER[0] - before
+
+
 __all__ = [
+    "BAD_BBOX_COUNTER",
     "ENEMY_HEALTH_BAR_Y_MAX",
     "FUNCTION_NAMES",
     "UNKNOWN",
     "PolicyContext",
     "PolicySignals",
     "UnknownValue",
+    "count_enemy_entities",
+    "is_enemy_evidence",
 ]

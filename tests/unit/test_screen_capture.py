@@ -713,7 +713,11 @@ def test_capture_active_frame__foreground_via_mss_primary_monitor(sc, monkeypatc
 
     def _fake_mss_capture(rect):
         seen["rect"] = rect
-        return sc.CaptureResult(True, "aGVsbG8=", 4, 4, "mss", "", 128.0)
+        # 2026-10-16：前景路径新增了残帧守卫（is_black_frame），桩必须返回
+        # **真图**。原桩用 "aGVsbG8="（即 "hello"），那不是 PNG —— 解码失败
+        # 按设计判黑，于是降级到 bridge，本用例的断言就不再成立了。
+        # 按本文件开头的约定（image 与 avg_luma 成对一致）改成 128 灰阶真图。
+        return sc.CaptureResult(True, _png_b64(128), 32, 24, "mss", "", 128.0)
 
     monkeypatch.setattr(sc, "find_genshin_window", lambda: None)
     _install_mss_fakes(monkeypatch, sc, monitors=[_ALL_MON, _PRIMARY_MON])
@@ -738,7 +742,9 @@ def test_capture_active_frame__foreground_bridge_when_mss_capture_fails(sc, monk
     )
     monkeypatch.setattr(
         sc, "_capture_bridge",
-        lambda _pid, _t: sc.CaptureResult(True, "YnJpZGdl", 4, 4, "bridge", "", 128.0),
+        # 2026-10-16：bridge 也过残帧守卫，桩必须返回真图。
+        # 原桩 "YnJpZGdl"（即 "bridge"）不是 PNG，解码失败按设计判黑。
+        lambda _pid, _t: sc.CaptureResult(True, _png_b64(128), 32, 24, "bridge", "", 128.0),
     )
 
     result, path = sc.capture_active_frame()
@@ -769,6 +775,234 @@ def test_capture_active_frame__foreground_capture_failed_when_mss_module_and_bri
     assert result.error.startswith("capture_failed:")
     assert "mss=OSError" in result.error, "mss 子错误必须进 error 便于下次定位"
     assert "bridge=HTTPError" in result.error, "bridge 子错误必须进 error"
+
+
+# =============================================================================
+# 残帧守卫（2026-10-16）：黑帧判据加 dead% + foreground 路径补守卫
+# -----------------------------------------------------------------------------
+# 背景：``_runtime/capmatrix_normal_bitblt.png`` 这类"残帧" —— 左上角约 45%
+# 是画面，其余是未绘制的纯黑 padding。**全图 luma 只有 18.66~21.26**，
+# 稳稳越过 :data:`BLACK_FRAME_LUMA_THRESHOLD`=12，被判成"不是黑帧"送进 OCR。
+# 单看平均亮度永远抓不住它，必须看**死像素占比**。
+#
+# ``_runtime/`` 整个被 .gitignore，真图进不了仓库，所以下面用**合成样本**。
+# 合成的目标是**复现实测统计特征**（luma 与 dead% 双双落在实测区间内），
+# 而这个标定关系由 test_residual_frame_sample_matches_measured_stats 钉住。
+# =============================================================================
+
+
+def _residual_frame_b64(bright: int = 48, dark: int = 0, bright_area: float = 0.45) -> str:
+    """残帧样本：左上角 ``bright_area`` 面积是亮区，其余是纯黑 padding。
+
+    ``bright=48`` 不是随手填的 —— 实测残帧 luma ≈ 21 而亮区占 45%，
+    反推亮区自身亮度约 21/0.45 ≈ 48。照这个填，合成样本才和真帧同分布。
+
+    画布取 **60x60 正方形**：统计前会 resize 到 32x32，正方形不会被拉伸，
+    ``bright_area`` 与实测 dead% 一一对应（标定由
+    test_residual_frame_sample_matches_measured_stats 钉住）。
+    """
+    from PIL import Image  # 与 ocr_engine.py 一致：函数内 lazy import
+
+    w = h = 60
+    image = Image.new("RGB", (w, h), (dark, dark, dark))
+    side = min(w, h, max(1, int(round((w * h * bright_area) ** 0.5))))
+    for y in range(side):
+        for x in range(side):
+            image.putpixel((x, y), (bright, bright, bright))
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+    return base64.b64encode(buffer.getvalue()).decode("ascii")
+
+
+def _night_scene_b64(base: int = 45, span: int = 20) -> str:
+    """夜晚/暗场景：整体亮度低，但**没有任何一个像素**掉到 12 以下。
+
+    这是 dead% 判据的**已知误判边界**（见常量注释的 ⚠️）——
+    这张图必须判"不黑"，否则说明阈值收得太紧，暗场景会被误杀。
+    """
+    from PIL import Image
+
+    w, h = 64, 48
+    gray = Image.new("L", (w, h))
+    for y in range(h):
+        for x in range(w):
+            gray.putpixel((x, y), base + int(span * ((x / (w - 1)) - 0.5)))
+    buffer = io.BytesIO()
+    gray.convert("RGB").save(buffer, format="PNG")
+    return base64.b64encode(buffer.getvalue()).decode("ascii")
+
+
+@pytest.mark.unit
+def test_residual_frame_sample_matches_measured_stats(sc) -> None:
+    """★ 合成残帧必须与**真机实测**同分布，否则下面所有断言都在自说自话。
+
+    实测三张 BitBlt 残帧：luma 18.66 / 20.19 / 21.26，dead 55.6% / 53.9% / 54.6%。
+    完整帧：luma 51.7~236.4，dead 0.0%~2.8%。
+    这里取能同时容纳两侧、又留余量的区间。
+    """
+    luma, dead = sc._stats_from_b64(_residual_frame_b64())
+    assert 12.0 < luma < 40.0, f"残帧 luma 应落在实测区间 18.7~21.3 附近，实得 {luma:.2f}"
+    assert 0.40 < dead < 0.70, f"残帧 dead% 应落在实测区间 53.9%~55.6% 附近，实得 {dead * 100:.1f}%"
+
+
+@pytest.mark.unit
+def test_is_black_frame__residual_frame_is_black_despite_high_luma(sc) -> None:
+    """★ 核心回归：残帧判黑 —— **且必须是被 dead% 抓住的**。
+
+    同时断言 luma > 阈值：如果哪天有人把 dead% 判据删了、退回纯均值，
+    luma 这条断言会先失败，明确告诉他是哪一维度的判据没了。
+    """
+    b64 = _residual_frame_b64()
+    luma, dead = sc._stats_from_b64(b64)
+
+    assert luma > sc.BLACK_FRAME_LUMA_THRESHOLD, "样本前提失效：luma 本就该越过 12"
+    assert dead > sc.BLACK_FRAME_DEAD_FRAC_THRESHOLD, "样本前提失效：dead% 本就该越过 0.20"
+    assert sc.is_black_frame(b64) is True
+
+
+@pytest.mark.unit
+def test_is_black_frame__full_frame_is_not_black(sc) -> None:
+    """完整帧判不黑（dead% 极低，即使整体亮度不高也放行）。"""
+    b64 = _residual_frame_b64(bright_area=0.95)
+    luma, dead = sc._stats_from_b64(b64)
+
+    assert dead < sc.BLACK_FRAME_DEAD_FRAC_THRESHOLD, f"样本前提失效：dead={dead:.3f}"
+    assert sc.is_black_frame(b64) is False
+
+
+@pytest.mark.unit
+def test_is_black_frame__uniform_black_is_black(sc) -> None:
+    """全黑帧判黑（luma 与 dead% 两条判据都命中）。"""
+    luma, dead = sc._stats_from_b64(_png_b64(0))
+    assert luma < sc.BLACK_FRAME_LUMA_THRESHOLD
+    assert dead > sc.BLACK_FRAME_DEAD_FRAC_THRESHOLD
+    assert sc.is_black_frame(_png_b64(0)) is True
+
+
+@pytest.mark.unit
+def test_is_black_frame__dark_night_scene_is_not_black(sc) -> None:
+    """★ 误判边界：夜晚暗场景（luma 低但 dead% 不高）**不判黑**。"""
+    b64 = _night_scene_b64()
+    luma, dead = sc._stats_from_b64(b64)
+
+    assert luma > sc.BLACK_FRAME_LUMA_THRESHOLD, "样本前提：夜晚场景整体亮度不该低于 12"
+    assert dead < sc.BLACK_FRAME_DEAD_FRAC_THRESHOLD, "样本前提：夜晚场景不该有大量死像素"
+    assert sc.is_black_frame(b64) is False
+
+
+@pytest.mark.unit
+def test_is_black_frame__ocr_len_still_overrides_dead_frac(sc) -> None:
+    """ocr_len 严格判据仍**优先于** dead%：亮残帧 + 5 个字 = 判非黑。"""
+    b64 = _residual_frame_b64()
+    assert sc.is_black_frame(b64, ocr_len=0) is True
+    assert sc.is_black_frame(b64, ocr_len=5) is False
+
+
+@pytest.mark.unit
+def test_dead_frac_threshold_value(sc) -> None:
+    """新常量钉死。0.20 夹在实测的 2.8%（完整帧）与 53.9%（残帧）中间。"""
+    assert sc.BLACK_FRAME_DEAD_FRAC_THRESHOLD == 0.20
+
+
+@pytest.mark.unit
+def test_is_black_frame__undecodable_payload_is_black(sc) -> None:
+    """解不出来的 base64 判黑（宁可丢帧也不能把废图送进 OCR）。"""
+    assert sc.is_black_frame("aGVsbG8=") is True       # "hello"，不是 PNG
+    assert sc.is_black_frame("") is True
+
+
+# ----- foreground 路径的残帧拦截（任务 C） -----
+
+
+@pytest.mark.unit
+def test_capture_active_frame__foreground_partial_frame_falls_back_to_bridge(
+    sc, monkeypatch
+) -> None:
+    """★ foreground 路径被残帧拦截 → **必须继续走 bridge**，不能把残帧返回去。"""
+    monkeypatch.setattr(sc, "find_genshin_window", lambda: None)
+    _install_mss_fakes(monkeypatch, sc, monitors=[_ALL_MON, _PRIMARY_MON])
+    monkeypatch.setattr(
+        sc, "_capture_mss",
+        lambda _rect: sc.CaptureResult(True, _residual_frame_b64(), 80, 60, "mss", "", 21.0),
+    )
+    monkeypatch.setattr(
+        sc, "_capture_bridge",
+        lambda _pid, _t: sc.CaptureResult(True, _png_b64(200), 32, 24, "bridge", "", 200.0),
+    )
+
+    result, path = sc.capture_active_frame()
+
+    assert path == "foreground"
+    assert result.ok is True
+    assert result.method == "bridge", "mss 交残帧时必须降级到 bridge，而不是把残帧返回去"
+
+
+@pytest.mark.unit
+def test_capture_active_frame__foreground_black_mss_reports_black_frame_suberror(
+    sc, monkeypatch
+) -> None:
+    """mss 和 bridge 都是黑的 → capture_failed，且子错误要说清是 black_frame。"""
+    monkeypatch.setattr(sc, "find_genshin_window", lambda: None)
+    _install_mss_fakes(monkeypatch, sc, monitors=[_ALL_MON, _PRIMARY_MON])
+    monkeypatch.setattr(
+        sc, "_capture_mss",
+        lambda _rect: sc.CaptureResult(True, _residual_frame_b64(), 80, 60, "mss", "", 21.0),
+    )
+    monkeypatch.setattr(
+        sc, "_capture_bridge",
+        lambda _pid, _t: sc.CaptureResult(True, _png_b64(0), 32, 24, "bridge", "", 0.0),
+    )
+
+    result, path = sc.capture_active_frame()
+
+    assert path == "foreground"
+    assert result.ok is False
+    assert "mss=black_frame" in result.error, "残帧拦截必须留痕，否则排查时看不出是守卫拦的"
+
+
+@pytest.mark.unit
+def test_capture_active_frame__foreground_ok_without_image_falls_back_to_bridge(
+    sc, monkeypatch
+) -> None:
+    """ok=True 但压根没图（b64=None）也算这一路失败 → 走 bridge。"""
+    monkeypatch.setattr(sc, "find_genshin_window", lambda: None)
+    _install_mss_fakes(monkeypatch, sc, monitors=[_ALL_MON, _PRIMARY_MON])
+    monkeypatch.setattr(
+        sc, "_capture_mss",
+        lambda _rect: sc.CaptureResult(True, None, 0, 0, "mss", "", -1.0),
+    )
+    monkeypatch.setattr(
+        sc, "_capture_bridge",
+        lambda _pid, _t: sc.CaptureResult(True, _png_b64(200), 32, 24, "bridge", "", 200.0),
+    )
+
+    result, _path = sc.capture_active_frame()
+
+    assert result.ok is True
+    assert result.method == "bridge"
+
+
+@pytest.mark.unit
+def test_capture_active_frame__foreground_night_scene_is_accepted(
+    sc, monkeypatch
+) -> None:
+    """反方向守卫：夜晚暗场景**不该**被新判据误杀，原样放行。"""
+    seen: dict[str, object] = {}
+
+    def _fake_mss_capture(rect):
+        seen["rect"] = rect
+        return sc.CaptureResult(True, _night_scene_b64(), 64, 48, "mss", "", 45.0)
+
+    monkeypatch.setattr(sc, "find_genshin_window", lambda: None)
+    _install_mss_fakes(monkeypatch, sc, monitors=[_ALL_MON, _PRIMARY_MON])
+    monkeypatch.setattr(sc, "_capture_mss", _fake_mss_capture)
+
+    result, path = sc.capture_active_frame()
+
+    assert path == "foreground"
+    assert result.ok is True
+    assert result.method == "mss", "夜晚场景必须原样放行，不能被守卫拦掉"
+    assert seen["rect"] == (0, 0, 1920, 1080)
 
 
 # =============================================================================

@@ -194,10 +194,31 @@ def test_skip_codes__skipped_code_does_not_light_up_throttle(rig):
 
 
 def test_skip_codes__other_codes_still_broadcast(rig):
-    """跳过是**逐类**的，不能连坐。"""
+    """跳过是**逐类**的，不能连坐。
+
+    ⚠️ 2026-10-16 起 ``CORE_STARTED`` **也在** SKIP_CODES 里了（A4），
+    所以这条不能再拿它当「不连坐」的样本 —— 改用 ``RUN_STARTED``：
+    它与 ``CORE_STARTED`` 是同一件事的两次上报，开场只该说一次，
+    而它**必须**还能说。
+    """
+    rig.write("RUN_STARTED")
+    rig.a.drain_once()
+    assert "启动了" in rig.texts
+
+
+def test_skip_codes__core_started_is_now_skipped(rig):
+    """★★ ``CORE_STARTED`` 被显式跳过（2026-10-16，A4）。
+
+    它与 ``RUN_STARTED`` 是同一件事的两次上报，真机在 t=0.00s 同时触发；
+    「引擎起来了」+「启动了」连着说，观众只会听到一句，
+    而且「引擎」是工程词。详见 :data:`event_to_yui.SKIP_CODES` 里的说明。
+    """
+    from event_to_yui import SKIP_CODES
+
+    assert "CORE_STARTED" in SKIP_CODES
     rig.write("CORE_STARTED")
     rig.a.drain_once()
-    assert "引擎起来了" in rig.texts
+    assert rig.texts == []
 
 
 # ================================================================== T3 半行 JSON
