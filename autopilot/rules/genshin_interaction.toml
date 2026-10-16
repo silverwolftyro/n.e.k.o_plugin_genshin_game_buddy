@@ -1,0 +1,88 @@
+# ============================================================================
+# 原神 · 世界交互（2026-10-11 新增）
+# ============================================================================
+#
+# ★ 关于键位的重要结论（2026-10-11 联网核实）
+# --------------------------------------------
+# 用户列的这些动作，在原神 PC 里**全都是同一个 F 键**：
+#
+#   拾取 / 采集 / 开宝箱 / 对话 NPC / 激活传送锚点 / 供奉神像 / 钓鱼起竿
+#
+# 键位表（techbloat 2024 PC 布局）：
+#     Interact (pick up / talk / use) = F
+# 中文键位指南一致：「靠近物品按 F 拾取，打开宝箱、激活锚点均为 F」。
+#
+# 所以本文件**没有**新增 ACTIVATE_TELEPORT / PRAY_STATUE / FISH 这些
+# ActionType —— 它们在物理上和 USE_PICKUP 是**同一个键**，拆成不同动作
+# 只会让 traits 表多出几个语义重复的条目，而行为完全一样。
+#
+# 真正缺的不是动作，是**「附近有什么」** —— 而世界实体检测的 7 个类里
+# 没有传送锚点、神像、鱼点、花草、水域：
+#
+#   KIND_GROUPS = {enemy_identify, health_bar, drops, ore, unmined_ore,
+#                  chest, locked_chest}
+#
+# 这是**模型层面的缺口**，不是规则层能补的。要支持这些交互，
+# 需要重新训练/补充 bgi_world 模型，或接一套模板匹配。
+#
+# 依赖的 context 函数：has_nearby_ore() has_nearby_drops() nearby_count()
+#                       nearest_group_px() scene() perception_ok()
+# ============================================================================
+
+# ------------------------------------------------------------------ 先走过去再交互
+# ★ 这是本文件唯一一类**今天真的能用**的规则，而且很值钱：
+#   实体检测给的是屏幕坐标，不给「有没有交互提示」。所以「先走近再按 F」
+#   比「看见就按 F」正确得多 —— 后者在远处按 F 什么都不会发生，
+#   但规则照样命中，于是又是一串无意义的按键。
+[[rules]]
+name = "interact_walk_to_nearest_ore_first"
+action = "MOVE_FORWARD"
+when = "has_nearby_ore() and nearest_group_px('ore') > 120"
+priority = 45
+ttl_seconds = 2
+scenes = ["WORLD"]
+enabled = false
+note = "矿在 120px 之外 -> 先走近。⚠ 阈值未标定；且没有'走多久'的反馈，靠 TTL 收"
+
+[[rules]]
+name = "interact_pick_ore_when_close"
+action = "USE_PICKUP"
+when = "has_nearby_ore() and nearest_group_px('ore') <= 120"
+priority = 32
+ttl_seconds = 2
+scenes = ["WORLD"]
+enabled = false
+note = "走到 120px 内 -> 按 F 采集（与 world_pickup_ore 互为前置）"
+
+[[rules]]
+name = "interact_pick_drops_when_close"
+action = "USE_PICKUP"
+when = "has_nearby_drops() and nearest_group_px('drops') <= 120"
+priority = 42
+ttl_seconds = 2
+scenes = ["WORLD"]
+enabled = false
+note = "掉落物在近距离 -> 捡（掉落物通常一地都是，所以距离卡得比矿严）"
+
+# ------------------------------------------------------------------ 堆了很多先不开
+[[rules]]
+name = "interact_avoid_chest_storm"
+action = "WAIT"
+when = "nearby_count('chest') >= 3 and has_locked_chest()"
+priority = 25
+ttl_seconds = 1
+scenes = ["WORLD"]
+enabled = false
+note = "一堆箱子里混着上锁的 -> 先别急着一个个按，等状态识别清楚"
+
+# ------------------------------------------------------------------ 写不出来但值得记录
+#
+#   has_nearby_teleport_anchor() -> USE_PICKUP   ✗ 模型里没有锚点这个类
+#   has_nearby_statue()          -> USE_PICKUP   ✗ 模型里没有神像这个类
+#   has_nearby_fish_spot()       -> FISH         ✗ 类没有 + FISH 是复合操作
+#   has_nearby_flower()          -> USE_PICKUP   ✗ 类没有
+#   near_water()                 -> FISH         ✗ 类没有
+#   COOK / DISPATCH / PHOTOGRAPH                   ✗ 全是「开面板->点菜单->确认」
+#                                                   的复合操作，且需要 UI 元素定位
+#
+# 解锁顺序：先扩模型类目（锚点/神像/水域），再考虑复合动作层。

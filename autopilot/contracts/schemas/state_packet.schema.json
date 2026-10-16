@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://neko.local/schemas/state_packet-1.0.json",
+  "title": "N.E.K.O. Autopilot StatePacket v1.0",
+  "description": "感知层上行契约。三态约定：可空字段的 null 表示 UNKNOWN（既不就绪也不未就绪），决策层应保守跳过。position 为 null 表示定位丢失，此时禁止用预测值填补。",
+  "type": "object",
+  "required": ["schema_version", "game_id", "timestamp_ms", "state_version", "scene", "player", "resource"],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "type": "string", "const": "1.0" },
+    "game_id": { "type": "string", "minLength": 1 },
+    "timestamp_ms": { "type": "integer", "minimum": 0 },
+    "state_version": { "type": "integer", "minimum": 0, "description": "单调递增。意图绑定此值，执行时校验未漂移过大。" },
+    "scene": {
+      "type": "object",
+      "required": ["id", "confidence"],
+      "properties": {
+        "id": { "type": "string", "description": "见架构文档 5.5 场景枚举；UNKNOWN 是合法空状态。" },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "evidence": { "type": "array", "items": { "type": "string" }, "description": "判定依据，形如 PaimonMenu@0.96" },
+        "entered_ms": { "type": ["integer", "null"] },
+        "raw_label": { "type": "string" }
+      }
+    },
+    "position": {
+      "type": ["object", "null"],
+      "description": "定位丢失时为 null。禁止用运动预测填补——那会让上层在无观测情况下继续动作。",
+      "required": ["quality"],
+      "properties": {
+        "quality": { "enum": ["GOOD", "DEGRADED", "LOST"] },
+        "zone": { "type": ["string", "null"] },
+        "x": { "type": ["number", "null"] },
+        "y": { "type": ["number", "null"] },
+        "heading_deg": { "type": ["number", "null"], "minimum": 0, "maximum": 360 },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "source": { "type": "string" }
+      }
+    },
+    "player": {
+      "type": "object",
+      "properties": {
+        "level": { "type": ["integer", "null"] },
+        "hp_ratio": { "type": ["number", "null"], "minimum": 0, "maximum": 1, "description": "计划用血条几何投影计算，不用 OCR。" },
+        "hp_source": { "type": "string" },
+        "energy": { "type": ["integer", "null"] },
+        "energy_max": { "type": ["integer", "null"] },
+        "energy_state": { "enum": ["CHARGED", "CHARGING", "UNKNOWN"] },
+        "resin": { "type": ["integer", "null"] },
+        "resin_cap": { "type": ["integer", "null"] },
+        "party": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["slot", "char_id", "active"],
+            "properties": {
+              "slot": { "type": "integer" },
+              "char_id": { "type": "string" },
+              "name": { "type": "string" },
+              "active": { "type": "boolean" },
+              "cd_ready": {
+                "type": "object",
+                "description": "三态：true=就绪 false=未就绪 null=UNKNOWN。null 不得压缩为布尔。",
+                "additionalProperties": { "type": ["boolean", "null"] }
+              }
+            }
+          }
+        }
+      }
+    },
+    "resource": {
+      "type": "object",
+      "required": ["perception_ok"],
+      "properties": {
+        "fps": { "type": "number" },
+        "tick_ms": { "type": "integer" },
+        "perception_ok": { "type": "boolean", "description": "false 时决策层不产出任何意图。" },
+        "ocr_available": { "type": "boolean" },
+        "ocr_fail_streak": { "type": "integer", "minimum": 0 },
+        "yolo_ms": { "type": "number" },
+        "template_ms": { "type": "number" },
+        "locator_ms": { "type": "number" }
+      }
+    }
+  }
+}

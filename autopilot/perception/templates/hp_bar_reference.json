@@ -1,0 +1,46 @@
+{
+  "_comment": "由 autopilot/tools/extract_hp_template.py 实测生成，勿手改。ROI 依赖分辨率，换机器请重跑脚本。",
+  "measured_from": "autopilot\\_runtime\\capdiag_wgc.png",
+  "frame_size": [
+    2560,
+    1600
+  ],
+  "reference_resolution": [
+    2560,
+    1600
+  ],
+  "roi_xywh": [
+    1076,
+    1500,
+    408,
+    15
+  ],
+  "roi_frac": [
+    0.420312,
+    0.9375,
+    0.159375,
+    0.009375
+  ],
+  "fill_bgr": [
+    34,
+    215,
+    150
+  ],
+  "frame_bgr": [
+    145,
+    88,
+    36
+  ],
+  "white_overlay_ratio": 0.1426,
+  "empty_background_bgr": [
+    25,
+    25,
+    25
+  ],
+  "empty_template_is_synthetic": true,
+  "notes": [
+    "fill_bgr / frame_bgr / white_overlay_ratio 为真机实测。",
+    "empty_background_bgr 是我们选的合成色，不是量出来的 —— 满血帧里没有空条区域可测。",
+    "hp_estimator 在没有显式 background_color 时，对满血/空血返回 None（不猜）；部分血量不需要该参数。"
+  ]
+}

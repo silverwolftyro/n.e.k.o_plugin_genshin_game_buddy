@@ -1,0 +1,78 @@
+# ============================================================================
+# 原神 · 异常处理（2026-10-11 新增）
+# ============================================================================
+#
+# 这个方向是**唯一例外**：它要的信号恰好是今天真实可用的那几个。
+#
+# 可用信号：perception_ok() · ocr_ok() · scene() · scene_confidence()
+#           has_nearby_* · nearby_entity_count · nearby_count
+#
+# 不可用（写不了）：hp / energy / pos_quality / pos_usable / since
+#                  q_ready / e_ready / enemy_count / target_locked
+#
+# 所以这里能写的异常只有**感知层层面的**，而不是「角色层面的」。
+# 依赖的 context 函数：perception_ok() ocr_ok() scene() scene_confidence()
+#                       has_nearby_enemy() nearby_count()
+# ============================================================================
+
+# ------------------------------------------------------------------ 感知不健康
+# 引擎自己在连续失败 10 次后会进 CORE_PAUSED，但那是**硬停**；
+# 这条是更早的软闸：感知刚说不健康就先别动。
+[[rules]]
+name = "recovery_hold_when_perception_down"
+action = "WAIT"
+when = "not perception_ok()"
+priority = 5
+ttl_seconds = 2
+scenes = ["WORLD", "UNKNOWN"]
+enabled = false
+note = "感知层判定本帧不可信 -> 停下。⚠ 与 combat_hold_when_perception_bad 条件重复，见 PRIORITY_MAP.md 的冲突记录"
+
+# ------------------------------------------------------------------ OCR 读不到
+[[rules]]
+name = "recovery_hold_when_ocr_fails"
+action = "WAIT"
+when = "not ocr_ok()"
+priority = 8
+ttl_seconds = 2
+scenes = ["WORLD", "UNKNOWN"]
+enabled = false
+note = "OCR 失败时不做任何依赖文字的决策；这里只是一道保险闸"
+
+# ------------------------------------------------------------------ 场景识别没把握
+# scene_confidence 今天是真值（能出数），所以这条是能写的。
+# ★ 注意方向：**低置信度 -> 别轻举妄动**，不是「低置信度 -> 重新识别」
+#   （后者需要一个「重新识别」动作，而那不存在）。
+[[rules]]
+name = "recovery_cautious_when_scene_unsure"
+action = "WAIT"
+when = "scene_confidence() < 0.5 and scene() == 'UNKNOWN'"
+priority = 12
+ttl_seconds = 2
+scenes = ["WORLD", "UNKNOWN"]
+enabled = false
+note = "场景判定没把握 -> 原地等一拍。阈值 0.5 未标定"
+
+# ------------------------------------------------------------------ 敌人突然消失
+# 有过敌人、现在没有，而识别本身是好的 —— 通常意味着敌人死了或跑出画面。
+# 这时**不该**继续按战斗键。combat_single_focus_attack 会因为
+# has_nearby_enemy() 变 False 而自动停，所以这条主要是防御性的。
+[[rules]]
+name = "recovery_stand_down_when_cleared"
+action = "WAIT"
+when = "enemy_count() == 0 and not has_nearby_enemy()"
+priority = 50
+ttl_seconds = 1
+scenes = ["WORLD"]
+enabled = false
+note = "附近已经没有敌人 -> 收手，别继续追着打空气"
+
+# ------------------------------------------------------------------ 写不出来但值得记录
+#
+#   卡死 -> 传送            ✗ 没有「卡住」信号（PATHFIND_STUCK 依赖位置，
+#                              而 pos_* 恒 UNKNOWN）
+#   掉线 -> 重连            ✗ 根本没有网络状态感知
+#   体力耗尽 -> 休息        ✗ resin() 未观测，且原神没有「休息」这个动作
+#                            （原粹树脂只能等，每 8 分钟 1 点）
+#   场景误判 -> 重试        ✗ 没有「重新识别」这个动作；而且
+#                            场景识别本身就没有手动触发入口

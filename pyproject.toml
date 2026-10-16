@@ -1,7 +1,12 @@
 [project]
 name = "genshin_game_buddy"
-version = "2.0.73b0"
+version = "3.1.18"
 dependencies = [
+    # WGC 截图后端（CaptureChannel.WGC）。
+    # 硬件加速全屏下 bitblt/dxcam/mss 三个全部只拿到黑帧，WGC 走 DWM
+    # 合成管道，是唯一不碰注册表的解法。真机实测原神全屏可用。
+    # 缺它不会炸：_init_channel 判为不可用并自动跳过。
+    "windows-capture>=2.0.1",
 ]
 authors = [
     { name = "silverwolftyro" },

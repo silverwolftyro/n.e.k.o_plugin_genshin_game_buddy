@@ -433,10 +433,17 @@ def _install_window_fakes(monkeypatch: pytest.MonkeyPatch, sc, windows: list[_Fa
             "IsWindow": lambda hwnd: hwnd in by_hwnd,
             "GetWindowText": get_window_text,
             "GetWindowRect": get_window_rect,
-            "GetWindowThreadProcessId": get_window_thread_process_id,
             "GetClassName": get_class_name,
         },
         unknown,
+    )
+    # ★ 防回归守卫：GetWindowThreadProcessId **不属于** win32gui。
+    #   真实 pywin32 的模块布局就摆在那儿；替身要是"好心"把它补回 win32gui，
+    #   生产代码再写错模块归属时测试又会绿 —— 2026-10-10 那次就是这么漏过去的。
+    #   宁可直接断言失败，也不要一个会替 bug 背书的替身。
+    assert "GetWindowThreadProcessId" not in win32gui.handlers, (
+        "GetWindowThreadProcessId 属于 win32process，不属于 win32gui。"
+        "放回 win32gui 会让 screen_capture 写错模块也测不出来"
     )
     pygetwindow = _FakeModule(
         "pygetwindow",
@@ -457,7 +464,19 @@ def _install_window_fakes(monkeypatch: pytest.MonkeyPatch, sc, windows: list[_Fa
         },
         unknown,
     )
-    win32process = _FakeModule("win32process", {"GetModuleFileNameEx": get_module_file_name_ex}, unknown)
+    win32process = _FakeModule(
+        "win32process",
+        {
+            "GetModuleFileNameEx": get_module_file_name_ex,
+            # ★ 真 pywin32 里 GetWindowThreadProcessId 就在 win32process。
+            #   2026-10-10 真机事故：生产代码写成了 win32gui.，每个窗口都
+            #   AttributeError，又被窗口枚举的裸 except 吞掉，
+            #   find_genshin_window() 恒返回 None（真机 EnumWindows 回调 418 次，
+            #   命中 0 次）。当时这个键却被塞在假 win32gui 里，把 bug 认证成了正确的。
+            "GetWindowThreadProcessId": get_window_thread_process_id,
+        },
+        unknown,
+    )
 
     fakes = {fake.name: fake for fake in (win32gui, pygetwindow, psutil, win32process)}
     for fake in fakes.values():
@@ -509,6 +528,111 @@ def test_find_genshin_window__none_without_genshin_window(sc, monkeypatch) -> No
     ]
     unknown = _install_window_fakes(monkeypatch, sc, windows)
     assert sc.find_genshin_window() is None, f"未覆盖的 API 调用：{unknown}"
+
+
+@pytest.mark.unit
+def test_real_pywin32_layout__thread_process_id_belongs_to_win32process() -> None:
+    """**真机 API 形状守卫** —— 不需要游戏窗口，也不需要假模块。
+
+    2026-10-10 真机事故的根因锁在这一条：``GetWindowThreadProcessId`` 在真实
+    pywin32 里只存在于 **win32process**，win32gui 上压根没这个属性。当时
+    ``screen_capture.py`` 写成 ``win32gui.GetWindowThreadProcessId``，每个窗口
+    都 AttributeError，又被窗口枚举里的裸 ``except Exception: return True``
+    吞掉，于是 ``find_genshin_window()`` 恒返回 None —— 症状看起来跟
+    "游戏没开" 一模一样。
+
+    ★ 为什么不用真窗口做集成测试
+      造一个真实的 ``YuanShen.exe`` 窗口需要游戏在跑，而且会被最小化 /
+      DPI / 前台焦点污染；真正需要守住的是**模块归属**这一个事实，它跟窗口
+      无关，用真实 pywin32 直接断言反而更稳、跨机器也一致。
+    """
+    win32gui = pytest.importorskip("win32gui")
+    win32process = pytest.importorskip("win32process")
+
+    assert not hasattr(win32gui, "GetWindowThreadProcessId"), (
+        "win32gui 上不该出现 GetWindowThreadProcessId；"
+        "若 pywin32 变更了布局，请同步改 screen_capture 和本用例"
+    )
+    assert hasattr(win32process, "GetWindowThreadProcessId"), (
+        "screen_capture 依赖 win32process.GetWindowThreadProcessId，"
+        "真实 pywin32 上必须存在，否则窗口探测会静默失效"
+    )
+
+
+@pytest.mark.unit
+def test_screen_capture_source__never_calls_getwindowthreadprocessid_on_win32gui(sc) -> None:
+    """静态守卫：源码里不得再出现 ``win32gui.GetWindowThreadProcessId`` **调用**。
+
+    上一条依赖真实 pywin32（本机装了才跑）；这一条只读源码，**任何机器上
+    都能跑**，包括没装 pywin32 的 CI。两条一起守，才不会一边绿一边塌。
+
+    ★ 为什么走 AST 而不是字符串包含
+      模块里有一段注释和 docstring 专门记录这次事故（里面**故意**写了
+      ``win32gui.GetWindowThreadProcessId`` 这个错拼）。纯文本包含会把那段
+      说明当成违规，测试反而自己把自己绊倒。AST 只看真实的属性访问节点。
+    """
+    import ast
+    import inspect
+    import textwrap
+
+    tree = ast.parse(textwrap.dedent(inspect.getsource(sc)))
+
+    def _attr_lines(module: str) -> list[int]:
+        return sorted(
+            node.lineno
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Attribute)
+            and node.attr == "GetWindowThreadProcessId"
+            and isinstance(node.value, ast.Name)
+            and node.value.id == module
+        )
+
+    wrong = _attr_lines("win32gui")
+    assert not wrong, (
+        f"screen_capture 在第 {wrong} 行又通过 win32gui 取 pid —— "
+        "该函数属于 win32process，写错会被窗口枚举的 except 静默吞成'没找到窗口'"
+    )
+    right = _attr_lines("win32process")
+    assert right, "screen_capture 应当通过 win32process 取 pid（一个都没有说明改过头了）"
+
+
+@pytest.mark.unit
+def test_window_enumeration_failures_are_logged_not_silent(sc, monkeypatch, caplog) -> None:
+    """单个窗口处理失败必须**留下痕迹**，不能纯静默 return True。
+
+    这条是 2026-10-10 事故能藏这么久的直接原因：``except Exception: return True``
+    把真机 418 次 AttributeError 全部吃掉，函数外面只看到"没找到窗口"。
+    """
+    import logging as _logging
+
+    def _boom(_hwnd):
+        raise AttributeError("module 'win32process' has no attribute 'Xyz'")
+
+    _install_window_fakes(monkeypatch, sc, _game_windows())
+    monkeypatch.setitem(sys.modules["win32process"].handlers,
+                        "GetWindowThreadProcessId", _boom)
+    sc._ENUM_SEEN_ERRORS.clear()
+    # 一次性窗口普查也会打 WARNING，而它是**进程级**的一次性开关 ——
+    # 不显式置位的话，这条用例能不能过取决于它在文件里排第几，那是运气不是断言。
+    monkeypatch.setattr(sc, "_ENUM_CENSUS_DONE", True, raising=False)
+
+    with caplog.at_level(_logging.WARNING, logger=sc._LOGGER.name):
+        result = sc.find_genshin_window()
+
+    assert result is None, "取 pid 失败时必须返回 None，而不是假装找到窗口"
+    warnings = [r.getMessage() for r in caplog.records if r.levelno >= _logging.WARNING]
+    assert warnings, "窗口枚举炸了却一条 WARNING 都没有 —— 又是静默失败"
+    assert any("Xyz" in m for m in warnings), (
+        f"告警里应当点名真正出错的东西，实际：{warnings}"
+    )
+
+    # 节流：同一类错误跑第二遍，不该再刷一条。
+    caplog.clear()
+    with caplog.at_level(_logging.WARNING, logger=sc._LOGGER.name):
+        sc.find_genshin_window()
+    assert not [r for r in caplog.records if r.levelno >= _logging.WARNING], (
+        "同一类错误不该重复刷屏（去重键失效？）"
+    )
 
 
 # =============================================================================

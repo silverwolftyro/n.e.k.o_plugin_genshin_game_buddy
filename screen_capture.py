@@ -1,16 +1,20 @@
 """主动抓取目标游戏窗口画面 → 裸 base64（喂 OcrEngine）。
 
 降级链 PrintWindow -> mss -> 宿主抓屏桥。全程内存、不落盘；绝不记录任何图像或
-OCR 内容（隐私红线）。第三方依赖(mss/PIL/win32gui/psutil)一律函数内 lazy import，
-顶层只用 stdlib —— 本模块不在红线扫描名单里，但保持 ocr_engine.py 的既有惯例。
+OCR 内容（隐私红线）。第三方依赖(mss/PIL/win32gui/win32process/psutil)一律函数内
+lazy import，顶层只用 stdlib —— 本模块不在红线扫描名单里，但保持 ocr_engine.py
+的既有惯例。
 """
 from __future__ import annotations
 
 import base64
 import io
+import logging
 import threading
 from dataclasses import dataclass
 from typing import Any, Optional, Tuple
+
+_LOGGER = logging.getLogger(__name__)
 
 BLACK_FRAME_LUMA_THRESHOLD = 12.0
 
@@ -31,6 +35,42 @@ _GAME_EXE = {
 _GAME_TITLE_HINTS = (
     "原神", "genshin", "崩坏：星穹铁道", "崩坏星穹铁道", "starrail", "绝区零", "zenless",
 )
+
+#: 窗口枚举里"单窗口处理失败"的告警预算（按不同异常去重后计）。
+#:
+#: ★ 为什么必须有这个预算
+#:   ``EnumWindows`` 一次回调几百个窗口，每个窗口都独立 ``except``。
+#:   不节流的话，**一行 typo 就能刷出 418 条 WARNING**（真机实测值），
+#:   把真正的日志淹掉，而且看起来像"系统在疯狂报警"。
+_ENUM_WARN_BUDGET = 3
+_ENUM_SEEN_ERRORS: set = set()
+
+
+def _warn_window_skip(where: str, exc: BaseException) -> None:
+    """单个窗口处理失败时记一条可见告警，按 (位置, 异常类型, 消息) 去重。
+
+    ★ 这里曾经是 ``except Exception: return True`` —— 纯静默
+      2026-10-10 真机事故：``win32gui.GetWindowThreadProcessId`` 写错了模块
+      （真 pywin32 里它在 **win32process**），每个窗口都 AttributeError，
+      然后被这个裸 except 全部吞掉。``find_genshin_window()`` 于是恒返回
+      None，从外面看跟"游戏没开"一模一样 —— 而当时的单测替身还把这个错 API
+      塞进了假 win32gui，把 bug 一起认证成正确的。
+      静默兜底可以留，但**不能再不留痕迹**。
+    """
+    key = (where, type(exc).__name__, str(exc))
+    if key in _ENUM_SEEN_ERRORS:
+        return
+    _ENUM_SEEN_ERRORS.add(key)
+    n = len(_ENUM_SEEN_ERRORS)
+    if n <= _ENUM_WARN_BUDGET:
+        _LOGGER.warning(
+            "窗口枚举[%s] 跳过一个窗口：%s: %s", where, type(exc).__name__, exc)
+        return
+    if n == _ENUM_WARN_BUDGET + 1:
+        _LOGGER.warning(
+            "窗口枚举[%s] 还有别类错误在发生，去重后不再逐条打印（已去重 %d 类）。"
+            "上面的 %d 条之外若有**新类型**的错误仍会再报一条。",
+            where, n, _ENUM_WARN_BUDGET)
 
 
 @dataclass(frozen=True)
@@ -105,12 +145,74 @@ def _process_name(pid: Any) -> str:
         return ""
 
 
+_ENUM_CENSUS_DONE = False
+
+
+def _log_window_census_once() -> None:
+    """**每个进程只跑一次**的窗口普查，排障入口。
+
+    ★ 为什么需要它
+      2026-10-10 事故二段：把 ``win32gui`` -> ``win32process`` 的 typo 修好之后，
+      同一台机器上**独立跑**这份模块能正确返回原神窗口，
+      可插件宿主进程里 ``find_genshin_window()`` 依然返回 None。
+      同一份字节码、同一个桌面，结论却相反 —— 那差异只可能在**进程环境**里
+      （宿主是不是跑在别的 window station / 会话、能不能读到高完整性窗口标题…）。
+      光看返回值永远分不出来，得把"这个进程到底看见了什么"打出来。
+
+    只在**首次调用**时枚举一遍，之后立刻返回，不给 5s 一 tick 的探测添开销。
+    故意放在真正的枚举**之前**：找不到窗口的那一次才是需要证据的那一次。
+    """
+    global _ENUM_CENSUS_DONE
+    if _ENUM_CENSUS_DONE:
+        return
+    _ENUM_CENSUS_DONE = True
+
+    try:
+        import os
+        import sys
+
+        import win32gui
+        import win32process
+
+        total = visible = titled = 0
+        samples: list = []
+
+        def _peek(hwnd: Any, _extra: Any) -> bool:
+            nonlocal total, visible, titled
+            total += 1
+            if not win32gui.IsWindowVisible(hwnd):
+                return True
+            visible += 1
+            title = win32gui.GetWindowText(hwnd) or ""
+            if not title:
+                return True
+            titled += 1
+            if len(samples) < 8:
+                samples.append(title[:32])
+            return True
+
+        win32gui.EnumWindows(_peek, None)
+        _LOGGER.warning(
+            "[窗口普查] 模块=%s pid=%s python=%s 回调=%d 可见=%d 有标题=%d "
+            "win32gui有API=%s win32process有API=%s 进程名表=%d 标题样本=%r",
+            _LOGGER.name, os.getpid(), sys.executable, total, visible, titled,
+            hasattr(win32gui, "GetWindowThreadProcessId"),
+            hasattr(win32process, "GetWindowThreadProcessId"),
+            len(_GAME_EXE), samples,
+        )
+    except Exception as exc:  # noqa: BLE001 —— 普查自己不能把主流程带崩
+        _LOGGER.warning("[窗口普查] 普查本身失败：%s: %s", type(exc).__name__, exc)
+
+
 def find_genshin_window() -> Optional[dict]:
     """找本地游戏窗口（原神/星铁/绝区零；进程名优先，标题兜底）。返回 {hwnd,pid,title,rect} 或 None。"""
     try:
         import win32gui  # lazy: 第三方
+        import win32process  # lazy: 第三方
     except Exception:
         return None
+
+    _log_window_census_once()
 
     found: dict = {}
 
@@ -121,14 +223,18 @@ def find_genshin_window() -> Optional[dict]:
             title = win32gui.GetWindowText(hwnd) or ""
             if not title:
                 return True
-            _tid, pid = win32gui.GetWindowThreadProcessId(hwnd)
+            # ★ 必须是 win32process，不是 win32gui。
+            #   真 pywin32 里 GetWindowThreadProcessId 只存在于 win32process；
+            #   写错模块 -> AttributeError -> 被下面 except 吞成"没找到窗口"。
+            _tid, pid = win32process.GetWindowThreadProcessId(hwnd)
             name = _process_name(pid)
             is_gen = (name in _GAME_EXE) or any(h in title.lower() for h in _GAME_TITLE_HINTS)
             if is_gen and not found:
                 rect = win32gui.GetWindowRect(hwnd)
                 found.update({"hwnd": hwnd, "pid": pid, "title": title, "rect": tuple(rect)})
             return True
-        except Exception:
+        except Exception as exc:
+            _warn_window_skip("find_genshin_window", exc)
             return True
 
     try:
@@ -147,6 +253,7 @@ def _enum_large_visible_windows() -> list[dict]:
     """
     try:
         import win32gui  # lazy: 第三方
+        import win32process  # lazy: 第三方
     except Exception:
         return []
     out: list[dict] = []
@@ -164,13 +271,13 @@ def _enum_large_visible_windows() -> list[dict]:
             if w < 500 or h_ < 400:
                 return True
             title = win32gui.GetWindowText(hwnd) or ""
-            _tid, pid = win32gui.GetWindowThreadProcessId(hwnd)
+            _tid, pid = win32process.GetWindowThreadProcessId(hwnd)
             out.append({
                 "hwnd": hwnd, "pid": pid, "title": title,
                 "rect": tuple(rect), "area": w * h_,
             })
-        except Exception:
-            pass
+        except Exception as exc:
+            _warn_window_skip("_enum_large_visible_windows", exc)
         return True
 
     try:
@@ -188,6 +295,7 @@ def find_foreground_window() -> Optional[dict]:
     """
     try:
         import win32gui  # lazy: 第三方
+        import win32process  # lazy: 第三方
     except Exception:
         return None
 
@@ -197,15 +305,15 @@ def find_foreground_window() -> Optional[dict]:
         if hwnd:
             try:
                 title = win32gui.GetWindowText(hwnd) or ""
-                _tid, pid = win32gui.GetWindowThreadProcessId(hwnd)
+                _tid, pid = win32process.GetWindowThreadProcessId(hwnd)
                 rect = win32gui.GetWindowRect(hwnd)
                 left, top_, right, bottom = (rect or (0, 0, 0, 0))
                 if int(right) > int(left) and int(bottom) > int(top_):
                     return {"hwnd": hwnd, "pid": pid, "title": title, "rect": tuple(rect)}
-            except Exception:
-                pass
-    except Exception:
-        pass
+            except Exception as exc:
+                _warn_window_skip("find_foreground_window/path1", exc)
+    except Exception as exc:
+        _warn_window_skip("find_foreground_window/getfg", exc)
 
     # 路径 2：EnumWindows 取最大可见窗口（≥500x400，跳过任务栏/桌面 helper）
     candidates = _enum_large_visible_windows()

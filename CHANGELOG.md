@@ -1,4 +1,199 @@
-# Changelog — multi_game_companion
+# Changelog — genshin_game_buddy
+
+> ⚠️ **本节是重建，不是历史记录。**
+>
+> 2.0.73（2026-10-04）之后到 3.1.17 之间**没有逐版本记录**——那段时间的
+> 工作没有 git 仓库可查（`D:\NEKO` 下没有 `.git`），CHANGELOG 也没跟上。
+>
+> 所以下面这段是**从可追溯的来源倒推**的，每条都标了出处：
+>
+> - `[来源：session_20261010_wrapup.md]` —— 2026-10-10 的真机排查记录
+> - `[来源：session_20261012_signals.md]` —— 2026-10-11/12 的真机排查与信号接入
+>   （原 `session_20261010_wrapup.md` 之外的会话记录；10-11 与 10-12 已合并）
+> - `[来源：<文件> 注释 YYYY-MM-DD]` —— 代码里带日期的注释
+> - `<unknown source>` —— 找不到依据，**不编**
+>
+> **2026-10-05 ~ 10-09 整段 3.0 Autopilot 重写没有留下任何可追溯记录**，
+> 标 `<unknown source>`。要知道那段具体做了什么，只能读 `autopilot/` 下的
+> 源码和 docstring ——它们写得很细，比这份重建可靠。
+
+## 3.1.18 — 2026-10-12（深度信号接入准备：工具 / 评测 / 测试覆盖）
+
+**主题**：不做新功能，做「让下一阶段能开始」的准备工作 —— 降低人工成本、
+把真实数据摆到分类器面前、补上零覆盖的模块、清理历史遗留。
+**全部改动默认不启用**，需真机验证后逐条开。
+
+### 新增：模板裁图助手（降低人工成本）
+
+- `autopilot/tools/template_cropper.py`。`hp()` / `energy()` 依赖用户手动裁
+  模板图（仓库按惯例不预置），原先要「截图 → 自己找位置 → 画图工具裁 →
+  命名存盘 → 改 defaults.toml」。本工具读一张截图，按**色相 + 形状**找横条、
+  画预览、确认后按标准命名写进 `perception/templates/`，并生成可粘贴的
+  `[autopilot.templates.*]` 配置片段。
+- **HSV 参数在真机截图上实测标定**，不是拍脑袋。样本
+  `autopilot/_runtime/capdiag_wgc.png`（WGC 实拍 2560×1600）：
+  玩家血条 `y=[1500,1514] H=41 S=215 V=215`，检出 box=`(1076,1500,408,15)`
+  覆盖率 98%，与人工逐行扫描一致。
+- 由实测推导出三条**不可省**的设计约束（缺任一条就误报/漏报）：
+  1. **必须按色相门控** —— 夜石地面 `S=183`，比血条 `S=215` 只低一点，
+     用饱和度当判据会把整块地砖框进来；
+  2. **必须水平闭运算** —— 血条上的白色数字 `17640 / 17640` 会把连续绿色
+     切成碎段（实测最宽只剩 126px），桥接后还原为完整 408px；
+  3. **必须靠 ROI 隔离** —— 队友血条与玩家血条**颜色完全相同**（实测同为
+     `H=41 S=215`）。
+- ⚠️ `energy_bar` 的参数**未实测**：那张真机截图里角色能量为 0，能量条是空的。
+  参数来自 UI 常识，spec 里 `calibrated=False`，预览用橙色框标注。
+- 提供 tkinter 拉框兜底（`--manual`），依赖已在 `pyproject.toml` 声明
+  （Pillow 11.3.0），**未引入新依赖**。
+- `<来源：autopilot/tools/template_cropper.py 模块 docstring>`
+
+### 新增：OCR 场景分类器的真实数据评测
+
+- `autopilot/tools/ocr_scene_eval.py`。从插件运行日志抽真实 OCR 采样跑分类器。
+- **结论：这批数据验证不了分类器，需要重采样。**
+  - 样本 **1431 条**（2026-10-10 / 10-11 两份日志，仅本插件）
+  - **准确率无法计算**：日志里没有 ground truth。那两天跑的还是二值检测 ——
+    `state=` 是「游戏是否在前台」（`IN_GAME/UNKNOWN/AWAY`）不是场景；
+    `BAG_INVENTORY/MAP_BIG/DIALOG/COMBAT` 全日志出现 **0 次**
+  - **触发率 0 / 1431 = 0.00%**，桌面污染样本 516 条（36.1%）无一误报
+  - 36% 的「IN_GAME」样本其实抓到的是 **Windows 桌面 / 文件管理器**
+    （`capture_path=foreground` 抓的是**前台窗口**，前台是资源管理器）
+- 按要求**只报告、不调阈值**（`min_confidence` 保持 0.55）。
+- `<来源：autopilot/tools/ocr_scene_eval.py；recognition/notes/session_20261012_signals.md §2>`
+
+### 测试覆盖
+
+- 新增 **124 条**（`826 → 949 passed`）：
+  - `tests/unit/test_template_cropper.py` **33** 条
+  - `tests/unit/test_yolo_postprocess.py` **34** 条（`_letterbox` / `_postprocess`
+    / `_postprocess_end2end` / `_nms` 四个纯函数，合成张量驱动，不需模型显卡）
+  - `tests/unit/test_intent_validator.py` **32** 条
+  - `tests/unit/test_keymap.py` **25** 条
+- 补上两个「说测不了其实是没去看」的模块：`core/loop.py` 45 条、
+  `builder.py` 53 条（上一版 CHANGELOG 之前的轮次）
+
+### 修复（本轮新发现）
+
+- **`load_keymap` 回落路径返回错类型**：文件不存在时直接返回
+  `dict(DEFAULT_KEYMAP)`（值是 `VK` 成员），而读文件那条路返回 `KeyId`。
+  `VK` 没有 `to_vk()` —— 偏偏「没配 keymap.toml 的新用户」正走回落路径，
+  拿到的键位**根本没法注入按键**。
+  `<来源：autopilot/actuator/keymap.py:load_keymap>`
+- **`IntentValidator` 查重用错时钟**：`_check_id` 自己取 `time.time()`，
+  而不是 `validate()` 传进来的 `now_ms`。调用方传合成时间戳（回放 /
+  确定性测试 / 合并层用状态时间戳）时两条时钟混用，去重 TTL 比较对不上，
+  **重复意图因此漏过**。
+  `<来源：autopilot/actuator/validator.py:_check_id>`
+- **`.pytest-tmp/` 会让 build 跳过 metadata 推导**：`conftest.py` 原注释写
+  「用点前缀，打包规则会跳过」——**那是错的**。`neko_plugin_cli` 的暂存树检查
+  不认点前缀，会报 `[WARN] staged tree contains directories that cannot
+  survive packaging (['.pytest-tmp'])`，打出的包**没有 `plugin.meta.json`**，
+  要等宿主运行时重扫才能补上入口参数 schema。空目录一样触发。
+  已修正注释并删除该目录。
+  `<来源：tests/conftest.py:SCRATCH_ROOT>`
+- **`test_light_capture_dhash__static_screen_returns_same_hash` 假红**：
+  它抓**真实桌面**并断言两次抓屏几乎一致。只要桌面上有东西在动（全屏播视频、
+  游戏在跑、终端滚动）就必然失败。实测踩过两次：桌面全屏播 B 站视频时
+  两帧差 39.6% 的像素，diff=7。已改为「先判静止再断言」：连抓三帧，
+  任一对超过 `STATIC_MAX_DIFF=2` 就跳过。**刻意不复用生产阈值
+  `change_detect_threshold=8`** —— 那是「要不要触发 OCR」的业务阈值，
+  拿它当环境判据会在 diff 落在 (2, 8] 时误判成「静止」而照样红（实测过）。
+  `<来源：tests/unit/test_change_detect.py>`
+
+### 清理
+
+- 删除 `__init__.py.__e2y_backup`（135 KB，`__init__.py` 的旧快照）与
+  `pyproject.toml.bak`（2.0.73b0 时期的老依赖声明，那时 winrt 走 pip，
+  现在改为 vendored `vendor/winrt/`）。两者**全仓零引用**且**不在
+  `.gitignore` 里** —— 会被打进安装包。
+- 保留 `printwindow` 相关注释：它们是「为什么删掉 PrintWindow」的踩坑记录
+  （2026-10-10 真机实证），不是过时残留。`screen_capture.py`（YUI/OCR 用）
+  仍合法地使用 PrintWindow，与 `autopilot/perception/capturer.py` 是两回事。
+
+### 文档
+
+- `recognition/notes/INDEX.md` 新建：目录全量索引（用途 / 最后更新 / 读它干嘛）
+- `session_20261011_autopilot_3_notes.md` 与 10-12 的信号接入笔记合并为
+  `session_20261012_signals.md`（原两份内容保留后删除）
+- `recognition/notes/signal_integration_roadmap.md` 重写：信号按
+  ✅已接入 / 🟡离线完成未接主流程 / ❌仍恒 UNKNOWN 三态重排，
+  新增「离线 vs 真机」切分表
+
+---
+
+## 3.0 ~ 3.1.17 — Autopilot 3.0（B 轨）重建
+
+**主题**：从「只做术语陪聊」扩成「感知 → 决策 → 执行」的完整游戏陪玩。
+
+### 架构：新增 B 轨（引擎）
+
+- `autopilot/` 子包整体新增：截图 → 状态构建 → 规则决策 → 按键执行
+  `<来源：autopilot/README.md, LAYER_DETAIL_MAP.md>`
+- 规则以 TOML 形式外置在 `autopilot/rules/`，`priority` 升序、**命中即停**
+  `<来源：autopilot/policy/local_tree.py>`
+- 引擎以独立进程跑（`python -m autopilot.tools.run_loop`），
+  与宿主通过 `_runtime/*.stream.jsonl` 交换状态
+  `<来源：autopilot/ui/protocol.py>`
+
+### 截图通道
+
+- 新增 **WGC**（Windows Graphics Capture）作为首选通道。
+  动机是**实测**：BitBlt / DXcam / mss 在硬件加速全屏下**全部**只能拿到黑帧，
+  且三者的失败形态互不相同（DXcam 抛异常、BitBlt 静默返回全 0 的合法图、
+  mss 屏幕坐标抢不到）。
+  `<来源：session_20261012_signals.md §1>`
+- 依赖 `windows-capture>=2.0.1`（Rust + PyO3，abi3-py39），vendored 进 `vendor/`
+- 截图黑帧判定：`BLACK_FRAME_LUMA = 8.0`，`luma` **逐帧精确 0.0** 判为黑
+  `<来源：autopilot/contracts/events.py:150>`
+- 重启流程：引擎轮询等窗口出现（上限 30 秒）并在超时时**带最后矩形**报错，
+  避免「找不到窗口」和「找到了但被最小化」两种情况混淆
+  `<来源：autopilot/perception/capturer.py>`
+- WGC 会话在窗口句柄变化后**惰性重建**（旧 DC 变僵尸后 BitBlt 仍返回成功
+  但写不出任何像素）
+  `<来源：autopilot/perception/capturer.py>`
+
+### 实体检测与决策链
+
+- `ENTITY_ENABLE_THRESHOLD_MS` 由 100 → 80 → **120**，并支持环境变量
+  `NEKO_ENTITY_THRESHOLD_MS` 覆盖。原因是**按机器而异**：本机 DirectML
+  空闲 63 ms / 负载 93 ms / CPU 路线 202 ms。
+  `<来源：autopilot/perception/world_entities.py>`
+- 新增 `has_nearby_drops()` DSL 函数（`drops` 分组早就登记了，DSL 侧却缺函数）
+  `<来源：autopilot/policy/context.py>`
+- **PickMark 拾取标记**：真机实测宝箱打开后 `has_nearby_chest()` **不消失**，
+  规则每 tick 重发同一个箱子，154.8 秒里真执行 151 次。
+  标记按**实体位置**记录，冷却 8 秒 / 半径 120 px（两者**未标定**）。
+  标记挂在 `LocalPolicyTree` 而**不是** `PolicyContext` —— 后者每 tick 重建，
+  实例变量活不过一轮。
+  `<来源：session_20261012_signals.md §3>`
+
+### 陪玩链路（事件流 → YUI）
+
+- 新增 `event_to_yui.py`：追尾读事件流 → 翻译成台词 → `push_message`。
+  开关 `MGC_EVENT_TO_YUI`。
+  `<来源：<unknown source>（2026-10-08 前后）>`
+- 修**目录分家**：适配器盯安装副本的 `_runtime`，引擎写源码树的，
+  而安装副本那份是 `plugin build` 打的**快照**（每次打包刷新）。
+  判据顺序为「env 硬覆盖 > sidecar 硬覆盖 > 探测候选按 mtime 竞争」。
+  `<来源：__init__.py:_resolve_run_dir>`
+- `VERBATIM_CHAT = True`：台词**原样上屏**，不让 YUI 用自己的话复述
+  `<来源：event_to_yui.py>`
+- `SKIP_CODES`：`INTENT_EXECUTED`（真机单 run 触发 754 次）、
+  `BLACK_FRAME`（暂停态下感知继续跑，单 run 2655 条）、
+  以及四个工程内部指标 `TEMPLATE_SCORE_LOW` / `OCR_RECOVERED` /
+  `YOLO_TIMEOUT` / `CONFIG_ERROR`
+  `<来源：event_20261010_wrapup.md>` `<来源：session_20261011 … §5>`
+
+### 已知遗留
+
+- 规则树**拿不到 position**：`StateBuilder` 没有注入 `locator`，
+  且定位服务初始为 `UNINITIALIZED`，必须先传送建立原点。
+  所以「走到某坐标」这条路不存在，`MOVE_FORWARD` 只能盲走 60 秒
+  `<来源：autopilot/perception/builder.py:378>`
+- 三条 `USE_PICKUP` 规则目前是 `enabled = false`，等真机验证后再逐个打开
+  `<来源：autopilot/rules/genshin_world.toml>`
+
+---
 
 ## 2.0.73 — 2026-10-04（worker 卡死回归 + 早退日志 + heartbeat 暴露 worker 健康度）
 

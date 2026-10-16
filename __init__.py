@@ -30,10 +30,13 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures  # 拍板 2.0.65：多线程 OCR（ThreadPoolExecutor 是 stdlib）
 import dataclasses
+import json  # 会话状态落盘（_write_session_state）
+import logging
 import os  # 拍板 2.0.66：探测 CPU 核数选 ocr_profile
 import threading
 import time
 from collections.abc import Mapping
+from pathlib import Path
 from typing import Any
 
 from plugin.sdk.plugin import (
@@ -51,6 +54,7 @@ from plugin.sdk.plugin import (
     ui,
 )
 
+from . import autopilot_bridge
 from .activation import ActivationState
 from .context_pack import (
     build_context_block,
@@ -65,10 +69,11 @@ from .game_registry import (
     PluginOptions,
     _clean_profile,
     as_section,
+    normalize_key,
 )
 from .ocr_engine import OcrEngine
 from .scene_store import SceneEntry, load_scenes
-from .screen_capture import capture_active_frame, is_black_frame
+from .screen_capture import capture_active_frame, find_genshin_window, is_black_frame
 from .session import (
     GameSession,
     GameSessionManager,
@@ -77,6 +82,98 @@ from .session import (
     SwitchResult,
 )
 from .term_store import CORE_LAYER_DIMENSIONS, TermEntry, TermLibrary, TermLoadError, load_library
+
+# ★ 会话探测的窗口查找兜底 + 自诊断（2026-10-10）—— 用**相对导入**。
+#   红线 test_redline__no_undeclared_third_party_imports 只允许根模块
+#   import 标准库 / plugin / __future__ / winrt（win32gui、psutil 都不在），
+#   而它检查的是 ``node.level == 0``（绝对导入）。相对导入 level > 0 不触发，
+#   且 window_probe 自己也不在 PLUGIN_MODULES 扫描列表里 —— 两边都不破线，
+#   Win32 代码不用被塞回 screen_capture。详见 window_probe 的模块 docstring。
+from .window_probe import find_window_by_title as _find_window_by_title
+from .window_probe import log_window_census as _log_window_census
+
+#: 与 autopilot/ 子包一致的日志约定（那边 20+ 个模块都是这么写的）
+logger = logging.getLogger(__name__)
+
+#: 读不到 plugin.toml 时的兜底版本号。**改了版本请两处一起改**：
+#: 这里和 ``plugin.toml [plugin] version``。不一致时读侧会显示兜底值，
+#: 那本身就是个信号 —— 用户一看就知道该同步了。
+PLUGIN_VERSION_FALLBACK = "3.1.17"
+
+#: 解析出来的版本号缓存。只读一次 plugin.toml。
+_PLUGIN_VERSION_CACHE: str | None = None
+
+
+def plugin_version() -> str:
+    """本插件的版本号。**以 ``plugin.toml`` 为唯一真源**。
+
+    ★ 为什么从文件读，而不是在代码里写死一份
+      ----------------------------------------
+      仓库里已经因为「pyproject 2.0.73b0 / plugin.toml 3.1.16」两套版本号
+      常年红了一条红线（``test_manifest__identity_is_consistent``）。再加一份
+      写死在 .py 里的版本号，就是**第三套**，迟早又漂一次。
+      从 manifest 读，漂了也只有一处要改；读不到就退到
+      :data:`PLUGIN_VERSION_FALLBACK` 并在日志里说一声。
+    """
+    global _PLUGIN_VERSION_CACHE
+    if _PLUGIN_VERSION_CACHE:
+        return _PLUGIN_VERSION_CACHE
+    try:
+        import tomllib  # noqa: PLC0415 - 标准库，函数内导入足够
+        from pathlib import Path as _Path  # noqa: PLC0415
+
+        path = _Path(__file__).resolve().parent / "plugin.toml"
+        raw = tomllib.loads(path.read_text(encoding="utf-8"))
+        ver = str(raw.get("plugin", {}).get("version", "") or "").strip()
+        _PLUGIN_VERSION_CACHE = ver or PLUGIN_VERSION_FALLBACK
+    except Exception as exc:  # noqa: BLE001
+        _PLUGIN_VERSION_CACHE = PLUGIN_VERSION_FALLBACK
+        logger.debug("读 plugin.toml 版本失败，退到兜底值 %s：%s",
+                     PLUGIN_VERSION_FALLBACK, exc)
+    return _PLUGIN_VERSION_CACHE
+
+
+# --------------------------------------------------------------------------
+
+# --------------------------------------------------------------------------
+# 会话探测的窗口查找兜底 + 自诊断（2026-10-10）—— 见上方 import 处的说明。
+# --------------------------------------------------------------------------
+
+def _bridge_candidates() -> list[Any]:
+    """主控台桥接文件的**候选路径**，按优先级排。
+
+    ★ 为什么需要多个候选
+      主控台把状态写在 ``<它的 base_dir()>/runtime/console_bridge.json``，
+      而 ``base_dir()`` 的语义**随运行方式变**：
+
+          源码模式 ``python -m neko_console`` -> NEKO-Console\\
+          打包 exe ``build\\Console.exe``     -> NEKO-Console\\build\\
+
+      插件这边只有一个写死的默认路径。用户在``build`` 下跑 exe 时，
+      插件就找不到文件 —— 面板永远显示"主控台未启动"，而主控台明明开着。
+      这里挨个探测，用**存在的那个**，并把结果透出到面板，
+      下次出问题用户能一眼看到"它到底在找哪个文件"。
+
+    ★ 模块顶层不做 IO
+      函数里才 stat，import 期什么都不碰（插件红线 R8）。
+    """
+    from pathlib import Path  # noqa: PLC0415 - 函数内导入，顶层不引入副作用
+
+    default = Path(autopilot_bridge.DEFAULT_BRIDGE_PATH)
+    console_dir = default.parent.parent          # ...\NEKO-Console
+    out: list[Any] = [default]
+    # 打包 exe 常落在 build\ 或 dist\ 下
+    for sub in ("build", "dist", "build/main.dist"):
+        out.append(console_dir / sub / "runtime"
+                   / autopilot_bridge.BRIDGE_FILE_NAME)
+    seen: set[str] = set()
+    uniq = []
+    for p in out:
+        key = str(p).lower()
+        if key not in seen:
+            seen.add(key)
+            uniq.append(p)
+    return uniq
 
 
 def _detect_profile_from_system() -> tuple[str, int, float]:
@@ -138,6 +235,123 @@ _DESKTOP_MARKERS_BUILTIN: tuple[str, ...] = (
 )
 
 
+def _newest_stream_mtime(directory: Path) -> float:
+    """目录里最新的 ``*.stream.jsonl`` 的修改时间；没有就 -1。"""
+    try:
+        files = list(directory.glob("*.stream.jsonl"))
+    except OSError:
+        return -1.0
+    if not files:
+        return -1.0
+    try:
+        return max(f.stat().st_mtime for f in files)
+    except OSError:
+        return -1.0
+
+
+def _resolve_run_dir(default: Path) -> tuple[Path, str]:
+    """适配器该盯哪个 ``_runtime``。返回 ``(目录, 选中理由)``。
+
+    ★ 为什么不能直接用 ``protocol.DEFAULT_RUN_DIR``（2026-10-11 真机）
+      ------------------------------------------------------------------
+      那个常量按本文件位置解析，指向**插件安装副本**。但引擎（``run_loop``）
+      是以源码树为 cwd 跑的，事件写进**源码树**的 ``_runtime``。两边于是
+      分成两套互不相干的文件：
+
+          适配器盯 C:\\...\\.neko-plugin-installations\\...\\autopilot\\_runtime
+                 └─ run_current.txt = 20261010_144055（打包那一刻就冻住了）
+          引擎写 D:\\...\\genshin_game_buddy\\autopilot\\_runtime
+                 └─ run_current.txt = 20261011_000227（一直在变）
+
+      症状是「适配器明明在跑、日志里也确实播报了，但说的全是陈旧台词」——
+      它忠实地读了一个**死掉的 run**。真机日志里它播完老 run 的 4 条事件后
+      就再无下文，正是这个原因。
+
+    ★ 判定顺序
+      ------------------------------
+      0. **显式声明（硬覆盖，不参与竞争）**：
+         - ``NEKO_AUTOPILOT_RUNTIME`` 环境变量
+         - ``<插件目录>/autopilot_runtime.path`` sidecar 文件
+         用户说「活目录在这儿」就是在这儿，不该被启发式推翻。
+      1. 进程 cwd 下的 ``autopilot/_runtime`` 或 ``_runtime``（引擎实际位置）
+      2. 开发机源码树的已知位置（本机布局）
+      3. ``DEFAULT_RUN_DIR``（安装副本，最后兜底）
+
+      1~3 之间候选必须**存在且含有 stream 文件**才算数，最终挑
+      **stream 文件最新**的那个。
+
+      ⚠️ 但这条 mtime 规则有个已知弱点（2026-10-11 01:36 实测踩到）：
+        ``plugin build`` 会把源码树的 ``_runtime`` **快照**进安装副本，
+        并盖上「安装时刻」的 mtime。引擎没在跑的时候（源码树不更新），
+        安装副本反而「最新」——mtime 会在**两套文件内容完全相同**的情况下
+        选中那个陈旧副本。所以显式声明必须走硬覆盖，不能混进这张表。
+    """
+    import os  # noqa: PLC0415 - 函数内 import 避免顶层副作用
+
+    candidates: list[tuple[str, Path]] = []
+    # ★ 环境变量是**硬覆盖**，不是「候选之一」。
+    #   用户显式指定了目录还让它输给 mtime 竞争，是把明确意图当噪声 ——
+    #   早先按候选表统一比 mtime 时就踩过：把 env 指向安装副本，
+    #   结果因为源码树更新而被无视，日志里只印「sidecar」，人完全懵了。
+    env = os.environ.get("NEKO_AUTOPILOT_RUNTIME", "").strip()
+    if env:
+        env_path = Path(env)
+        if _newest_stream_mtime(env_path) >= 0:
+            return env_path, "环境变量 NEKO_AUTOPILOT_RUNTIME（显式指定，直接采用）"
+        # 目录不存在或没有事件流 —— 落回自动探测，但要**说清楚**，
+        # 否则会变成「我明明设了环境变量怎么没用」这类查不出来的坑。
+        logger.warning(
+            "NEKO_AUTOPILOT_RUNTIME=%s 不可用（目录不存在或没有事件流），"
+            "改用自动探测。", env_path)
+    # ★ sidecar 与环境变量同性质：**用户显式声明**，所以也是硬覆盖，
+    #   不参与 mtime 竞争。
+    #   为什么不跟 env 一样直接 return 就完事 —— 因为「引擎没在跑的时候
+    #   判断这个目录好不好用」是多余的：sidecar 是**声明**，不是猜测。
+    #   只有下面那些**探测出来的**候选才需要 mtime 决胜。
+    #
+    #   ⚠️ 这里踩过一个真实的坑（2026-10-11 01:36）：
+    #   最初把 sidecar 当普通候选，让它和安装副本比 stream 的 mtime。
+    #   结果每次 ``plugin build`` 都会把源码树的 _runtime **重新快照**进
+    #   安装副本、并盖上「安装时刻」的时间戳 —— 于是：
+    #       安装副本 20261011_004823.stream.jsonl  mtime=01:36:17（打包盖的）
+    #       源码树   20261011_004823.stream.jsonl  mtime=00:51:49（引擎写的）
+    #   安装副本「新」了 44 分钟，mtime 竞争选中了它，sidecar 白设。
+    #   **「stream 最新」不等于「目录是活的」** —— 打包会伪造这个信号。
+    sidecar = Path(__file__).resolve().parent / "autopilot_runtime.path"
+    try:
+        if sidecar.is_file():
+            text = sidecar.read_text(encoding="utf-8").strip()
+            if text:
+                return Path(text), f"sidecar {sidecar.name}（显式指定，直接采用）"
+    except OSError:
+        pass
+    try:
+        cwd = Path.cwd()
+        candidates.append(("进程 cwd/autopilot/_runtime", cwd / "autopilot" / "_runtime"))
+        candidates.append(("进程 cwd/_runtime", cwd / "_runtime"))
+    except OSError:
+        pass
+    # 开发机源码树。**只在目录存在且有事件流时才会被选中**（mtime 规则），
+    # 所以装到别人机器上时它不存在，不会误伤。
+    candidates.append((
+        "开发机源码树",
+        Path(r"D:\NEKO\N.E.K.O-main\N.E.K.O-main\plugin\plugins"
+             r"\genshin_game_buddy\autopilot\_runtime"),
+    ))
+    candidates.append(("安装副本 DEFAULT_RUN_DIR", default))
+
+    best_name, best_dir, best_mtime = "兜底（无任何候选含事件流）", default, -1.0
+    for name, path in candidates:
+        if not path.is_dir():
+            continue
+        mtime = _newest_stream_mtime(path)
+        if mtime < 0:
+            continue
+        if mtime > best_mtime:
+            best_name, best_dir, best_mtime = name, path, mtime
+    return best_dir, best_name
+
+
 @neko_plugin
 class GenshinGameBuddyPlugin(NekoPluginBase):
     """原神游戏搭子插件。
@@ -187,6 +401,15 @@ class GenshinGameBuddyPlugin(NekoPluginBase):
         self._stress_mode = "off"
         self._stress_metrics = None
         self._stress_lock = None
+        # 3.0-a：会话自动建立探针。
+        # _probe_last_log_at 用来给"没找到窗口"这条常态日志做节流——
+        # 探针每 5s 跑一次，不节流的话一晚上就是几千行 INFO。
+        self._probe_last_log_at: float = 0.0
+        self._probe_last_reason: str = ""
+        self._probe_activated: str = ""   # 已经自动建过会话的 game_id，防重复登记
+        # 3.0-b：会话状态落盘（overlay 读）
+        self._session_state_active: bool = False
+        self._session_state_written_at: float = 0.0
         # 拍板 2.0.71：高频 OCR + 场景状态机——抓屏/OCR 缓存给术语激活复用
         self._last_capture_b64: str | None = None
         self._last_capture_at_monotonic: float = 0.0
@@ -296,10 +519,62 @@ class GenshinGameBuddyPlugin(NekoPluginBase):
             cfg_path,
         )
 
+        # ══════════════════════════════════════════════════════════════
+        # ★ 事件流 -> YUI 适配器（2026-10-08）
+        # ────────────────────────────────────────────────────────────
+        #   autopilot（B 轨）把事件写成 ``autopilot/_runtime/<run_id>.stream.jsonl``，
+        #   这里起一个后台线程追尾读它，翻译成台词再 ``push_message`` 给宿主，
+        #   让 YUI 开口说「走到哪了 / 看见敌人了 / 又卡住了」。
+        #
+        #   开关：环境变量 ``MGC_EVENT_TO_YUI``，``0``/未设 = 关。
+        #   为什么用环境变量而不是 config.toml：这个开关是**临时**的
+        #   （演示开关），不该进用户配置面板；而 R8 红线要求顶层不做 IO，
+        #   读 env 发生在 startup 里，合规。
+        # ★ import os 放在**本方法第一行**，不是下面 stress mode 那处 ——
+        #   Python 会把函数内任何 import 都算作局部变量声明，
+        #   于是在它之前用 os 会 UnboundLocalError（54 个测试就是这么红的）。
+        import os
+        _e2y = os.environ.get("MGC_EVENT_TO_YUI", "0").strip().lower()
+        self._event_to_yui = None
+        if _e2y in ("0", "", "false", "no", "off"):
+            self.logger.info(
+                "genshin_game_buddy: 事件流->YUI 未启用"
+                "（设 MGC_EVENT_TO_YUI=1 开启）")
+        else:
+            # ★ 这里**不能**提前 return：startup 后半段还有 stress mode 初始化、
+            #   OCR 预热、registry restore 和最终的 ``Ok({...})`` 返回。
+            #   早退过一次，54 个集成测试直接红成 AttributeError。
+            try:
+                from .autopilot.ui import protocol as _e2y_protocol
+                from .event_to_yui import EventToYui
+                _run_dir, _run_dir_why = _resolve_run_dir(
+                    _e2y_protocol.DEFAULT_RUN_DIR)
+                self._event_to_yui = EventToYui(
+                    push_fn=self.push_message,
+                    runtime_dir=_run_dir,
+                    poll_seconds=2.0,
+                    throttle_seconds=5.0,
+                    logger_=self.logger,
+                )
+                if self._event_to_yui.start():
+                    # ★ 把「实际盯哪个目录 + 为什么选它 + 进程 cwd」打进日志。
+                    #   这次分家之所以这么难查，就是因为日志里只印了
+                    #   DEFAULT_RUN_DIR，读的人完全看不出它跟引擎写的
+                    #   不是同一个地方。cwd 也打出来，是因为候选里就有
+                    #   cwd 分支 —— 出问题时得能一眼看出它落在哪。
+                    self.logger.info(
+                        "genshin_game_buddy: 事件流->YUI 已启动，目录 %s"
+                        "（来源：%s；进程 cwd=%s）",
+                        _run_dir, _run_dir_why, os.getcwd())
+            except Exception as exc:                      # noqa: BLE001
+                # ★ 适配器起不来**不能拖垮插件** —— 它只是让 YUI 多说话，
+                #   停了只是少个功能，插件本身照常干活。
+                self.logger.warning("事件流->YUI 启动失败（忽略）：%s", exc)
+                self._event_to_yui = None
+
         # 拍板 2.0.70：内置 stress mode（环境变量 MGC_STRESS_MODE 控制）——真机长挂测
         # 不引入新依赖；metrics 只用 threading.active_count() + psutil fallback resource。
         # "0"/未设 = 正常模式；"fast" = tick 间隔压到 0.3s（压 OCR 调度）；"long" = 正常间隔但每 60s 打 RSS/线程/handle。
-        import os
         stress_mode = os.environ.get("MGC_STRESS_MODE", "0").strip().lower()
         if stress_mode in ("fast", "long"):
             self._stress_mode = stress_mode
@@ -353,10 +628,16 @@ class GenshinGameBuddyPlugin(NekoPluginBase):
         # 真机 2.0.71 暴露：auto_restore 后没人调 _load_scenes_for_current，导致 _scene_store 一直空，
         # SceneTracker 永远 current=(none)，scenes=0。修复：先试一次（虽然空），restore 成功后**再调一次**。
         self._load_scenes_for_current()
+        # ★ 先把会话状态落一份「无会话」：上一轮崩溃/被杀可能留下一份
+        #   active=true 的陈旧文件，不先清掉的话 overlay 要等满 90s TTL
+        #   才会自己纠正。restore 成功后再覆盖成 true。
+        self._write_session_state(active=False, reason="startup:clear")
         result = await self._manager.restore(self._registry)
         if result is None:
             self.logger.info("genshin_game_buddy: started, no current game")
+            self._publish_session(reason="startup:no_restore")
             return Ok({"status": "ready", "game_id": "", "term_count": 0, "notes": []})
+        self._publish_session(reason="startup:restore")
         self._init_anchors(result.session, result.library)
         self.logger.info(
             "genshin_game_buddy: restored game {} ({} terms)",
@@ -399,6 +680,20 @@ class GenshinGameBuddyPlugin(NekoPluginBase):
 
     @lifecycle(id="shutdown")
     async def shutdown(self, **_: Any) -> Any:
+        # ★ 先停事件流->YUI 适配器（2026-10-08）：它是 daemon 线程，
+        #   不主动停的话会在插件卸载后继续 push_message 到一个已经
+        #   不可用的 ctx 上。**放在最前面**，让停止发生在其他清理之前。
+        _e2y = getattr(self, "_event_to_yui", None)
+        if _e2y is not None:
+            try:
+                _e2y.stop(timeout=3.0)
+                self.logger.info("genshin_game_buddy: 事件流->YUI 已停止")
+            except Exception as exc:                      # noqa: BLE001
+                self.logger.warning("事件流->YUI 停止异常（忽略）：%s", exc)
+            self._event_to_yui = None
+        # ★ 会话状态落盘收尾（2026-10-10）：插件卸载后 overlay 不该还显示
+        #   「原神」。写 active=false 让它**立刻**收回，不必等满 90s TTL。
+        self._write_session_state(active=False, reason="shutdown")
         # 拍板 2.0.70：stress mode 关停报告——汇总 RSS/线程/handle/total_ocr/errors/timeouts
         if getattr(self, "_stress_mode", "off") != "off" and getattr(self, "_stress_metrics", None) is not None:
             with getattr(self, "_stress_lock"):
@@ -629,6 +924,587 @@ class GenshinGameBuddyPlugin(NekoPluginBase):
                 },
             },
         }
+
+    # ==================================================================
+    # Autopilot B 轨：主控台状态透传 + 控制命令
+    # ==================================================================
+    # 这一段与上面那段 settings 面板**互不依赖**，只是恰好挨着。
+    # 协议（文件名 + JSON 形状）由 NEKO-Console/neko_console/bridge.py
+    # 唯一定义，改格式要两边同时改。
+
+    @ui.context(id="autopilot", title="Autopilot 控制台")
+    async def _ui_autopilot_context(self) -> dict[str, Any]:
+        """Autopilot 面板加载/刷新时调用。
+
+        ★ 全是普通数据，不做任何副作用
+          这里只读一个 JSON 文件。**不发命令、不碰进程** —— 面板每次刷新
+          都调它，一旦带副作用就会变成"看一眼就启动引擎"。
+
+        ★ 方法名保留前导下划线
+          官方示例写的是 ``async def dashboard(self)``（无下划线），但本插件
+          **能正常工作的** settings 用的就是 ``_ui_settings_context``
+          （有下划线），而宿主日志里两个 context 都出现在
+          "contexts collected" 列表中。两者命名模式一致，所以下划线不是
+          原因 —— 改名属于盲改，不做。
+
+        ★ 为什么这里要打这么多日志
+          之前这个方法**完全静默**：read_bridge / is_console_alive 在成功
+          路径上不打日志，于是"面板显示未启动"这件事**没有任何线索**，
+          只能靠猜。现在每次调用都留痕：读了哪个路径、文件在不在、
+          解析出了什么、alive 判定结果。
+        """
+        # getattr 兜底而不是写进 __init__：context 可能在本类构造完成前
+        # 就被宿主调用，那时 self._autopilot_ctx_calls 还不存在。
+        calls = getattr(self, "_autopilot_ctx_calls", 0) + 1
+        self._autopilot_ctx_calls = calls
+
+        # ★ 路径探测：面板之前只认死路径 ``<控制台>/runtime/``，
+        #   但主控台打成 Nuitka exe 跑在 ``build/`` 下时，它写的是
+        #   ``build/runtime/`` —— 路径对不上，面板永远显示"未启动"。
+        #   这里挨个试，**用存在的那一个**，并把选了哪个写进返回值。
+        try:
+            candidates = _bridge_candidates()
+        except Exception:  # noqa: BLE001 - 探测失败不该让 context 整个挂掉
+            candidates = []
+
+        chosen = None
+        for c in candidates:
+            try:
+                if c.is_file():
+                    chosen = c
+                    break
+            except OSError:
+                continue
+        if chosen is not None:
+            autopilot_bridge.configure(bridge_path=str(chosen))
+
+        path = autopilot_bridge.bridge_path()
+        bridge = autopilot_bridge.read_bridge()
+        alive = autopilot_bridge.is_console_alive(bridge)
+        engine = bridge.get("engine") if isinstance(bridge, dict) else None
+        overlay = bridge.get("overlay") if isinstance(bridge, dict) else None
+        stats = bridge.get("stats") if isinstance(bridge, dict) else None
+        exists = chosen is not None
+
+        logger.info(
+            "autopilot context 第 %d 次调用：探测 %d 个候选路径，采用=%s "
+            "命中=%s 解析=%s alive=%s version=%s",
+            calls, len(candidates), path, exists,
+            "有数据" if isinstance(bridge, dict) else "None",
+            alive, autopilot_bridge.console_version(bridge))
+        if not alive:
+            logger.warning(
+                "autopilot context 判定主控台未运行：查找 %s，命中=%s。"
+                "若主控台确实在跑，多半是路径不对（见 _bridge_candidates）。",
+                path, exists)
+
+        return {
+            "console_alive": alive,
+            "console_version": autopilot_bridge.console_version(bridge),
+            "engine_state": (engine or {}).get("state", "unknown")
+            if isinstance(engine, dict) else "unknown",
+            "overlay_state": (overlay or {}).get("state", "unknown")
+            if isinstance(overlay, dict) else "unknown",
+            "stats": stats if isinstance(stats, dict) else None,
+            # 面板顶部那行"插件 vX · 主控台 vY"的两半来源。
+            # ★ 两半都透出来是有意的：用户判断"我这套代码跑起来了吗"
+            #   靠的就是这一行 —— 如果它显示旧版本号，说明渲染的是旧前端。
+            "plugin_version": autopilot_bridge.plugin_version(),
+            # ↓ 诊断字段：面板在"未启动"时直接把这两行显示出来，
+            #   用户不用翻日志就知道是"找不到文件"还是"连不上"。
+            "bridge_path": str(path),
+            "bridge_exists": exists,
+            "context_calls": calls,
+        }
+
+    @ui.action(
+        id="autopilot_cmd",
+        label="Autopilot 控制",
+        icon="🎮",
+        tone="info",
+        group="autopilot",
+        order=10,
+        refresh_context=True,
+    )
+    @plugin_entry(
+        id="autopilot_cmd",
+        name="Autopilot 控制命令",
+        description="向 NEKO-Console 主控台转发一条启停命令。",
+        llm_result_fields=["summary"],
+        metadata={"result_kind": "event"},
+        input_schema={
+            "type": "object",
+            "properties": {
+                "cmd": {
+                    "type": "string",
+                    "description": "命令名：" + " / ".join(
+                        autopilot_bridge.VALID_COMMANDS),
+                    "enum": list(autopilot_bridge.VALID_COMMANDS),
+                },
+            },
+            "required": ["cmd"],
+        },
+    )
+    async def autopilot_cmd_entry(
+        self, payload: dict[str, Any] | None = None, **_: Any,
+    ) -> Any:
+        """面板点按钮时调用：把 ``{"cmd": ...}`` 转发给主控台。
+
+        ★ 为什么不直接在这里启停引擎
+          主控台才是引擎和卡片的**唯一所有者** —— 它有 Popen 句柄、有优雅
+          停止流程、有崩溃回收。插件这边 fork 一个出来，那就是又一份孤儿
+          进程来源，正是这套东西一开始要消灭的问题。
+
+        ★ payload 两种形状都收
+          Hosted UI 传的是 ``{"payload": {...}}``（见 panel.tsx 的
+          ``props.api.call(id, { payload })``），但直接调 entry 时可能传
+          ``{"cmd": ...}``。两种都认，少一次"点了没反应"的排查。
+        """
+        if payload is None:
+            return Err(SdkError(
+                code="INVALID_INPUT",
+                message="autopilot_cmd 需要 {\"cmd\": \"...\"}",
+            ))
+
+        # 优先取嵌套的 payload，退回顶层
+        inner = payload.get("payload") if isinstance(payload, Mapping) else None
+        data = inner if isinstance(inner, Mapping) else payload
+
+        cmd = data.get("cmd")
+        if not isinstance(cmd, str) or not cmd:
+            return Err(SdkError(
+                code="INVALID_INPUT",
+                message="cmd 必须是字符串，可用：" + " / ".join(
+                    autopilot_bridge.VALID_COMMANDS),
+            ))
+
+        # 主控台不在就别发了 —— 写进去也只会躺在文件里等超时
+        bridge = autopilot_bridge.read_bridge()
+        if not autopilot_bridge.is_console_alive(bridge):
+            return Err(SdkError(
+                code="CONSOLE_NOT_RUNNING",
+                message="主控台未在运行（或心跳已超时），请先启动 NEKO-Console。",
+            ))
+
+        try:
+            summary = autopilot_bridge.send_command(cmd)
+        except ValueError as exc:
+            return Err(SdkError(code="INVALID_INPUT", message=str(exc)))
+        except OSError as exc:
+            return Err(SdkError(code="IO_ERROR", message=str(exc)))
+
+        return Ok({
+            "summary": summary,
+            "cmd": cmd,
+        })
+
+    # ==================================================================
+    # 3.0-a：会话自动建立（消除 no_session 空转）
+    # ------------------------------------------------------------------
+    # 体检发现：``ocr_perceive`` 在 ``self._manager.current is None`` 时
+    # 直接 early-return，当天实测 803 次 tick / 803 次空转。
+    #
+    # 根因是**先有鸡还是先有蛋**：会话的唯一写入者是 ``set_game``
+    # （一个 LLM 工具），而 ``startup`` 里的 ``GameSessionManager.restore()``
+    # 只从 KV 读**上次登记过**的 game_id。全新安装时 KV 是空的，
+    # ``default_game`` 又是空串，于是 ``restore()`` 永远返回 None。
+    # ——没人调 set_game，就永远没有会话。
+    #
+    # 这里补一条**不依赖 LLM** 的通路：复用
+    # ``screen_capture.find_genshin_window()``（进程名 yuanshen /
+    # genshinimpact 优先，标题兜底），扫到游戏窗口就登记。
+    # 两条触发路径共用 ``_probe_and_activate``：
+    #   B1 ``@timer_interval("session_probe")`` —— 自动探测兜底
+    #   B2 ``activate_game`` 入口 + 面板按钮   —— 用户显式控制
+    #
+    # ⚠️ 只补"有会话"，**不碰"在不在游戏"**：那是 ``_perception_state``
+    # 另一条状态机（UNKNOWN→IN_GAME→AWAY→OUT_OF_GAME）的职责，两者正交。
+
+    #: 探针"没找到窗口"的日志节流（秒）。窗口不在是常态。
+    _PROBE_LOG_THROTTLE_S = 60.0
+
+    #: 连续多少次"没找到窗口"之后打一份窗口普查。
+    #:
+    #: ★ 为什么不是首次就打
+    #:   ------------------
+    #:   探测是 **5s 一轮**。首次就打普查，等于每轮都刷一条几百字节的窗口
+    #:   列表，把真正的日志冲掉 —— 凌晨那版普查就是这么变成噪声的。
+    #:   3 轮 ≈ 15 秒：既降噪，又正好落在"确实不对劲"的时候。
+    _PROBE_CENSUS_AFTER = 3
+
+    #: 连续 miss 轮数。**类属性**而不是 ``__init__`` 里的实例属性：
+    #:   单测会拿 ``object.__new__(cls)`` 造裸实例再逐个塞属性（见
+    #:   ``tests/unit/test_session_probe.py::_plugin``），实例属性那一处
+    #:   它不会执行到，``self._probe_miss += 1`` 就 AttributeError。
+    #:   读类属性兜底、赋值自然落到实例上 —— 不用 ``getattr`` 兜、
+    #:   也不用为了迁就测试去改测试。
+    _probe_miss: int = 0
+
+    # -- 探测结果落盘（2026-10-10，让 overlay 卡片能显示"探针在不在跑"）----
+    # 同样是**类属性**：单测用 object.__new__ 造裸实例，实例属性它跑不到。
+    _probe_count: int = 0        # 累计探测次数
+    _probe_result: str = ""      # found / no_window / no_match / register_failed / error
+    _probe_detail: str = ""      # 人话：窗口标题 / 失败原因
+    _probe_ts_ms: int = 0        # 最近一次探测的墙钟毫秒
+    _probe_published: str = ""   # 上次**已经写进文件**的结果，用于去重
+    _probe_published_at: int = 0 # 上次写盘的墙钟毫秒
+
+    def _probe_game_for_title(self, title: str) -> tuple[str, str]:
+        """窗口标题 -> ``(game_id, 判定依据)``。
+
+        匹配顺序（先精确后兜底），每条都带依据返回 —— 日志里要能一眼
+        看出**为什么**选了它，静默猜一个 game_id 在比赛现场没法排查：
+
+          1. 标题命中注册表归一化键（id / 正式名 / 别名）-> ``"title"``
+          2. 配了 ``default_game``                      -> ``"default_game"``
+          3. 第一个已启用的游戏                          -> ``"fallback:first_enabled"``
+
+        两边都过 ``normalize_key``（NFKC + casefold + 去全部空白），
+        否则 "Genshin Impact" 和 "genshinimpact" 对不上。
+        """
+        haystack = normalize_key(title)
+        registry = getattr(self, "_registry", None)
+        if registry is None or not haystack:
+            return "", "fallback:no_registry"
+
+        for entry in registry.games:
+            if not entry.enabled:
+                continue
+            if any(key and key in haystack for key in entry.normalized_keys()):
+                return entry.game_id, "title"
+
+        configured = (getattr(self._options, "default_game", "") or "").strip()
+        if configured:
+            entry = registry.get(configured)
+            if entry is not None and entry.enabled:
+                return entry.game_id, "default_game"
+
+        for entry in registry.games:
+            if entry.enabled:
+                return entry.game_id, "fallback:first_enabled"
+        return "", "fallback:none_enabled"
+
+    async def _probe_and_activate(self, trigger: str) -> tuple[bool, str]:
+        """扫窗口 -> 登记游戏。返回 ``(是否成功, 给人的一句话)``。
+
+        ``trigger`` 只进日志，用来区分是定时探测（``"timer"``）还是
+        用户点了按钮（``"manual"``）。
+        """
+        now = time.monotonic()
+        registry = getattr(self, "_registry", None)
+        if registry is None:
+            # ★ 这条也是静默出口（2026-10-10 补）。配置没就绪时探针每 5s
+            #   撞一次然后安静退出，日志和卡片都看不到 —— 而"配置没加载出来"
+            #   恰恰是最该被看见的故障之一。记成 error 让卡片变红。
+            #   _record_probe 按结果去重，所以不会每 5s 写一次盘。
+            self._record_probe("error", "插件配置尚未就绪（注册表为空）")
+            return False, "插件配置尚未就绪"
+
+        # 已经有会话就什么都不做 —— 探测是兜底，不是抢占。
+        # 用户手动 ``set_game`` 切走的游戏，这里不该偷偷切回来。
+        manager = getattr(self, "_manager", None)
+        current = getattr(manager, "current", None)
+        if current is not None:
+            self._probe_activated = current.game_id
+            # ★ 这里也必须记一次探测结果（2026-10-10 修）
+            #   上一轮只在"没找到 / 匹配不上 / 登记失败 / 成功"五个出口
+            #   挂了 ``_record_probe``，**漏了这条"已经有会话"的路**。
+            #   后果恰好在**一切正常**的时候出现：会话一旦建立，探针每 5s
+            #   都在这条 return 上安静退出 —— 不记日志、不更新 session_state.json，
+            #   于是卡片上的「探测」停在会话建立前那一条，甚至整个文件因
+            #   90s TTL 过期而显示「探测:—」。真机 2026-10-10 17:37 就是这个状态：
+            #   定时器在跑、会话活着（no_session=0、detected=genshin），
+            #   但日志里一条探测记录都没有、session_state.json 停在 17:13。
+            self._record_probe("found", "会话已存在：{}".format(current.display_name))
+            return False, "已有会话（{}），无需探测".format(current.display_name)
+
+        try:
+            window = await asyncio.to_thread(find_genshin_window)
+        except Exception as exc:  # noqa: BLE001 —— 探测失败绝不能拖死 timer 线程
+            self.logger.warning("会话探测：扫窗口失败（%s）：%s", trigger, exc)
+            self._record_probe("error", "扫窗口失败：{}".format(exc))
+            return False, "扫窗口失败：{}".format(exc)
+
+        if not window:
+            # ★ 兜底：改用**引擎侧**那套只认标题的查找（2026-10-10）。
+            #   两条查找的关键差异 ——
+            #     screen_capture.find_genshin_window()：进程名 **或** 标题，
+            #       进程名靠 ``psutil.Process(pid).name()``，而整个 _cb 被
+            #       try 包着 —— psutil 在插件宿主进程里对游戏进程一抛
+            #       （权限/会话），**每个窗口都走 except 被跳过**，
+            #       结果恒 None，而外���看跟"游戏没开"一模一样。
+            #     capturer._find_window()：只看标题子串，**完全不碰进程名**，
+            #       所以对 psutil 的权限问题免疫 —— 引擎侧一直靠它跑通。
+            #   引擎侧已实测能拿到原神窗口（客户区 0,0,2560,1600），所以
+            #   这里用它兜底是安全的；两套都失败才认定"真没找到"。
+            window = await asyncio.to_thread(_find_window_by_title)
+            if window:
+                self.logger.info(
+                    "genshin_game_buddy: 会话探测（%s）主路径没找到，"
+                    "已由标题兜底路径命中：title=%r pid=%s",
+                    trigger, window.get("title"), window.get("pid"))
+            else:
+                # ★ 普查**不是每次都打**。宿主里"没找到窗口"是 5s 一次的常态，
+                #   首轮就打普查既刷屏又会把真正的日志冲掉；等连续 miss 到
+                #   _PROBE_CENSUS_AFTER 轮（约 15s）才打，既降噪又正好落在
+                #   诊断价值最高的时刻。window_probe 侧还有一道进程级闸。
+                self._probe_miss += 1
+                if self._probe_miss >= self._PROBE_CENSUS_AFTER:
+                    # 用**插件自己**的 logger —— 写在 screen_capture 里那份
+                    # 用子 logger 打，真机日志里一条都没有：宿主只给
+                    # plugin.genshin_game_buddy 这一个名字装了 handler，
+                    # 子 logger 往 root 冒泡时没人接，记录被日志配置吃掉了。
+                    _log_window_census(self.logger, trigger)
+                    self._probe_miss = 0
+
+        if not window:
+            self._record_probe("no_window")
+            # 常态路径，节流后再记。
+            if now - self._probe_last_log_at >= self._PROBE_LOG_THROTTLE_S:
+                self._probe_last_log_at = now
+                self._probe_last_reason = "no_window"
+                self.logger.info(
+                    "genshin_game_buddy: 会话探测（%s）没找到游戏窗口，"
+                    "引擎继续空转；启动原神后会自动建立会话",
+                    trigger,
+                )
+            return False, "没找到游戏窗口 —— 请先启动原神"
+
+        title = str(window.get("title") or "")
+        game_id, rule = self._probe_game_for_title(title)
+        if not game_id:
+            self.logger.warning(
+                "会话探测（%s）找到了窗口「%s」但没有可登记的游戏：%s",
+                trigger, title, rule,
+            )
+            self._record_probe("no_match", "窗口「{}」不匹配：{}".format(title, rule))
+            return False, "找到窗口但没有可登记的游戏（{}）".format(rule)
+
+        try:
+            status, result = await self._register(game_id)
+        except Exception as exc:  # noqa: BLE001
+            self.logger.warning("会话探测（%s）登记 %s 失败：%s", trigger, game_id, exc)
+            self._record_probe("register_failed",
+                               "登记 {} 失败：{}".format(game_id, exc))
+            return False, "登记失败：{}".format(exc)
+
+        if status != "ok" or result is None:
+            self.logger.warning(
+                "会话探测（%s）登记 %s 失败：status=%s", trigger, game_id, status,
+            )
+            self._record_probe("register_failed",
+                               "登记 {} 返回 status={}".format(game_id, status))
+            return False, "登记失败（{}）".format(status)
+
+        session = result.session
+        self._probe_activated = session.game_id
+        self._probe_last_log_at = now
+        # 场景/术语索引在 set_game 路径上会跟着建；这里补一次
+        # _load_scenes_for_current，保证 switch 后场景表不是空的
+        # （拍板 2.0.72 记的正是这个坑）。
+        try:
+            self._load_scenes_for_current()
+        except Exception as exc:  # noqa: BLE001 —— 场景表失败不该回滚会话
+            self.logger.warning("会话探测：场景表加载失败（不影响会话）：%s", exc)
+
+        self.logger.info(
+            "genshin_game_buddy: 会话已建立（窗口=%s，标题=%s，game=%s，依据=%s，触发=%s）",
+            window.get("pid"), title, session.game_id, rule, trigger,
+        )
+        # ★ overlay 读的就是这份文件。写失败只 warning，不影响会话本身。
+        #   先记探测结果再发布 —— _publish_session 会把 self 上的探测字段
+        #   一并写进 payload，所以顺序必须是"记录 -> 发布"。
+        self._record_probe("found", "窗口「{}」-> {}".format(title, session.game_id))
+        return True, "会话已建立：{}".format(session.display_name)
+
+    @timer_interval(id="session_probe", seconds=5)
+    async def session_probe(self) -> None:
+        """B1：每5s 扫一次游戏窗口，扫到就自动建立会话。
+
+        与 ``ocr_perceive`` 共用 ``@timer_interval`` 机制（宿主在timer
+        线程里 ``asyncio.run()`` 跑这个协程），所以这里**不需要**自己
+        起线程、也不需要在 ``shutdown`` 里回收 —— 生命周期跟
+        ``ocr_perceive`` 完全一致，少一处容易漏的清理。
+
+        ★ 为什么不用 ``default_game = "genshin"`` 一刀切：
+          那样 ``restore()`` 会在每次启动时**无条件**建立会话，于是用户
+          根本没开游戏时也会去抓屏（要等 6 个 tick 才由 OUT_OF_GAME 闸门
+          停掉）。窗口命中才建会话，语义上干净得多。
+        """
+        try:
+            await self._probe_and_activate("timer")
+        except Exception:  # noqa: BLE001 —— 探针崩了不能让 timer 停摆
+            self.logger.exception(
+                "genshin_game_buddy: session_probe tick crashed (timer keeps running)"
+            )
+            return
+        # 探针正常跑完就顺手续个命：overlay 的 90s TTL 靠这个撑着。
+        # 放在 try 外面是有意的 —— _probe_and_activate 抛了也不该停止续写，
+        # 那正好是"会话还在但探测出错"的情况。
+        self._session_heartbeat(reason="probe:heartbeat")
+
+    @ui.action(
+        id="activate_game",
+        label="检测并激活游戏",
+        icon="🎯",
+        tone="primary",
+        group="settings",
+        order=5,
+        refresh_context=True,
+    )
+    @plugin_entry(
+        id="activate_game",
+        name="检测并激活游戏",
+        description="扫描本地游戏窗口，命中就自动建立会话（不用先在对话里说游戏名）。",
+        llm_result_fields=["summary"],
+        metadata={"result_kind": "event"},
+        input_schema={"type": "object", "properties": {}},
+    )
+    async def activate_game_entry(self, **_: Any) -> Any:
+        """B2：面板按钮 / LLM 都能显式触发一次探测。
+
+        与定时器走**同一条** ``_probe_and_activate``，只是不受 5s 节流
+        限制 —— 用户主动点的，必须立刻给结论。
+        """
+        ok, message = await self._probe_and_activate("manual")
+        return Ok({"summary": message, "activated": ok})
+
+    # ==================================================================
+    # 3.0-b：会话状态落盘（overlay 读）
+    # ------------------------------------------------------------------
+    # 为什么**不**写进 state_snapshot.json：那个文件归**引擎**
+    # （run_loop 经 ChannelWriter）所有，而「有没有会话」是 N.E.K.O
+    # 插件侧的事 —— 插件不跑引擎，引擎也不认识 N.E.K.O 的会话。
+    # 混写会变成两边抢同一个文件，且 StateSnapshot 的字段是引擎形状的。
+    #
+    # 为什么写侧**不在这里复制路径表达式**：读侧在
+    # ``autopilot/ui/overlay/layout.py`` 的 SESSION_STATE_FILE。这里从
+    # ``protocol.DEFAULT_RUN_DIR`` 推导，两边同源于 ``autopilot/_runtime``，
+    # **结构上就不可能写歪**。pathfind_state.json 那对是靠「两边各写一份
+    # + 注释互相提醒」，这里能做到一样准就不该退化到靠纪律。
+
+    #: 与 ``layout.SESSION_SCHEMA_VERSION`` 必须一致；对不上 overlay
+    #: **不显示**（宁可退回「无会话」，也不拿错字段名渲染）。
+    SESSION_SCHEMA_VERSION = 1
+    #: 续写间隔（秒）。``layout.SESSION_STATE_MAX_AGE_S`` 是 90s，
+    #: 超过它插件在 overlay 眼里就"没影了" —— 所以有会话时必须定期续命。
+    #: 取 30s = 3 倍余量，容忍偶发的循环延迟。
+    SESSION_HEARTBEAT_S = 30.0
+
+    def _write_session_state(self, *, active: bool, game_id: str = "",
+                             display_name: str = "", reason: str = "") -> bool:
+        """把会话状态写成 ``autopilot/_runtime/session_state.json``。
+
+        用 ``atomic_write_text``（临时文件 + ``os.replace``）而不是直接
+        ``open(path, "w")`` —— 后者先把文件截断成 0 字节再逐字节写，
+        overlay 正好在那个窗口里 stat 到 size 变化、紧接着读到半截 JSON，
+        第 1 行就会闪一下退回「无会话」。理由见 ``protocol.atomic_write_text``。
+
+        **失败只 warning 不抛**：这是纯诊断输出，目录写不进去不该
+        反过来影响会话本身。
+        """
+        try:
+            from .autopilot.ui import protocol as _proto
+        except Exception as exc:  # noqa: BLE001
+            self.logger.debug("会话状态文件不可用（autopilot.ui 导入失败）：%s", exc)
+            return False
+        target = _proto.DEFAULT_RUN_DIR / "session_state.json"
+        payload = {
+            "schema_version": self.SESSION_SCHEMA_VERSION,
+            "written_at_ms": int(time.time() * 1000),
+            "active": bool(active),
+            "game_id": game_id,
+            "display_name": display_name or game_id,
+            "reason": reason,
+            # -- 探测反馈（2026-10-10 新增，全部**可选**）--
+            # 老版本 overlay 只读 active/game_id/display_name，多这几个键
+            # 它一个都不看；新版 overlay 缺这几个键时退回「探测:—」。
+            # 所以**不 bump schema 版本**：bump 会让"新写侧 + 旧读侧"
+            # 直接读不出文件（load_session_state 版本不符返回 None），
+            # 而加可选键两个方向都兼容。
+            "probe_ts_ms": int(getattr(self, "_probe_ts_ms", 0) or 0),
+            "probe_result": str(getattr(self, "_probe_result", "") or ""),
+            "probe_detail": str(getattr(self, "_probe_detail", "") or ""),
+            "probe_count": int(getattr(self, "_probe_count", 0) or 0),
+            # 宿主跑的是哪一版 —— 2026-10-10 加：排查时反复遇到"我改了
+            # 怎么没生效"，根因都是**宿主还跑着上一次的构建**。版本号
+            # 直接摆在卡片上，一眼就能看出装的是不是刚改的那版。
+            "plugin_version": plugin_version(),
+        }
+        try:
+            _proto.atomic_write_text(
+                target, json.dumps(payload, ensure_ascii=False, indent=2))
+        except Exception as exc:  # noqa: BLE001
+            self.logger.warning("写会话状态失败（不影响会话本身）：%s", exc)
+            return False
+        self._session_state_written_at = time.monotonic()
+        self._session_state_active = bool(active)
+        return True
+
+    def _publish_session(self, *, reason: str) -> bool:
+        """按**当前真实**会话状态写一次。startup / set_game / 探针命中都走它。"""
+        session = getattr(getattr(self, "_manager", None), "current", None)
+        self._probe_published = str(getattr(self, "_probe_result", "") or "")
+        self._probe_published_at = int(time.time() * 1000)
+        if session is None:
+            return self._write_session_state(active=False, reason=reason)
+        return self._write_session_state(
+            active=True,
+            game_id=session.game_id,
+            display_name=session.display_name,
+            reason=reason,
+        )
+
+    #: 两次落盘之间的最小间隔（秒）。探针 5s 一轮，但**结果没变时**
+    #: 每 12 轮（≈60s）才写一次。
+    #:
+    #: ★ 为什么要去重 —— 不能每轮都写
+    #:   ------------------------------
+    #:   ① ``session_state.json`` 的 TTL 是 90s，它的"过期"本身就是
+    #:      "插件没了"的信号。探针每 5s 写一次，等于**永久不过期**，
+    #:      插件崩了/被杀之后 overlay 还会一直显示"有会话"，骗人。
+    #:   ② 每 5s 一次原子写（临时文件 + replace）对一个诊断文件太吵。
+    #:   结果**变了**立刻写（用户要马上看到），没变才按 60s 续命。
+    _PROBE_PUBLISH_MIN_INTERVAL_S = 60.0
+
+    def _record_probe(self, result: str, detail: str = "") -> None:
+        """记一次探测结果，并**按需**落盘。
+
+        :param result: ``found`` / ``no_window`` / ``no_match`` /
+            ``register_failed`` / ``error``
+        :param detail: 人话，overlay 原样显示（窗口标题 / 失败原因）。
+
+        结果变了立刻写；没变则每 60s 写一次，既让 overlay 看得见"探针还活着"，
+        又保住 90s TTL 的"插件死了会过期"语义（见
+        :attr:`_PROBE_PUBLISH_MIN_INTERVAL_S` 的注释）。
+        """
+        import time as _time  # noqa: PLC0415 - 与模块级 time 同源，显式别名避免歧义
+
+        self._probe_count = int(getattr(self, "_probe_count", 0) or 0) + 1
+        self._probe_result = result
+        self._probe_detail = detail
+        self._probe_ts_ms = int(_time.time() * 1000)
+
+        now_ms = self._probe_ts_ms
+        changed = result != str(getattr(self, "_probe_published", "") or "")
+        due = (now_ms - int(getattr(self, "_probe_published_at", 0) or 0)
+               >= self._PROBE_PUBLISH_MIN_INTERVAL_S * 1000)
+        if changed or due:
+            self._publish_session(reason="probe:{}".format(result))
+
+    def _session_heartbeat(self, *, reason: str = "heartbeat") -> None:
+        """定期续命，**只在有会话时写**。
+
+        没会话时没必要每 30 秒动一次文件去说「还是没有」—— 那条信息
+        在 overlay 上已经是默认显示的了（读不到文件就显示「无会话」）。
+        """
+        if getattr(self, "_session_state_active", False) is not True:
+            return
+        if (time.monotonic()
+                - getattr(self, "_session_state_written_at", 0.0)
+                < self.SESSION_HEARTBEAT_S):
+            return
+        self._publish_session(reason=reason)
 
     @ui.action(
         id="apply_settings",
@@ -861,6 +1737,8 @@ class GenshinGameBuddyPlugin(NekoPluginBase):
             return Err(SdkError(self._terms_error_text(status)))
         if result is None:  # pragma: no cover - 上面的分支已覆盖全部非 ok 状态
             return Err(SdkError(self._t("errors.internal")))
+        # 会话变了 -> overlay 的第 1 行要跟着变（用户手动切的也算）
+        self._publish_session(reason="set_game")
 
         injected = self._push_context(result.session)
         summary = self._t(

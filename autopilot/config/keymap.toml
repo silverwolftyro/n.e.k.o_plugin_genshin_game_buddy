@@ -1,0 +1,41 @@
+# N.E.K.O. 键位配置
+#
+# 改完直接生效。值写 VK 名（W / E / SHIFT / LBUTTON / F12…）、
+# 0x 前缀十六进制，或 "NONE"（该动作不发按键）。
+#
+# ⚠ 方向键与队伍槽位键**不在这里配** —— 它们是硬编码的，
+#   改了会破坏导航与切人逻辑。
+#
+# 用 keymap_editor 交互式编辑：
+#   python -m autopilot.tools.keymap_editor
+
+[keymap]
+
+# ---- COMBAT ----
+NORMAL_ATTACK = "LBUTTON"
+USE_SKILL = "E"
+USE_BURST = "Q"
+DODGE = "SHIFT"
+SWITCH_CHARACTER = "ONE"
+
+# ---- NAV ----
+MOVE_FORWARD = "W"
+MOVE_BACK = "S"
+MOVE_LEFT = "A"
+MOVE_RIGHT = "D"
+SPRINT = "SHIFT"
+JUMP = "SPACE"
+
+# ---- UI ----
+OPEN_INVENTORY = "B"
+OPEN_MAP = "M"
+OPEN_PAIMON_MENU = "ESCAPE"
+CLICK_ELEMENT = "LBUTTON"
+CONFIRM = "ENTER"
+CANCEL = "ESCAPE"
+CLOSE = "ESCAPE"
+
+# ---- SYSTEM ----
+WAIT = "NONE"
+SCREENSHOT = "NONE"
+NOOP = "NONE"

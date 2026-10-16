@@ -1,0 +1,116 @@
+# ============================================================================
+# 原神 · 导航规则
+# ============================================================================
+#
+# priority 越小越优先。间隔 10/20/30/40/50 留空便于插规则。
+#
+# ★ 本文件的第一原则：**定位不可信时绝不动**
+#   导航出错的代价是跑进怪堆/悬崖/水里，而"原地不动"的代价只是慢。
+#   所以"定位 LOST → WAIT"排在"定位 GOOD → MOVE_FORWARD"前面。
+#   （原则 1：响亮失败优于静默走错）
+#
+# ★★ scenes 一律**显式声明**，绝不留空 ★★
+#   留空 = 任意场景。这条规则曾在实测里闯过祸：priority 40 的
+#   "定位可用就前进"在 COMBAT 和 BAG_INVENTORY 里抢先命中，
+#   把战斗规则和"关背包"全压住了 —— 机器人在战斗中一直往前走。
+#   没有目标点时"往前走"**只在探索场景**成立，必须写死场景。
+#   本文件统一用 NAV_SCENES = 探索 / 过渡场景。
+#
+# ⚠ 已知限制：目前**没有"目标点"概念**。感知层输出的是角色自身坐标
+#   （position.x/y），不是"要去哪"。所以"到点停下"这一层现在做不了 ——
+#   MOVE_FORWARD 由执行层按 traits.max_duration_ms（60s）自然停止。
+#   等目标点/寻路数据接上后，补 nav_stop_at_target 规则（见文件末尾占位）。
+#
+# 依赖的 context 函数：scene() pos_quality() pos_usable() since()
+# ============================================================================
+
+# ---------------------------------------------------------------------------
+# 生效规则
+# ---------------------------------------------------------------------------
+
+# 解决：地图开着挡视线，关掉。
+# 依赖：scene()
+# ⚠ CLOSE 在 traits 里**不允许** COMBAT 场景（战斗中关 UI 可能退出战斗），
+#   所以这条只声明 scenes = ["MAP_BIG"]，不写空。
+[[rules]]
+name = "nav_close_map"
+action = "CLOSE"
+when = "scene() == 'MAP_BIG'"
+priority = 10
+ttl_seconds = 2
+scenes = ["MAP_BIG"]
+enabled = false
+note = "打开地图就关掉，别挡视线"
+
+# 解决：定位丢了还硬走 = 蒙眼跑路。停下等定位恢复。
+# 依赖：pos_quality()
+# ★ 这一条是整个导航的兜底安全网。pos_quality() 返回 "LOST"；
+#   position 为 None 时它返回 UNKNOWN（不触发）—— 那时上一条 MOVE_FORWARD
+#   也不会触发（见下），所以两种"定位不可信"都覆盖到了。
+[[rules]]
+name = "nav_hold_when_position_lost"
+action = "WAIT"
+when = "pos_quality() == 'LOST'"
+priority = 20
+ttl_seconds = 2
+scenes = ["MAIN_MENU", "LOADING"]
+params = { ms = 800 }
+enabled = false
+note = "定位丢失就停下，绝不盲走"
+
+# 解决：定位质量为 DEGRADED —— 位置大致对但不准。
+#      这种情况下继续走大概率走偏，等一拍让匹配恢复更划算。
+# 依赖：pos_quality()
+[[rules]]
+name = "nav_pause_when_degraded"
+action = "WAIT"
+when = "pos_quality() == 'DEGRADED'"
+priority = 30
+ttl_seconds = 1
+scenes = ["MAIN_MENU", "LOADING"]
+params = { ms = 500 }
+enabled = false
+note = "定位降级时先停一拍，别走偏"
+
+# 解决：定位 GOOD 且坐标可用 → 往前走。
+# 依赖：pos_usable()（等价于 quality ∈ {GOOD, DEGRADED} 且 x 不为 None；
+#       上一条已把 DEGRADED 拦掉，所以到这里的实际都是 GOOD）
+# ⚠ 没有目标点，所以是"走一段"而不是"走到某点"。执行层按 traits
+#   的 max_duration_ms（60s）自动松开 W 键。
+# ⚠ scenes 必须写死 —— 见文件头说明。
+[[rules]]
+name = "nav_forward_when_position_good"
+action = "MOVE_FORWARD"
+when = "pos_usable()"
+priority = 40
+ttl_seconds = 2
+scenes = ["MAIN_MENU", "LOADING"]
+enabled = false
+note = "定位可用就前进（无目标点，靠时长停止）"
+
+# ---------------------------------------------------------------------------
+# 占位规则（enabled = false —— 等目标点/寻路数据）
+# ---------------------------------------------------------------------------
+
+# 占位：到达目标点附近 → 停。
+# 依赖：需要「与目标点距离」信号 —— StatePacket 没有目标点字段。
+# [[rules]]
+# name = "nav_stop_at_target"
+# action = "WAIT"
+# when = "pos_usable() and distance_to_target() < 1.5"
+# priority = 35
+# ttl_seconds = 2
+# params = { ms = 600 }
+# note = "到目标点停下（目标点信号未实现）"
+
+# 占位：赶路时冲刺。
+# 依赖：需要「是否在赶路」信号 —— 未实现。
+# ⚠ SPRINT 的 traits.min_gap_ms 是 1500ms（与 MaaEnd 的
+#   kAutoSprintCooldownMs 对齐），这里不再重复设冷却。
+# [[rules]]
+# name = "nav_sprint_on_the_way"
+# action = "SPRINT"
+# when = "scene() == 'MAIN_MENU' and on_the_way()"
+# priority = 45
+# ttl_seconds = 2
+# note = "赶路时冲刺（信号未实现）"

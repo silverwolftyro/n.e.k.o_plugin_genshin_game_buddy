@@ -9,8 +9,20 @@ S1 整体行为（轻量帧抓取 + tick 决策）在集成测试里覆盖；这
 """
 from __future__ import annotations
 
+import time
+
 import pytest
 from plugin.plugins.genshin_game_buddy import GenshinGameBuddyPlugin
+from plugin.plugins.genshin_game_buddy.game_registry import PluginOptions
+
+#: 生产侧的「画面变了」判定阈值（``game_registry.PluginOptions``）。
+#: 直接取默认值而不是写死 8 —— 哪天改了默认值，这条测试自动跟上。
+PROACTIVE_HASH_THRESHOLD = PluginOptions().change_detect_threshold
+
+#: 「桌面算不算静止」的判据。**刻意不复用** :data:`PROACTIVE_HASH_THRESHOLD`
+#: —— 那是「要不要触发 OCR」的业务阈值，语义完全不同，拿它当环境判据会
+#: 在 diff 落在 (2, 8] 时误判成「静止」，于是动画桌面上照样红（实测过）。
+STATIC_MAX_DIFF = 2
 
 
 @pytest.mark.unit
@@ -90,16 +102,41 @@ def test_light_capture_dhash__returns_hex_string_or_empty() -> None:
 def test_light_capture_dhash__static_screen_returns_same_hash() -> None:
     """拍板 2.0.67：静止画面两次抓取 → 哈希相同 → diff = 0 → 不触发。
 
-    跳过条件：无屏幕/无 mss/PIL 时 _light_capture_dhash 返回空串。
-    CI 环境（Linux 无 display）会跳过——本测试在真机跑才有效。
+    ⚠️ 这条测试**依赖桌面是静止的**，而本测试无法保证这一点
+    ------------------------------------------------------
+    它抓的是**真实桌面**。只要桌面上有东西在动 —— 全屏播视频、游戏在跑、
+    甚至本进程自己的输出在终端里滚动 —— 两次抓屏就必然不同。
+
+    实测踩过两次：
+      · 桌面全屏播 B 站视频 -> 两帧差 39.6% 的像素，diff=7，稳定失败
+      · 静止判据一度误用生产阈值（8）当闸门 -> diff=7 < 8 没拦住，照样红
+
+    所以闸门**不复用** :data:`PROACTIVE_HASH_THRESHOLD`（那是「要不要触发
+    OCR」的业务阈值，与「画面动不动」无关）。这里用独立的 :data:`STATIC_MAX_DIFF`，
+    连抓三帧：任一对超过它就判定桌面在动、跳过；全都在它以内才算静止，
+    这时再断言 ``diff <= 2``。
+
+    坦白说：在不受控的桌面环境里，这条测试基本只会 skip 而不会红 ——
+    这是它应有的诚实语义（环境前提不成立时不该报假警），而不是它变强了。
+    真正有断言价值的是它上面那条表驱动的 :func:`_dhash_diff` 边界测试。
     """
     h1 = GenshinGameBuddyPlugin._light_capture_dhash()
     if not h1:
         pytest.skip("no display/mss/pillow in this environment")
+    time.sleep(0.25)
     h2 = GenshinGameBuddyPlugin._light_capture_dhash()
-    # 静止画面：dHash 应一致（实际上有极小概率因抖动出现 1-2 位差异，故允许 ≤ 2）
-    diff = GenshinGameBuddyPlugin._dhash_diff(h1, h2)
-    assert diff <= 2, f"static screen produced diff={diff} (expected ≤ 2)"
+    time.sleep(0.25)
+    h3 = GenshinGameBuddyPlugin._light_capture_dhash()
+    if not h2 or not h3:
+        pytest.skip("capture failed partway (screen changing?)")
+
+    diffs = [GenshinGameBuddyPlugin._dhash_diff(a, b)
+             for a, b in ((h1, h2), (h2, h3), (h1, h3))]
+    if max(diffs) > STATIC_MAX_DIFF:
+        pytest.skip(
+            f"桌面不是静止画面（三帧两两 diff={diffs} > {STATIC_MAX_DIFF}）"
+            "—— 视频 / 游戏 / 终端滚动都会这样")
+    assert max(diffs) <= 2, f"static screen produced diff={diffs} (expected ≤ 2)"
 
 
 @pytest.mark.unit

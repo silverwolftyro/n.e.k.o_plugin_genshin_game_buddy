@@ -225,6 +225,8 @@ export default function MultiGameCompanionPanel(
   const [savedAt, setSavedAt] = useState<string>("")
   const toast = useToast()
   const applyAction = actionById(props.actions || [], "apply_settings")
+  const activateAction = actionById(props.actions || [], "activate_game")
+  const [probing, setProbing] = useState(false)
 
   function pickProfile(p: string) {
     const next = buildDefaultsForProfile(props.state || {}, p)
@@ -293,6 +295,43 @@ export default function MultiGameCompanionPanel(
     const d = buildDefaults(props.state || {})
     setForm(d)
     toast.info("已重置为默认值（未保存，请点「应用」写入）。")
+  }
+
+  /**
+   * 检测并激活游戏（3.0-a）。
+   *
+   * 背景：会话的唯一写入者是 LLM 工具 set_game，全新安装时没人调它，
+   * 于是 ocr_perceive 一直 early-return: no_session（实测 803/803 空转）。
+   * 这个按钮让用户不用先去对话里说游戏名，点一下就扫窗口建会话。
+   *
+   * 后端每 5s 也有一个自动探测兜底，这个按钮只是把那次探测**立刻**跑一遍
+   * 并把结论用 toast 回显 —— 两条路径走的是同一个 _probe_and_activate。
+   */
+  async function activateGame() {
+    if (!activateAction) {
+      toast.error("检测动作不可用，请确认插件已启动。")
+      return
+    }
+    setProbing(true)
+    try {
+      const result = unwrap(
+        await props.api.call("activate_game", { payload: {} }),
+      )
+      const activated = result.activated === true
+      const summary =
+        (typeof result.summary === "string" && result.summary) ||
+        (activated ? "会话已建立" : "未建立会话")
+      if (activated) {
+        toast.success(summary)
+      } else {
+        toast.warning(summary)
+      }
+      await props.api.refresh()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : String(error))
+    } finally {
+      setProbing(false)
+    }
   }
 
   const profileChoices = (opts.ocr_profile && opts.ocr_profile.choices) || [
@@ -614,12 +653,21 @@ export default function MultiGameCompanionPanel(
         style={{
           display: "flex",
           justifyContent: "flex-end",
+          alignItems: "center",
           gap: 8,
           marginTop: 16,
           paddingTop: 16,
           borderTop: `1px solid ${THEME.border}`,
         }}
       >
+        <Button
+          tone="primary"
+          onClick={activateGame}
+          disabled={!activateAction || probing}
+          title="扫描本机游戏窗口，命中就建立会话（后端每 5 秒也会自动探测一次）"
+        >
+          {probing ? "检测中..." : "🎯 检测并激活游戏"}
+        </Button>
         <Button tone="default" onClick={resetDefaults} disabled={saving}>
           恢复默认
         </Button>

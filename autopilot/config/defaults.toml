@@ -1,0 +1,242 @@
+# N.E.K.O. Autopilot 3.0 默认配置
+#
+# 这个文件是「示例 + 默认值」合一：直接把 enabled 改成 true 就能跑。
+# 模板/ROI 需要你按自己的分辨率裁一遍，见 tools/template_demo.py。
+
+[autopilot]
+# ★ 3.0 默认关闭 —— 2.0 是已发布版本，autopilot 的任何 bug 都不该影响现有用户
+enabled = false
+game_id = "genshin_impact"
+
+# --------------------------------------------------------------------------
+# 主循环（tick 循环）
+# --------------------------------------------------------------------------
+# ⚠ 必须独立成 [autopilot.loop] 段，**不能**把 tick_rate_hz 写进上面的
+#   [autopilot] —— AutopilotConfig 是 extra="forbid"，未知键会报
+#   "Extra inputs are not permitted"，那是**新增**一个错误而不是修复。
+#
+# 命令行 --tick-rate 会覆盖这里的值（命令行显式给了就以命令行为准）。
+[autopilot.loop]
+# tick 频率。感知单帧 30~80ms，5Hz（200ms）留了足够余量。
+# 战斗场景想更快调到 10~20，但先把 avg_tick_ms 观察清楚再提。
+tick_rate_hz = 5.0
+# 连续截图失败多少次后自动暂停（游戏窗口被关掉时不必无限重试刷屏）
+max_consecutive_capture_failures = 10
+# 连续多少次 tick 崩溃后主动暂停（连续崩说明是系统性问题，不是偶发）
+max_consecutive_tick_crashes = 5
+# 事件总线容量。满了丢**最旧**的，并计入 dropped。
+event_queue_size = 1000
+# 停止时等工作线程退出的上限（秒）。超时仍不退出 = 有 tick 卡住了，会明确报错。
+stop_timeout_s = 10.0
+
+# --------------------------------------------------------------------------
+# 定位服务（小地图 + 相位相关）
+# --------------------------------------------------------------------------
+# ⚠️ **默认关闭，而且开着也不一定有用** —— 这是最容易误解的一个开关。
+#
+#   LocalizationService 初始状态是 UNINITIALIZED：**它没有起点**。
+#   必须先在游戏里**传送一次**建立原点（走 teleport_contract.md 的三段契约），
+#   在那之前 StatePacket.position 恒为 quality="LOST"（不是 None）。
+#
+#   也就是说：enabled = true 只是把接线接上，**不等于能定位**。
+#   4 条 nav 规则（依赖 pos_usable/pos_quality）要等原点建立后才会真正触发。
+#
+# 关着时（默认）：StateBuilder(locator=None)，StatePacket.position 恒为 None
+# —— 与接入定位之前的行为**完全一致**，这是向后兼容的唯一保证。
+[autopilot.locator]
+enabled = true
+# 相位相关峰值响应下限（归一化相关 0~1）。真机静止基线 579 帧 p99|d|=0.109px，
+# 大世界段峰值响应 p25=0.89。
+min_peak_response = 0.10
+# 圆内灰度标准差下限（0~255）。低于它说明圆内是纯色（黑屏/加载/纯水），
+# 相位相关没有意义。真机大世界段 p25=39.1。
+min_circle_std = 20.0
+# 传送契约 ① SELECT：在「非大世界」帧（传送地图开着）跑 OCR，把命中的
+# 传送点喂给 LocalizationService.on_teleport_ocr()。
+#
+# ★ 2026-10-15 接线：在此之前 on_teleport_ocr 的调用方是 **0 个** ——
+#   所以 enabled = true 也永远停在 UNINITIALIZED，position 恒为 LOST。
+#   现在这一段是「开了 enabled 就真的能用」的关键环节。
+#   关掉它 = 改用手动建立原点（move_to_probe --set-origin <传送点名>）。
+teleport_ocr_enabled = true
+# 节流间隔（秒）。只在非大世界帧尝试 —— 地图可能开着几十秒，
+# 每帧跑一次 OCR 在 5Hz 下太贵。0.5s 的响应延迟人察觉不到。
+teleport_ocr_interval_s = 0.5
+
+# ---------------------------------------------------------------------------
+# 血量几何投影（默认关）
+# ---------------------------------------------------------------------------
+# 从本帧血条的长度比例算 hp_ratio，不经 OCR。拿不准就返回 UNKNOWN，
+# 绝不填猜出来的数 —— 规则里 `hp() < 0.35` 会据此决定要不要吃药。
+#
+# 关着时（默认）：PlayerInfo.hp_ratio 恒为 None，hp() 信号恒 UNKNOWN，
+# 与接入之前完全一致。
+[autopilot.hp_estimation]
+enabled = false
+
+# 血条 ROI 比例 (x, y, w, h)，相对帧宽/帧高。
+# ★ 存比例而不是像素：ROI 依赖分辨率。2560x1600 实测是 (1076,1500,408,15)，
+#   换一台 1920x1080 那个框就完全错位。
+# 不填 = 用 perception/templates/hp_bar_reference.json 里的实测值。
+roi_frac = []
+
+# 空条底色 BGR。**不填也能用**：部分血量的条不需要它。
+# 但恰好满血或空血时条内部是一整片纯色、与「纯色补丁」无法区分，
+# 此时 hp_ratio 返回 UNKNOWN 而不是猜。要让满血也出值就把底色填进来。
+# ⚠️ 别把这个值当成真机实测 —— 参考帧是满血，压根没有空条可量。
+background_bgr = []
+
+# 剥掉几像素描边（参考帧实测 1px）
+border_inset = 1
+
+[autopilot.capture]
+# 目标窗口标题片段。找不到窗口会直接抛错（不静默返回 None）
+window_title_substr = "原神"
+# ★ 2026-10-10 两次调整：先 bitblt 优先，最后 wgc 顶到最前。
+#   bitblt 优先的理由：dxcam 抓的是**屏幕坐标**下的那块矩形，窗口一旦全屏
+#   越界（真机实测 17:57 连续报 `Invalid Region: Region should be in
+#   2560x1600`）就直接抛，而这类异常原先走不到降级逻辑，通道永远卡在 dxcam。
+#   bitblt 走的是窗口自己的 GDI 设备上下文，**不看屏幕坐标**。
+#
+#   wgc 排最前的理由：真机证明 bitblt 在**硬件加速全屏**下抓到的也是全黑
+#   （事件流里 luma 逐帧精确 0.0，且尺寸完全合法所以从未触发降级）。
+#   WGC 走的是 DWM 合成管道，抓的是 Windows 正在合成的表面，
+#   真机实测原神无边框全屏 2560x1600 下可用（luma=124.4，颜色种类 618）。
+#
+#   ⚠️ wgc 需要 `windows-capture`（>=2.0.1）。没装的机器上它会被
+#      `_init_channel` 判为不可用并自动跳过，链条照常往下走。
+#   ⚠️ WGC 抓不到**真·独占全屏**（那种模式绕过 DWM）。
+channel_order = ["wgc", "bitblt", "dxcam", "mss"]
+# 连续失败几次才抛异常（防偶发抖动中断循环）
+fail_threshold = 3
+# 全屏独占模式时退化到全屏矩形（会捕获整个屏幕，不推荐）
+allow_fullscreen_fallback = false
+
+[autopilot.perception]
+# 参考画布尺寸。ROI 表达式按这个基准写，运行时按当前截图自适应缩放。
+# 目标分辨率是 2560x1600（16:10），与 1920x1080（16:9）宽高比不同 ——
+# 靠边元素必须用 anchor 锚定，不能只按比例缩放。
+ref_size = [1920, 1080]
+# 画面亮度低于此值判为黑帧（游戏最小化/切屏）
+black_frame_luma = 8.0
+
+[autopilot.perception.yolo]
+# 没训练模型前保持 false。开启后 check_env / autopilot_demo 会加载 ONNX。
+enabled = false
+onnx_path = "perception/models/yolo11n.onnx"
+# ★ 必须与训练时的 data.yaml 里的 names 顺序完全一致
+class_names = [
+  "main_menu",
+  "bag_inventory",
+  "bag_character",
+  "map_big",
+  "combat",
+  "dialog",
+  "loading",
+]
+conf = 0.35
+iou = 0.5
+imgsz = 640
+timeout_ms = 500.0
+# 场景路由白名单：只在这些场景跑 YOLO。空 = 全场景跑。
+# 这是感知层性能的主要优化点 —— 背包场景不需要检测"战斗"类。
+scene_whitelist = []
+
+[autopilot.perception.ocr]
+enabled = true
+fail_threshold = 5
+# WinRT 不可用时降级到 RapidOCR（需 pip install rapidocr-onnxruntime）
+allow_rapid_fallback = true
+
+# --------------------------------------------------------------------------
+# ROI 公共变量（标量）
+# --------------------------------------------------------------------------
+# s = cw / ref_w（cw < ref_w 时），否则 1.0 —— 内置，不用声明
+[autopilot.roi_vars]
+topBarH = "56 * s"
+leftPartyW = "0.22 * cw"
+skillBarH = "0.30 * ch"
+
+# --------------------------------------------------------------------------
+# 公共区域别名（矩形）
+# --------------------------------------------------------------------------
+# 内置变量：cw, ch, cx, cy, s
+# 内置函数：rect(x,y,w,h) cutLeft/Right/Top/Bottom(p) cut*Corner(wp,hp)
+[autopilot.regions]
+topBar = "rect(0, 0, cw, topBarH)"
+leftParty = "rect(0, ch * 0.55, leftPartyW, skillBarH)"
+rightSkill = "rect(cw * 0.72, ch * 0.55, cw * 0.28, skillBarH)"
+topLeftQuarter = "rect(0, 0, cw / 4, ch / 4)"
+
+# --------------------------------------------------------------------------
+# 模板
+# --------------------------------------------------------------------------
+# path 相对 autopilot/ 目录解析。**文件不存在会在加载期直接报错** ——
+# 这是刻意的：一个声明了却找不到的模板，等于每次匹配都白跑，
+# 而你会以为是阈值不对，调半天。
+#
+# ⚠⚠ 下面三条模板**默认是注释掉的** ⚠⚠
+#   perception/templates/ 目录里目前只有 .gitkeep —— 模板图需要
+#   **你按自己的分辨率裁**，仓库里不能预置（每个人的 UI 缩放/画质/
+#   语言都不一样，预置的图对你是错的）。
+#
+#   取消注释前先裁图：
+#     1. python -m autopilot.tools.capture_demo --save shot.png
+#     2. 用图片编辑器裁出目标区域（40~80px，带轮廓/纹理，别裁纯色块）
+#     3. 存成 perception/templates/<name>.png
+#
+# 在你裁好之前，场景识别会退化成「只用 YOLO」—— 那意味着 model/
+# 目录下的 ONNX 没就绪时场景基本认不出来，主循环会大量空转。
+# 这是预期行为，不是 bug。
+#
+# 裁图要点（会直接决定能不能匹配上）：
+#   1. **必须包含结构**（边缘/纹理）。纯色方块方差趋零，会算出 0/0 匹配不到。
+#   2. **不要只裁纯色块**。宁可框大一点（40~80px），把轮廓带进去。
+#   3. 阈值从 0.80 起调。看到分数在 0.6~0.8 徘徊就降阈值；
+#      常年 >0.99 说明 ROI 太大了，收紧它比降阈值更省算力。
+#   4. 抗 UI 缩放：ROI 表达式负责分辨率适配，但**模板本身不会自动缩放**，
+#      换分辨率后建议重新裁一遍。
+
+# [autopilot.templates.PaimonMenu]
+# path = "perception/templates/paimon_menu.png"
+# threshold = 0.85
+# stable_count = 2
+# roi = "@topLeftQuarter"
+
+# [autopilot.templates.BagGrid]
+# path = "perception/templates/bag_grid.png"
+# threshold = 0.80
+# use_binary = true
+# binary_threshold = 128
+# roi = "rect(cw * 0.25, ch * 0.15, cw * 0.5, ch * 0.7)"
+
+# [autopilot.templates.EnemyHealthBar]
+# path = "perception/templates/enemy_health_bar.png"
+# threshold = 0.80
+# stable_count = 3
+# roi = "rect(0, ch * 0.2, cw, ch * 0.6)"
+
+# --------------------------------------------------------------------------
+# 场景路由（性能关键）
+# --------------------------------------------------------------------------
+# 只跑当前场景需要的模板。UNKNOWN 场景不跑任何模板 —— 不确定时少做，
+# 不要瞎猜。
+#
+# ⚠ 模板还没裁之前，下面这几行必须保持**全空** ——
+#   scene_routes 引用了未定义的模板名，加载期会直接报错
+#   （"引用了未定义的模板: X"）。裁好模板图后再连同上面的模板一起取消注释。
+[autopilot.scene_routes]
+# MAIN_MENU = ["PaimonMenu", "BagGrid"]
+# BAG_INVENTORY = ["BagGrid"]
+# COMBAT = ["EnemyHealthBar"]
+UNKNOWN = []
+
+# YOLO 标签 -> 内部场景 ID
+[autopilot.scene_map]
+main_menu = "MAIN_MENU"
+bag_inventory = "BAG_INVENTORY"
+bag_character = "BAG_CHARACTER"
+map_big = "MAP_BIG"
+combat = "COMBAT"
+dialog = "DIALOG"
+loading = "LOADING"

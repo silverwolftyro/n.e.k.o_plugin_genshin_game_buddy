@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://neko.local/schemas/intent_packet-1.0.json",
+  "title": "N.E.K.O. Autopilot IntentPacket v1.0",
+  "description": "决策层下行契约。action 必须在枚举白名单内，非法值一律拒绝执行（不降级、不猜测）。source=CLOUD 时 signature 必填。",
+  "type": "object",
+  "required": ["schema_version", "intent_id", "issued_at_ms", "state_version", "ttl_seconds", "priority", "source", "intent"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "type": "string", "const": "1.0" },
+    "intent_id": { "type": "string", "minLength": 1, "description": "全局唯一，重复即拒绝（防重放）。" },
+    "issued_at_ms": { "type": "integer", "minimum": 0 },
+    "state_version": { "type": "integer", "minimum": 0, "description": "生成意图时的状态版本。执行时漂移超过 10 帧即拒绝。" },
+    "ttl_seconds": { "type": "integer", "minimum": 1, "maximum": 300 },
+    "priority": { "type": "integer", "minimum": 0, "maximum": 100 },
+    "source": { "enum": ["LOCAL", "CLOUD"] },
+    "signature": { "type": ["string", "null"] },
+    "intent": {
+      "type": "object",
+      "required": ["action"],
+      "properties": {
+        "action": {
+          "enum": [
+            "NORMAL_ATTACK", "USE_SKILL", "USE_BURST", "DODGE", "SWITCH_CHARACTER",
+            "MOVE_FORWARD", "MOVE_BACK", "MOVE_LEFT", "MOVE_RIGHT", "SPRINT", "JUMP",
+            "OPEN_INVENTORY", "OPEN_MAP", "OPEN_PAIMON_MENU", "CLICK_ELEMENT",
+            "CONFIRM", "CANCEL", "CLOSE",
+            "WAIT", "SCREENSHOT", "NOOP"
+          ]
+        },
+        "action_kind": { "enum": ["COMBAT", "NAV", "UI", "SYSTEM"] },
+        "params": { "type": "object" }
+      }
+    },
+    "target": {
+      "type": "object",
+      "properties": {
+        "scene_required": { "type": "array", "items": { "type": "string" } },
+        "ui_element": { "type": ["string", "null"] },
+        "world_position": {
+          "type": ["object", "null"],
+          "properties": {
+            "x": { "type": "number" },
+            "y": { "type": "number" },
+            "radius": { "type": "number", "minimum": 0 }
+          }
+        },
+        "precondition": { "type": ["string", "null"], "description": "条件 DSL 表达式，加载期校验语法。" }
+      }
+    },
+    "constraints": {
+      "type": "object",
+      "properties": {
+        "max_attempts": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "requires_window_focus": { "type": "boolean" },
+        "forbid_during": { "type": "array", "items": { "type": "string" } },
+        "cooldown_ms": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

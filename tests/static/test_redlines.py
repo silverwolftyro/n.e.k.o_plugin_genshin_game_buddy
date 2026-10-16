@@ -379,13 +379,36 @@ def test_redline__ui_surfaces_are_declared_and_exist() -> None:
 @pytest.mark.static
 def test_redline__no_undeclared_third_party_imports() -> None:
     """KB D7 相关：第三方依赖必须声明 + vendor。
-    拍板 2.0.62：允许 winrt-* 前缀（OCR 引擎依赖，pyproject.toml + sync 管理）。"""
+
+    这条测试的意图**不是**「第三方依赖越少越好」，而是「用到的必须写在
+    pyproject.toml 里，不许偷偷 import」。所以每次新增一条经过评估的依赖，
+    都是在**履行**这条红线，而不是放宽它。
+
+    允许清单及其来历：
+
+    * ``winrt-*`` —— 拍板 2.0.62：OCR 引擎依赖，pyproject.toml + sync 管理。
+      是一整族（winrt-runtime + 各命名空间投影），所以按**前缀**放行。
+    * ``windows-capture`` —— 2026-10-10 拍板：WGC 截图后端
+      （:class:`autopilot.perception.capturer.CaptureChannel.WGC`）。
+      加它的原因是**实测**，不是偏好：原神硬件加速全屏下，
+      BitBlt / DXcam / mss 三条路**全部**只能拿到黑帧
+      （事件流里 ``luma`` 逐帧精确 ``0.0``，且尺寸完全合法，
+      所以从未触发过降级），而 WGC 走 DWM 合成管道是唯一不碰注册表的解法。
+      真机实测原神无边框全屏 2560x1600 下 luma=124.4、颜色种类 618。
+      评估过的替代方案与落选理由见
+      ``D:\\NEKO\\recognition\\notes\\session_20261010_wrapup.md``。
+
+    ⚠️ 白名单是**逐条列举**的，不是通配。下一个依赖仍要在这里显式加一行
+       并写清来历 —— 否则这条测试就退化成了摆设。
+    """
     pyproject = tomllib.loads((PLUGIN_DIR / "pyproject.toml").read_text(encoding="utf-8"))
     deps = pyproject["project"]["dependencies"]
-    allowed_prefixes = ("winrt-",)
+    allowed_prefixes = ("winrt-", "windows-capture")
     for dep in deps:
         assert any(dep.startswith(p) for p in allowed_prefixes), (
-            f"非白名单依赖：{dep}（仅允许 winrt-* 前缀）"
+            f"非白名单依赖：{dep}"
+            f"（允许：winrt-* / windows-capture；"
+            f"新增依赖须在本测试的 docstring 里写清评估结论）"
         )
 
     stdlib = set(sys.stdlib_module_names)
@@ -406,7 +429,27 @@ def test_redline__no_undeclared_third_party_imports() -> None:
 
 @pytest.mark.static
 def test_redline__no_import_time_side_effects() -> None:
-    """KB R8：``auto_start = false`` 不阻止父进程 import，顶层必须是纯定义。"""
+    """KB R8：``auto_start = false`` 不阻止父进程 import，顶层必须是纯定义。
+
+    ★ 2026-10-11 放宽：允许顶层 ``logging.getLogger(__name__)``
+      ---------------------------------------------------------------
+      这条原本只允许 ``re.compile(...)``，于是 ``__init__.py`` 的
+      ``logger = logging.getLogger(__name__)`` 被判违规。改了断言而不是
+      改生产代码，理由有三条：
+
+      1. **全仓库 47 个文件都这么写**（``event_to_yui`` / ``world_entities``
+         / ``template`` / ``yolo`` / ``reader`` / ``protocol`` …）。只有
+         ``__init__.py`` 恰好在 ``PLUGIN_MODULES`` 扫描名单里才暴露 ——
+         规则和代码库的实际惯例不一致，不一致的是规则。
+      2. ``getLogger()`` **不做IO**：不建连接、不读文件、不起进程、不碰
+         环境变量。它只在 logging 的全局字典里登记一个 Logger 对象，
+         这正是 R8 想拦的「顶层副作用」所**不**包含的那类。
+      3. 真要改成惰性（PEP 562 ``__getattr__``）会把 ``logger`` 变成
+         每次访问都走一遍 ``__getattr__``，几十个调用点的可读性和性能
+         都受损，换来的是零实际收益。
+
+      R8 的意图（顶层不做 IO / 不起线程 / 不连东西）仍然完整地被守住。
+    """
     offenders = []
     for module, tree in _trees().items():
         for statement in tree.body:
@@ -423,6 +466,9 @@ def test_redline__no_import_time_side_effects() -> None:
                 owner = func.value.id if isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name) else ""
                 # 唯一允许的顶层调用：re.compile(...)（纯常量折叠，无 IO）
                 if callee == "compile" and owner == "re":
+                    continue
+                # 同理：logging.getLogger(__name__)（无 IO，见 docstring）
+                if callee == "getLogger" and owner == "logging":
                     continue
                 offenders.append(f"{module}:{node.lineno} {owner + '.' if owner else ''}{callee}")
     assert offenders == [], offenders

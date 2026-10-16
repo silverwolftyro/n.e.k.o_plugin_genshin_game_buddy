@@ -1,0 +1,116 @@
+# ============================================================================
+# 原神 · 背包规则
+# ============================================================================
+#
+# 场景：BAG_INVENTORY
+#
+# ★ priority 越小越优先。间隔 10/20/30/40/50/60 留空便于插规则。
+#
+# ⚠ 诚实说明：强化、分解、圣遗物管理这些**真正需要"看清背包里有什么"**
+#   的逻辑，目前 perception 产不出对应信号（StatePacket 没有背包内容字段）。
+#
+#   所以涉及识别的规则写成两种形态：
+#     · enabled = false  + 真实条件  → 加载期全量校验，但不会触发
+#     · enabled = false  + when=false → 连条件都写不了（因为要用到尚未
+#       实现的 context 函数，而未知函数会在**加载期**直接报错）。
+#       真实条件写在 note 里，接通信号后照抄即可。
+#
+#   两种形态都能被 policy_diagnose 列出来，不会"忘了这条规则的存在"。
+#
+# 依赖的 context 函数：scene() since() resin()
+# ============================================================================
+
+# 解决：刚打开背包 UI 还在动画/加载，立刻操作大概率点空。
+# 依赖：since()
+[[rules]]
+name = "bag_wait_ui_settle"
+action = "WAIT"
+when = "scene() == 'BAG_INVENTORY' and since() < 800"
+priority = 10
+ttl_seconds = 1
+scenes = ["BAG_INVENTORY"]
+params = { ms = 800 }
+enabled = false
+note = "背包刚打开先等 UI 稳定"
+
+# 解决：原粹树脂满了还开着背包，白白挡着进度条。
+# 依赖：resin()
+# ⚠⚠ 上限 160 是硬编码的字面量 —— context 目前没有 resin_cap()。
+#    玩家上限被游戏改过时这条会误触发。接通 resin_cap() 后改成
+#    `resin() >= resin_cap()`。
+#    先设 enabled = false，正是为了不在上限不明时乱触发。
+[[rules]]
+name = "bag_resin_full_go_collect"
+action = "CLOSE"
+when = "resin() >= 160"
+priority = 20
+ttl_seconds = 2
+scenes = ["BAG_INVENTORY"]
+enabled = false
+note = "树脂满了关背包去领奖励。⚠上限硬编码 160，接 resin_cap() 前保持禁用"
+
+# 占位：检测到有可强化圣遗物 → 停下来等强化子流程。
+# 解决：强化的多步流程（选圣遗物→选槽位→确认）需要完整 UI 状态，
+#       单帧看不出"点了会不会点到别的东西"。所以第一版先停住。
+# 依赖：需要「有可强化圣遗物」信号 —— StatePacket 当前**没有**该字段。
+[[rules]]
+name = "bag_hold_for_upgrade"
+action = "NOOP"
+when = "false"
+priority = 25
+ttl_seconds = 1
+scenes = ["BAG_INVENTORY"]
+enabled = false
+note = "有可强化圣遗物时停住等强化子流程。接通信号后 when 改为 scene() == 'BAG_INVENTORY' and has_upgradable_artifact()"
+
+# 占位：强化材料不足 → 关背包去刷副本。
+# 依赖：需要「可用强化材料数量」信号 —— 未实现。
+[[rules]]
+name = "bag_close_when_material_short"
+action = "CLOSE"
+when = "false"
+priority = 30
+ttl_seconds = 2
+scenes = ["BAG_INVENTORY"]
+enabled = false
+note = "材料不足就关背包去刷。接通信号后 when 改为 scene() == 'BAG_INVENTORY' and upgrade_material() < 1"
+
+# 诊断用：进背包先截一帧，方便事后查"为什么机器人不动了"。
+# ⚠ 生产环境保持 enabled = false —— 每帧截图会显著拖慢感知循环。
+# 依赖：since()
+[[rules]]
+name = "bag_debug_snapshot"
+action = "SCREENSHOT"
+when = "scene() == 'BAG_INVENTORY' and since() < 300"
+priority = 40
+ttl_seconds = 1
+scenes = ["BAG_INVENTORY"]
+enabled = false
+note = "调试用：进背包先截一帧"
+
+# 解决：打开背包是要办事的。没事办就别占着背包挡视线。
+# 依赖：scene() since()
+# ⚠ 这条是兜底，priority 50 —— 前面的规则有机会先接管。
+#   放前面的话，任何"打开背包但不关"的情况都会被它立刻关掉。
+[[rules]]
+name = "bag_close_when_idle"
+action = "CLOSE"
+when = "scene() == 'BAG_INVENTORY' and since() > 800"
+priority = 50
+ttl_seconds = 2
+scenes = ["BAG_INVENTORY"]
+enabled = false
+note = "背包开着没事干就关掉"
+
+# 解决：看门狗 —— 背包开了一分多钟还没关，说明前面的规则都没生效
+#      （很可能是 UI 识别卡住了）。再等下去只会一直挡着。
+# 依赖：since()
+[[rules]]
+name = "bag_watchdog_close"
+action = "CLOSE"
+when = "scene() == 'BAG_INVENTORY' and since() > 60000"
+priority = 60
+ttl_seconds = 2
+scenes = ["BAG_INVENTORY"]
+enabled = false
+note = "看门狗：背包开太久（疑似 UI 识别卡住）就强制关掉"

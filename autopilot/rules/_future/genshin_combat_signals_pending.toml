@@ -1,0 +1,129 @@
+# ============================================================================
+# 由 genshin_combat.toml 拆出（2026-10-11）。**这些规则的 when 今天恒不成立**，
+# 整类挪到这里等信号接上。加载器只扫 rules/*.toml（glob 非递归），
+# 所以这个子目录里的东西**不会被加载** —— 它们只是留着。
+#
+# 解锁它们需要什么：见 recognition/notes/signal_integration_roadmap.md
+# ============================================================================
+
+[[rules]]
+name = "combat_result_confirm"
+action = "CONFIRM"
+when = "scene() == 'COMBAT_RESULT'"
+priority = 10
+ttl_seconds = 2
+scenes = ["COMBAT_RESULT"]
+enabled = false
+note = "结算界面点领取"
+
+# 解决：血量进斩杀线，站着不动就是死。
+# 依赖：hp()
+# 闪避有 1500ms 内置 CD，traits 里也配了 min_gap_ms，不会连按。
+[[rules]]
+name = "combat_emergency_dodge"
+action = "DODGE"
+when = "hp() < 0.20"
+priority = 20
+ttl_seconds = 1
+scenes = ["COMBAT"]
+enabled = false
+note = "危急血量先闪避争取反应时间"
+
+# 解决：血量低但还站着时，切到治疗位。
+# 依赖：hp()
+# ⚠ char_id 是硬编码的示例队伍，实际要按自己的编队改（keymap_editor 管键位，
+#   编队角色要改这里的 params.char_id）。
+[[rules]]
+name = "combat_heal_switch"
+action = "SWITCH_CHARACTER"
+when = "hp() < 0.35"
+priority = 20
+ttl_seconds = 3
+scenes = ["COMBAT"]
+params = { char_id = "barbara" }
+enabled = false
+note = "低血量切治疗位"
+
+# ---------------------------------------------------------------------------
+# 输出（资源到位就放）
+# ---------------------------------------------------------------------------
+
+# 解决：能量满 + 大招好 → 直接开大，这是收益最高的单次操作。
+# 依赖：q_ready() energy()
+# ⚠ 大招有 800ms 后摇（traits.min_gap_ms），这里 ttl 给 3s 让后摇走完。
+[[rules]]
+name = "combat_burst_full_energy"
+action = "USE_BURST"
+when = "q_ready() and energy() > 0.95"
+priority = 30
+ttl_seconds = 3
+scenes = ["COMBAT"]
+enabled = false
+note = "满能量大招优先"
+
+# 解决：大招没好但元素战技转好了 → 至少别干站着。
+# 依赖：e_ready()
+# cooldown 800ms 防连点（E 键本身不吃资源，冷却纯防手抖）。
+[[rules]]
+name = "combat_skill_ready"
+action = "USE_SKILL"
+when = "e_ready()"
+priority = 40
+ttl_seconds = 2
+scenes = ["COMBAT"]
+cooldown_ms = 800
+enabled = false
+note = "E 技能就绪就放"
+
+# 解决：雷神不在场上 → 切上去。切人本身也是输出（切人触发后台切）。
+# 依赖：onfield()
+# ⚠ 当前 context 只支持「查场上是不是某人」，**不支持**「查场下某人 CD 好没好」
+#    （那需要 q_ready('raiden') 这种带参形式）。所以这条只判断「在不在场上」，
+#    语义偏弱：可能白切一次。接了带参 CD 查询后应改成
+#    `not onfield('雷电将军') and slot(2)`。
+[[rules]]
+name = "combat_switch_to_raiden"
+action = "SWITCH_CHARACTER"
+when = "not onfield('雷电将军')"
+priority = 50
+ttl_seconds = 3
+scenes = ["COMBAT"]
+cooldown_ms = 3000
+params = { char_id = "raiden" }
+enabled = false
+note = "雷神不在场上就切过去"
+
+# ---------------------------------------------------------------------------
+# 节奏控制
+# ---------------------------------------------------------------------------
+
+# 解决：刚切进战斗场景的那半秒，角色还在跑图/转身，直接操作大概率打空。
+# 依赖：since()
+# 代价很小（0.5s），收益是避免一连串无效输入。
+[[rules]]
+name = "world_emergency_dodge"
+action = "DODGE"
+when = "has_nearby_enemy() and hp() < 0.20"
+priority = 20
+ttl_seconds = 1
+scenes = ["WORLD"]
+enabled = true
+note = "大世界里有敌人且血量进斩杀线 -> 闪避"
+
+# 大招：能量满 + 有敌人。
+# 依赖：has_nearby_enemy() q_ready() energy()
+[[rules]]
+name = "world_burst_only_with_enemy"
+action = "USE_BURST"
+when = "has_nearby_enemy() and q_ready() and energy() > 0.95"
+priority = 30
+ttl_seconds = 3
+scenes = ["WORLD"]
+enabled = true
+note = "有敌人才放大招（避免对着空气开大）"
+
+# 采集类：附近有矿/宝箱时的后续动作占位。
+# ⚠ 现在**没有采集动作**（ActionType 白名单里没有 USE_PICKUP 之类），
+#    所以只留位置不写规则。要等动作层补上采集动作才有意义。
+#   条件写法（届时）：when = "has_nearby_ore()" / "has_nearby_chest()"
+# note = "领完奖退出结算。启用时把 when 改成 scene() == 'COMBAT_RESULT' and reward_claimed()"

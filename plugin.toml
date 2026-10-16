@@ -40,7 +40,13 @@ keywords = [
     "wuthering",
 ]
 
-version = "2.0.73b0"
+# ★ 版本号规则：与 NEKO-Console 同步。
+#     3    = N.E.K.O. 3.0 项目代号
+#     1    = 主迭代号
+#     16   = 小迭代号（每完成一个任务包 +1）
+#   两边版本号**必须一致** —— 用户一眼就能判断"插件和主控台是配套的"。
+#   这是测试期本地安装的版本，不会上传。
+version = "3.1.18"
 entry = "plugin.plugins.genshin_game_buddy:GenshinGameBuddyPlugin"
 
 [plugin.author]
@@ -95,6 +101,18 @@ entry = "ui/panel.tsx"
 mode = "hosted-tsx"
 context = "settings"
 permissions = ["config:write", "action:call", "state:read"]
+
+# Autopilot B 轨：把 NEKO-Console 主控台的实时状态透过来，并转发启停命令。
+# 与上面那个 settings surface 完全独立，两个可同时打开。
+# 权限只给 state:read + action:call —— 不需要 config:write：
+# 这个面板不改插件配置，只发命令给主控台。
+[[plugin.ui.panel]]
+id = "autopilot"
+title = "Autopilot 控制台"
+entry = "ui/autopilot_panel.tsx"
+mode = "hosted-tsx"
+context = "autopilot"
+permissions = ["state:read", "action:call"]
 
 [[plugin.ui.guide]]
 id = "quickstart"

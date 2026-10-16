@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import tomllib
@@ -253,8 +254,71 @@ def make_config(
 #: ``pytest`` 的 ``tmp_path`` 与 ``tempfile.mkdtemp()`` 在沙箱/托管环境下建出来的
 #: 目录**不可写**（建一级成功、往里写就 PermissionError，实测于 Windows 沙箱），
 #: 而插件源码目录在测试时一定可写（``__pycache__`` / ``.pytest_cache`` 本来就在这里）。
-#: 该目录已进 .gitignore、用点前缀，打包规则会跳过。
+#:
+#: ⚠️ **打包前必须删掉它**（``rm -- .pytest-tmp``）。
+#:    这里曾经注释说「用点前缀，打包规则会跳过」——**那是错的**：
+#:    ``neko_plugin_cli`` 的暂存树检查不认点前缀，会报
+#:    ``[WARN] ... staged tree contains directories that cannot survive
+#:    packaging (['.pytest-tmp'])``，并因此**跳过 metadata 推导**，
+#:    打出来的包没有 ``plugin.meta.json``，要等宿主运行时重扫才能补上入口参数 schema。
+#:    即便目录是空的也一样会触发 —— 所以只要跑过测试就要删。
 SCRATCH_ROOT = PLUGIN_DIR / ".pytest-tmp"
+
+
+@pytest.fixture(autouse=True)
+def _isolate_process_switches(monkeypatch: pytest.MonkeyPatch) -> None:
+    """把**会起后台线程的进程级开关**在测试期间清空。
+
+    ★ 2026-10-11 加 —— 真机上发现的三条集成测试红，根因就在这里
+      -------------------------------------------------------
+      ``MGC_EVENT_TO_YUI`` 被设成 **User 级环境变量**（用户为了看 YUI 陪玩
+      打开的）。于是 ``startup()`` 会在每条集成用例里都拉起
+      ``event_to_yui`` 的**追尾读线程**，它读真实的
+      ``autopilot/_runtime/*.stream.jsonl`` 并往 ``ctx`` 里 ``push_message`` ——
+      用例断言 ``len(pushed) == 2`` 时实际拿到 **7** 条，而且每条内容是
+      真机跑出来的台词（``RUN_STARTED`` 之类）。
+
+      这是**环境决定测试行为**：同一份代码在「用户设过环境变量」和
+      「没设过」的机器上跑出不同结果。这类污染很难查（报错里没有任何
+      环境变量字样），所以在这里统一掐掉，而不是去改那三条用例。
+
+      只清 ``MGC_*``：它们全是**演示/实验开关**，按设计就不该在
+      测试期间生效。``NEKO_STORAGE_SELECTED_ROOT`` 等由各自的 fixture 管。
+    """
+    for key in list(os.environ):
+        if key.startswith("MGC_"):
+            monkeypatch.delenv(key, raising=False)
+
+
+@pytest.fixture(autouse=True)
+def _isolate_run_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """把插件的 ``_runtime`` 写盘目录重定向到每条用例的临时目录。
+
+    ★ 为什么必须全局做，而不是逐个测试文件补
+      ------------------------------------------------
+      写盘路径是 ``__init__.py`` 里的
+      ``_proto.DEFAULT_RUN_DIR / "session_state.json"``，
+      而 ``DEFAULT_RUN_DIR`` 是**模块级常量**，导入时就算好了。
+      任何构造了插件实例、并且走到 ``_publish_session`` /
+      ``_session_heartbeat`` 的用例都会写进**真实的**
+      ``autopilot/_runtime/session_state.json``。
+
+      2026-10-12 实测踩到：跑一次 ``pytest tests`` 就把那个文件的
+      mtime 和内容都改了。于是它看起来「刚刚更新」，会被误当成
+      「插件最近跑过」的证据 —— 而实际上那是测试写的。
+
+      之前是逐条排查出来的三个文件
+      （``test_plugin_entries.py`` / ``test_config_path.py`` /
+      ``test_session_probe.py``）在打补丁。放 autouse 里更稳：
+      **以后新写的用例默认就被保护**，不会再有人踩同一个坑。
+
+      读侧 ``layout.SESSION_STATE_FILE`` 也是模块级常量，但那只影响
+      overlay 的显示，用例要断言它时自己 monkeypatch 即可
+      （``test_session_state_overlay.py`` 已经是这么做的）。
+    """
+    from plugin.plugins.genshin_game_buddy.autopilot.ui import protocol
+
+    monkeypatch.setattr(protocol, "DEFAULT_RUN_DIR", tmp_path)
 
 
 @pytest.fixture

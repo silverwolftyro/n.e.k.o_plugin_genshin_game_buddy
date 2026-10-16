@@ -1,0 +1,82 @@
+# ============================================================================
+# 原神 · 战斗细分（2026-10-11 新增）
+# ============================================================================
+#
+# ★★★ 动手前必读：这份文件里大部分想法**今天写不出来**
+# ------------------------------------------------------
+# 我对 28 个 DSL 函数做了一次全量探测（造真机形状的 StatePacket 逐个调用）。
+# 结果 —— 今天真正能出值的只有 11 个：
+#
+#   fps · scene · scene_confidence · perception_ok · ocr_ok · t
+#   has_nearby_enemy / chest / ore / drops · nearby_entity_count
+#
+# 而战斗决策最需要的三个信号**全部**是 UNKNOWN：
+#
+#   hp()      —— PlayerInfo.hp_ratio 未观测（v1 不做几何投影）
+#   energy()  —— PlayerInfo.energy 未观测
+#   q_ready() —— 「未记录任何技能 CD」，**没有任何数据源**
+#   e_ready() —— 同上
+#   since()   —— scene.entered_ms 未设置
+#
+# 所以本文件里**没有**「血量低于 X% 就吃药/逃跑」这类规则 ——
+# 写出来它就永远不会触发，而 21 条里有 14 条已经是这种状态。
+#
+# 依赖的 context 函数：has_nearby_enemy() enemy_bar_count() nearby_count()
+#                       scene() perception_ok()
+# ============================================================================
+
+# ------------------------------------------------------------------ 群体
+# 「附近有几个敌人」今天只能靠血条数（health_bar）—— enemy_identify 是
+# 玩家主动锁定后才出现的，通常只有 1 个，写不出群体判断。
+[[rules]]
+name = "combat_group_spread_when_swarmed"
+action = "MOVE_BACK"
+when = "enemy_count() >= 4"
+priority = 10
+ttl_seconds = 2
+scenes = ["WORLD"]
+enabled = false
+note = "被 4 个以上敌人围住 -> 后退拉距离。⚠ 血条数≈敌人数是近似（一个敌人可能多条血条）。2026-10-11 改用 enemy_count() —— 它现在会退回血条计数，规则不必再直接摸侧信道 helper"
+
+[[rules]]
+name = "combat_single_focus_attack"
+action = "NORMAL_ATTACK"
+when = "enemy_count() == 1 and has_nearby_enemy()"
+priority = 60
+ttl_seconds = 2
+scenes = ["WORLD"]
+enabled = false
+note = "只有 1 个敌人 -> 直接平A，不需要任何技能判断"
+
+# ------------------------------------------------------------------ 开箱
+# 上锁的箱子需要钥匙，和普通箱子是完全不同的决策 —— 而
+# has_nearby_chest() 把 chest / locked_chest 归在同一组，分不出来。
+[[rules]]
+name = "combat_skip_locked_chest"
+action = "CANCEL"
+when = "has_locked_chest() and not nearby_count('chest') > 1"
+priority = 15
+ttl_seconds = 1
+scenes = ["WORLD"]
+enabled = false
+note = "只有一个箱子且是上锁的 -> 别去按 F（没钥匙），浪费交互"
+
+# ------------------------------------------------------------------ 感知不健康
+# ⚠ 这条原本写在这里，与 recovery.toml 的 recovery_hold_when_perception_down
+#   **条件完全相同**（not perception_ok()）—— 同优先级下谁先命中取决于
+#   **文件加载顺序**，那不是设计。已删除，保留 recovery 的那条（它放在
+#   异常处理文件里，语义归属更准）。
+#   见 rules/PRIORITY_MAP.md 的冲突 A。
+
+# ------------------------------------------------------------------ 写不出来但值得记录的
+# 以下都是用户/设计想要的，但**今天没有数据源**，故不写规则：
+#
+#   hp < 0.20 -> 逃跑          ✗ hp() 恒 UNKNOWN
+#   hp < 0.35 -> 换人/吃药     ✗ 同上，且 USE_FOOD 动作不存在（无食物快捷键）
+#   energy > 0.95 -> 大招      ✗ energy() / q_ready() 恒 UNKNOWN
+#   e_ready() -> 小技能        ✗ 同上
+#   since() < 500 -> 进场等一下 ✗ since() 恒 UNKNOWN
+#   单体放大招/群体放小技能     ✗ 元素反应数据链根本没有
+#
+# 解锁顺序：**先接血量/能量/技能 CD 的观测**（builder 侧），
+# 再写这些规则。在那之前写它们只会得到一堆永不触发的哑规则。
