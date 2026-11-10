@@ -59,9 +59,11 @@ from .activation import ActivationState
 from .context_pack import (
     build_context_block,
     build_lookup_block,
+    clip_text,
     render_scene_avoid,
     render_term_card,
 )
+from .game_data_store import GameData, load_game_data
 from .game_registry import (
     OCR_PROFILE_DEFAULTS,
     OCR_PROFILES,
@@ -454,6 +456,10 @@ class GenshinGameBuddyPlugin(NekoPluginBase):
         self._known_suppress = KnownSuppressRegistry(
             window_seconds=float(self._options.known_suppress_window_s)
         )
+        # 2026-11-10：离线攻略数据（武器 / 圣遗物 / 材料）的进程内缓存。
+        #   键 = game_id；值 = GameData 或 None（该游戏没有这三张表）。
+        #   纯内存，不落盘；数据文件是包内只读 TOML，运行时零网络。
+        self._offline_data_cache: dict[str, GameData | None] = {}
         # 归属检测的 (library, scenes) 按游戏缓存；config 重建时清空（2.0.14）。
         self._detect_cache: dict[str, tuple[Any, dict[str, SceneEntry]]] = {}
         # 2026-11-07：BetterGI 双向桥接（startup 里建，shutdown 里收）。
@@ -2311,7 +2317,7 @@ class GenshinGameBuddyPlugin(NekoPluginBase):
         name="lookup_game_term",
         description=tr(
             "tools.lookup_game_term.description",
-            default="查询当前游戏术语库里的具体条目（角色、机制、武器、圣遗物等）。【重要】参数 query 必须传角色名/术语名（如「纳西妲」「深境螺旋」），不要传完整句子。查不到时先用你已有的知识回答，不要只是说「找不到」。",
+            default="查询当前游戏术语库与攻略数据里的具体条目（角色、机制、武器、圣遗物、材料等）。【重要】参数 query 必须传角色名/术语名（如「纳西妲」「深境螺旋」「风鹰剑」），不要传完整句子。查不到时先用你已有的知识回答，不要只是说「找不到」。",
         ),
         parameters={
             "type": "object",
@@ -2355,6 +2361,33 @@ class GenshinGameBuddyPlugin(NekoPluginBase):
 
         matches = library.match(text, self._options.lookup_max_matches)
         if not matches:
+            # ★ 2026-11-10：术语库没命中 → 回落离线攻略数据（武器/圣遗物/材料）。
+            #   术语库优先；离线表命中时按**同一契约**返回（found/count/entries/text），
+            #   调用方（main_server 读的 llm_tool 返回体）不用改。
+            offline = self._offline_lookup(text, self._options.lookup_max_matches)
+            if offline:
+                cards = [
+                    self._offline_card(item, max_chars=self._options.lookup_max_chars_per_term)
+                    for item in offline
+                ]
+                self.logger.info(
+                    "genshin_game_buddy: lookup_game_term offline hit {} (game={}, query_len={})",
+                    len(offline),
+                    session.game_id,
+                    len(text),
+                )
+                return {
+                    "output": {
+                        "found": True,
+                        "game": session.display_name,
+                        "count": len(offline),
+                        "entries": offline,
+                        "text": build_lookup_block(
+                            self._t("lookup.found_header", count=len(offline)), cards
+                        ),
+                    },
+                    "is_error": False,
+                }
             self.logger.info(
                 "genshin_game_buddy: lookup_game_term miss (game={}, query_len={})",
                 session.game_id,
@@ -2445,6 +2478,183 @@ class GenshinGameBuddyPlugin(NekoPluginBase):
             return self._manager.ensure_library(entry), ""
         except TermLoadError as exc:
             return None, exc.code
+
+    # ------------------------------------------------------------------
+    # 2026-11-10：离线攻略数据（武器 / 圣遗物 / 材料）检索
+    # ------------------------------------------------------------------
+    # 背景：``terms/genshin/{weapons,artifacts,materials}.toml`` 三张表早已落地，
+    #   但 ``game_data_store`` 此前**不在运行时 import 链**里 → 数据在盘上、
+    #   检索层够不着（"风鹰剑"这种问题插件侧零供给）。这一段把它接进
+    #   ``lookup_game_term``：术语库优先，未命中再回落离线表。
+
+    def _offline_game_data(self, game_id: str) -> GameData | None:
+        """取某游戏的离线攻略数据快照。没有这三张表时返回 ``None``。
+
+        ★ **数据源路径**与 ``_load_library_for`` 同一套约定：默认层读
+          ``self.plugin_dir`` 下的 ``<terms_dir>``。刻意**不用**
+          ``game_data_store.default_terms_dir()``（它按 ``__file__`` 定位，
+          插件从 zip 加载时读不到文件）。
+        ★ **覆盖层不适用**：离线表是包内只读数据，没有用户侧改写机制。
+        ★ 纯内存缓存：进程内只解析一次；失败也缓存（不反复试 IO）。
+        """
+        if game_id in self._offline_data_cache:
+            return self._offline_data_cache[game_id]
+        entry = self._registry.get(game_id)
+        data: GameData | None = None
+        if entry is not None:
+            try:
+                root = Path(self.plugin_dir).joinpath(
+                    *entry.terms_dir.replace("\\", "/").split("/")
+                )
+                data = load_game_data(terms_dir=root)
+            except Exception as exc:  # noqa: BLE001 - 缺文件/坏文件都不该阻断检索
+                self.logger.info(
+                    "genshin_game_buddy: offline game data unavailable for {} ({})",
+                    game_id,
+                    type(exc).__name__,
+                )
+                data = None
+        self._offline_data_cache[game_id] = data
+        return data
+
+    def _offline_lookup(self, text: str, limit: int) -> list[dict[str, Any]]:
+        """在离线攻略数据里查 ``text``，返回条目负载列表（可能为空）。
+
+        匹配规则：数据条目的**名字**出现在查询串里（``name in text``）。
+        这三张表里的名字都是 ≥2 字的专有名词（风鹰剑 / 绝缘之旗印 / 精锻用魔矿），
+        不会像单字术语那样在长句里误命中。
+        """
+        if not text or limit <= 0:
+            return []
+        session = self._manager.current
+        if session is None:
+            return []
+        data = self._offline_game_data(session.game_id)
+        if data is None:
+            return []
+        found: list[dict[str, Any]] = []
+        for entry in data.weapons:
+            if entry.name and entry.name in text:
+                found.append(self._offline_weapon_payload(entry, data))
+        for entry in data.artifacts:
+            if entry.name and entry.name in text:
+                found.append(self._offline_artifact_payload(entry, data))
+        for entry in data.materials:
+            if entry.name and entry.name in text:
+                found.append(self._offline_material_payload(entry, data))
+        return found[:limit]
+
+    @staticmethod
+    def _offline_weapon_payload(entry: Any, data: GameData) -> dict[str, Any]:
+        """一条武器 → 查询返回体里的条目负载（形状与术语条目兼容）。"""
+        rarity = f"{entry.rarity}星" if entry.rarity else ""
+        brief_parts = [f"{entry.weapon_type}·{rarity}" if entry.weapon_type else rarity]
+        if entry.base_atk:
+            brief_parts.append(f"基础攻击 {entry.base_atk:g}")
+        if entry.main_stat:
+            brief_parts.append(f"{entry.main_stat} {entry.main_stat_value}".strip())
+        return {
+            "key": entry.name,
+            "kind": "武器",
+            "brief": "，".join(part for part in brief_parts if part),
+            "source": data.source,
+            "detail": {
+                "slug": entry.slug,
+                "rarity": entry.rarity,
+                "weapon_type": entry.weapon_type,
+                "base_atk": entry.base_atk,
+                "main_stat": entry.main_stat,
+                "main_stat_value": entry.main_stat_value,
+                "passive": entry.passive,
+                "passive_detail": entry.passive_detail,
+                "ascension_materials": list(entry.ascension_materials),
+            },
+        }
+
+    @staticmethod
+    def _offline_artifact_payload(entry: Any, data: GameData) -> dict[str, Any]:
+        """一套圣遗物 → 查询返回体里的条目负载。"""
+        rarity = "/".join(f"{value}星" for value in entry.rarity)
+        return {
+            "key": entry.name,
+            "kind": "圣遗物",
+            "brief": rarity,
+            "source": data.source,
+            "detail": {
+                "slug": entry.slug,
+                "rarity": list(entry.rarity),
+                "effect_2pc": entry.effect_2pc,
+                "effect_4pc": entry.effect_4pc,
+                "pieces": list(entry.pieces),
+            },
+        }
+
+    @staticmethod
+    def _offline_material_payload(entry: Any, data: GameData) -> dict[str, Any]:
+        """一种材料 → 查询返回体里的条目负载。"""
+        return {
+            "key": entry.name,
+            "kind": "材料",
+            "brief": entry.category_text,
+            "source": data.source,
+            "detail": {
+                "slug": entry.slug,
+                "rarity": entry.rarity,
+                "category": entry.category,
+                "category_text": entry.category_text,
+                "sources": list(entry.sources),
+                "description": entry.description,
+            },
+        }
+
+    def _offline_card(self, payload: Mapping[str, Any], *, max_chars: int) -> str:
+        """渲染一条离线数据卡片（行级预算：放不下的子行整行丢弃）。
+
+        与 ``render_term_card`` 同语义（行级取舍，不切半个词），只是
+        离线表没有"相关说法 / 注意不要说"这两行，取而代之的是各类型的详细字段。
+        """
+        budget = max(int(max_chars), 1)
+        detail = payload.get("detail") or {}
+        labels = {
+            "武器": (
+                ("passive", "特性"),
+                ("passive_detail", "特性说明"),
+                ("ascension_materials", "突破材料"),
+            ),
+            "圣遗物": (
+                ("effect_2pc", "2件套"),
+                ("effect_4pc", "4件套"),
+                ("pieces", "部件"),
+            ),
+            "材料": (
+                ("sources", "获取途径"),
+                ("description", "说明"),
+            ),
+        }
+        lines = [
+            self._t(
+                "lookup.entry_line",
+                term=payload.get("key", ""),
+                kind=payload.get("kind", ""),
+                brief=payload.get("brief", ""),
+            )
+        ]
+        for field, label in labels.get(payload.get("kind", ""), ()):
+            value = detail.get(field)
+            if isinstance(value, (list, tuple)):
+                value = "、".join(str(item) for item in value if str(item))
+            value = str(value or "").strip()
+            if value:
+                lines.append(f"{label}：{value.splitlines()[0]}")
+        kept: list[str] = []
+        for line in lines:
+            if len("\n".join([*kept, line])) <= budget:
+                kept.append(line)
+            else:
+                break
+        if not kept:
+            kept = [clip_text(lines[0], budget)]
+        return "\n".join(kept)
 
     async def _register(self, raw: object) -> tuple[str, SwitchResult | None]:
         """登记/切换的公共路径。返回 ``(status, result)``。

@@ -15,7 +15,7 @@
 
   "tools.set_current_game.description": "当用户提到自己正在玩某款游戏时调用，登记当前游戏，之后的陪聊会使用该游戏的语境与术语。",
   "tools.set_current_game.param.game": "游戏名称，可以是用户原话里的说法。",
-  "tools.lookup_game_term.description": "查询当前游戏术语库里的具体条目（角色、机制、武器、圣遗物等）。【重要】参数 query 必须传角色名/术语名（如「纳西妲」「深境螺旋」），不要传完整句子。查不到时先用你已有的知识回答，不要只是说「找不到」。",
+  "tools.lookup_game_term.description": "查询当前游戏术语库与攻略数据里的具体条目（角色、机制、武器、圣遗物、材料等）。【重要】参数 query 必须传角色名/术语名（如「纳西妲」「深境螺旋」「风鹰剑」），不要传完整句子。查不到时先用你已有的知识回答，不要只是说「找不到」。",
   "tools.lookup_game_term.param.query": "要查的术语或玩家的说法。",
 
   "errors.unknown_game": "没有找到这款游戏的登记信息。当前可用：{available}",

@@ -4,8 +4,12 @@
 
 1. **数据集形状**：条目数、字段完整性、文件头版本锚点；
 2. **查询能力**：按中文名 / slug 精确查、按关键字模糊查；
-3. **运行时零网络**：查询模块不 import 任何网络库，运行时模块不 import 查询模块，
+3. **运行时零网络**：查询模块不 import 任何网络库、不发起网络调用；
    取数脚本带"仅开发期使用"标记且不在运行时 import 链上。
+
+★ 2026-11-10（P0-1）修正：查询模块**已接入**运行时 import 链（只有入口
+  ``__init__.py`` 引用它）——"数据落地但不接线"让三张表运行时够不着。
+  零网络这条没变，只是"不 import 查询模块"换成了"import 查询模块但不联网"。
 """
 
 from __future__ import annotations
@@ -278,11 +282,27 @@ def test_runtime__query_module_has_no_network_calls() -> None:
         assert token not in source, f"game_data_store.py 疑似发起网络请求：{token}"
 
 
-def test_runtime__no_runtime_module_imports_query_module() -> None:
-    """查询模块不在运行时 import 链上——插件运行行为零变化。"""
-    for module in PLUGIN_MODULES:
-        source = read_plugin_source(module)
-        assert "game_data_store" not in source, f"{module} 引用了 game_data_store"
+def test_runtime__query_module_is_in_runtime_chain_via_entry_only() -> None:
+    """2026-11-10（P0-1）：查询模块**已接入**运行时 import 链。
+
+    ★ 这条断言的**方向变了**。它原本钉的是"查询模块不在运行时 import 链上
+      —— 插件运行行为零变化"。那是上一轮接入离线数据时的**有意设计**：
+      数据先落地、不接线，留给后面某轮。
+
+      但端到端验证证明了这个设计的代价：数据在盘上、检索层却够不着，
+      "风鹰剑""绝缘之旗印""精锻用魔矿"三问插件侧零供给。于是本轮把它
+      接进 ``lookup_game_term``（术语库优先，未命中再回落离线表）。
+
+    现在钉住的是"接上了，但不越界"：
+
+    * 确实在链上（否则三张表永远查不到）；
+    * **只有** ``__init__.py`` 引用它（入口一处，其余模块不直接依赖）；
+    * 仍然零网络（上面两条用例已钉）。
+    """
+    referrers = [
+        module for module in PLUGIN_MODULES if "game_data_store" in read_plugin_source(module)
+    ]
+    assert referrers == ["__init__.py"], referrers
 
 
 def test_runtime__fetch_script_is_dev_only_and_out_of_runtime_chain() -> None:
