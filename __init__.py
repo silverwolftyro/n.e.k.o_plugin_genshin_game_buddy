@@ -3016,8 +3016,18 @@ class GenshinGameBuddyPlugin(NekoPluginBase):
     def _push_proactive(
         self, changed_scenes: list[str], added: list[str], removed: list[str]
     ) -> bool:
-        """构造变化量文本 + 当前激活 key 列表，push_message(ai_behavior="respond")。"""
-        active_keys = self._activation.get_active_keys()
+        """构造变化量文本 + 当前激活 key 列表，push_message(ai_behavior="respond")。
+
+        ★ 2026-11-11（P1-1）："当前屏幕上出现了这些关键词"只列**真实来源**的激活键
+          （source = screen / screen_slang / query）。``core_layer`` 是常驻锚点——
+          它本来就一直在，把它们念成"屏幕上出现了"是对模型的事实误报
+          （模型可能据此编造"我看到了抽卡界面"）。
+          过滤后为空 → 改用中性表述，**不硬凑**关键词。
+        """
+        # 只取"屏幕/查询"来源的激活键——常驻锚点（core_layer）不算屏幕事实。
+        active_keys = self._activation.get_active_keys_by_sources(
+            ("screen", "screen_slang", "query")
+        )
         if not self._activation.has_scene_active():
             text = self._t("perception.anchors_only")
         elif changed_scenes or added:
@@ -3026,8 +3036,11 @@ class GenshinGameBuddyPlugin(NekoPluginBase):
                 if changed_scenes
                 else "在当前场景中发现了新的关键词"
             )
-            keys_text = " / ".join(active_keys[:12])
-            text = self._t("perception.proactive_switch", action=action, keys=keys_text)
+            if active_keys:
+                keys_text = " / ".join(active_keys[:12])
+                text = self._t("perception.proactive_switch", action=action, keys=keys_text)
+            else:
+                text = self._t("perception.proactive_switch_no_keys", action=action)
         else:
             _gid = getattr(self._manager.current, "game_id", "") if self._manager.current else ""
             text = self._t("perception.proactive_no_change", game=_gid)

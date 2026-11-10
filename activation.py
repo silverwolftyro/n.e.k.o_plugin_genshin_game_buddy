@@ -61,6 +61,22 @@ class ActivationState:
         self._expire()
         return list(self._active.keys())
 
+    def get_active_keys_by_sources(self, sources: "Iterable[str]") -> list[str]:
+        """按来源取激活 key（保持激活顺序）。
+
+        拍板 2.0.74（P1-1）：文案层需要区分"这词是屏幕/查询里真的出现了"
+        （source = ``screen`` / ``screen_slang`` / ``query``）与"这词是常驻锚点"
+        （source = ``core_layer``）。后者本来就一直在，把它当屏幕事实念给模型
+        是事实误报（模型可能据此编造"我看到了抽卡界面"）。
+
+        这里只做**只读筛选**，不碰激活 / 过期 / 淘汰逻辑。
+        source 精确匹配——``scene:<name>`` 这种带前缀的 source 不会被
+        ``"scene"`` 命中，要按前缀筛请用 :meth:`clear_by_sources` 的同款语义。
+        """
+        wanted = tuple(sources)
+        self._expire()
+        return [key for key, (_exp, src) in self._active.items() if src in wanted]
+
     def has_scene_active(self) -> bool:
         self._expire()
         return any(src.startswith("scene:") for _, src in self._active.values())

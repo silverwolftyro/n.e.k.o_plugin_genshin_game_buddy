@@ -58,6 +58,7 @@
   "terms.load.empty_dimension": "「{dimension}」这个维度目前没有内容。",
 
   "perception.proactive_switch": "（你注意到主人 {action}，当前屏幕上出现了这些关键词：{keys}。可以自然地提起这个话题。）",
+  "perception.proactive_switch_no_keys": "（你注意到主人 {action}，可以自然地聊聊这个话题。）",
   "perception.proactive_no_change": "（你注意到主人还在玩 {game}，屏幕上没有什么新变化。）",
   "perception.anchors_only": "（当前只有基础锚点激活，暂时没有检测到具体场景。）"
 }

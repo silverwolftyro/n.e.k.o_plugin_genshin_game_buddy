@@ -268,7 +268,9 @@ def test_i18n__no_placeholder_like_todo(messages: dict[str, str]) -> None:
 
 @pytest.mark.static
 def test_i18n__total_key_count(messages: dict[str, str]) -> None:
-    assert len(messages) == 54
+    # 2026-11-11（P1-1）：+1 —— perception.proactive_switch_no_keys
+    # （主动提示过滤掉常驻锚点后的中性表述，不再硬凑"屏幕上出现了什么"）。
+    assert len(messages) == 55
 
 
 # =============================================================================
