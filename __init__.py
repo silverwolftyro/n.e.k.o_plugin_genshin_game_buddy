@@ -2852,21 +2852,78 @@ class GenshinGameBuddyPlugin(NekoPluginBase):
                 lines.append(self._t("context.term_line", term=entry.key, brief=entry.brief))
         return "\n".join(lines)
 
+    @staticmethod
+    def _is_cjk_char(char: str) -> bool:
+        """是否中日韩统一表意文字（单字术语"独立成词"判定用）。"""
+        if not char:
+            return False
+        code = ord(char)
+        return 0x3400 <= code <= 0x4DBF or 0x4E00 <= code <= 0x9FFF
+
+    @staticmethod
+    def _standalone_single_char(char: str, text: str) -> bool:
+        """单字在 ``text`` 里是否**独立成词**：左右至少一侧不是汉字。
+
+        夹在两个汉字中间的单字是更长的词的一部分（"天空之刃"里的"空"），
+        不是用户在指代那个单字术语；真正在问它时它会站在词首或落在标点旁
+        （"空是谁"、"太欧了"）。
+        """
+        index = text.find(char)
+        while index != -1:
+            left = text[index - 1] if index > 0 else ""
+            right = text[index + 1] if index + 1 < len(text) else ""
+            if not GenshinGameBuddyPlugin._is_cjk_char(left) or not GenshinGameBuddyPlugin._is_cjk_char(right):
+                return True
+            index = text.find(char, index + 1)
+        return False
+
+    @staticmethod
+    def _query_match_kind(entry: TermEntry, text: str) -> str:
+        """一条术语是否被用户原文命中。
+
+        返回 ``""``（未命中）/ ``"multi"``（≥2 字的 key 或 alias 命中）/
+        ``"single"``（单字 key 或 alias 独立成词地命中）。
+        """
+        for candidate in (entry.key, *entry.aliases):
+            if not candidate:
+                continue
+            if len(candidate) >= 2:
+                if candidate in text:
+                    return "multi"
+                continue
+            if GenshinGameBuddyPlugin._standalone_single_char(candidate, text):
+                return "single"
+        return ""
+
     def _scan_and_activate_query(self, text: str) -> None:
         """拍板 2.0.59：扫用户消息命中术语 → 激活（source="query", ttl=300）→ 推简短术语卡。
         只扫 key + aliases（slang 留给 ocr_perceive）。已激活的不重推；>8 条只激活不推。
-        push 内容只含 key+brief（库数据），不含用户原文——守住 I-16。"""
+        push 内容只含 key+brief（库数据），不含用户原文——守住 I-16。
+
+        ★ 2026-11-10：单字术语门槛（对齐屏幕路径 2.0.63 的 ``len>=2`` 精神）
+          长度 <2 的 key / alias 只有在 query 里**独立成词**时才计数——
+          即左右至少一侧不是汉字。夹在两个汉字中间的单字是更长的词的一部分
+          （"风鹰剑和天空之刃哪个好"里的"空"是"天空之刃"的一部分，不是
+          用户在问"空"），而真问它时它站在词首（"空是谁"）→ 照常命中。
+          命中集合里含单字 term 且总数 >1 时**只激活不推卡**——
+          推错卡比不推更糟（会把无关条目塞进模型上下文）。
+        """
         library = self._manager.library
         if library is None:
             return
         matched: list[str] = []
+        single_char_keys: set[str] = set()
         seen: set[str] = set()
         for entry in library.by_key.values():
             if entry.key in seen:
                 continue
-            if entry.key in text or any(a and a in text for a in entry.aliases):
-                matched.append(entry.key)
-                seen.add(entry.key)
+            kind = self._query_match_kind(entry, text)
+            if not kind:
+                continue
+            matched.append(entry.key)
+            seen.add(entry.key)
+            if kind == "single":
+                single_char_keys.add(entry.key)
         if not matched:
             return
         with self._state_lock:
@@ -2878,6 +2935,14 @@ class GenshinGameBuddyPlugin(NekoPluginBase):
             newly or matched, len(matched),
         )
         if not newly or len(matched) > 8:
+            return
+        if single_char_keys and len(matched) > 1:
+            # 命中里混着单字术语且不止一条 → 疑似误命中，不推卡（只激活）
+            self.logger.info(
+                "genshin_game_buddy: on_chat_message query-activate skip-card single_char={} count={}",
+                sorted(single_char_keys),
+                len(matched),
+            )
             return
         hint = self._render_query_hint(newly)
         current = self._manager.current
