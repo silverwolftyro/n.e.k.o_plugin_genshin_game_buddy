@@ -206,9 +206,100 @@ desktop_markers_enabled = true
 # 用户自定义额外桌面特征串（追加到内置表）。空 = 全部用内置；非空 = 追加到内置之后。
 desktop_markers_extra = []
 
+# ── YUI 话痨度（播报档位）─────────────────────────────────────────────
+# 三档预设，与 Console 面板的「话痨度」滑块**共用同一套口径**：
+#   quiet  = 0.0  安静：只播 tier 1 关键事件（阵亡 / 血量极低 / 引擎异常）
+#   normal = 0.5  正常：播 tier 1 + tier 2（关键 + 常规反馈）
+#   chatty = 1.0  话痨：tier 1 + 2 + 3 全播
+#
+# ★ 取值优先级：宿主配置（本项）> Console 滑块 > 默认 1.0
+#   改这里**不需要重启插件**：宿主写完配置会推 CONFIG_UPDATE，
+#   插件的 config_change 生命周期随即刷新档位，下一轮播报（≤2s）就生效。
+#
+# ★ 为什么默认写 "chatty" 却**不**压过 Console 滑块
+#   宿主会把清单默认值一起写进用户配置副本（<用户数据>/plugins/
+#   genshin_game_buddy/config/plugin.toml），也就是说这一行**永远存在**，
+#   不管用户有没有动过它。若"键存在即覆盖"，Console 滑块就永远轮不到
+#   说话 —— 而滑块恰恰是用户最常用的即时开关。
+#   所以 "chatty" 的语义是「我没管它」：交回给 Console 滑块；
+#   想用宿主配置压过滑块，选 quiet 或 normal。
+#
+# ★ 默认行为不变：没有 Console、宿主也没显式选安静/正常时，档位 = 1.0，
+#   与这次改造前**逐字一致**。
+yui_verbosity_preset = "chatty"
+
+# ── 游戏生命周期守卫（2026-11-07）────────────────────────────────────
+# 目的：游戏没开 / 不在前台时，感知栈（YOLO 推理 + OCR 轮询 + 抓屏）
+#       **完全停摆**，不许在后台空转烧 CPU/GPU。
+#       但 BetterGI 的 Webhook 监听是**极低功耗**的（一个 idle 的 HTTP
+#       线程），必须一直开着 —— 否则主人一喊「开始打怪」就没人应答。
+#
+# enabled          : 总开关。关 = 完全不做进程/前台探测，感知栈常开
+#                    （等价于改造前的行为）。
+# poll_seconds     : 后台探测线程的轮询间隔（秒，1..300）。
+#                    5 = 默认。探测本身极轻量（psutil 扫进程名 + 一次
+#                    GetForegroundWindow），5s 一次对 CPU 不可见。
+# allow_background : 游戏进程**在**、但窗口在后台（最小化 / 被遮挡 /
+#                    Alt-Tab）时，是否继续跑感知栈。
+#                    false = 默认，后台也挂起（更省电，也更安全：
+#                    BetterGI 本身也要求前台窗口）。
+#                    true = 只在「游戏进程彻底不在」时才挂起。
+#
+# ★ fail-open：探测失败一律视为「不挂起」。
+#   宁可多烧一点 CPU，也不能让插件因为一次系统 API 抽风就哑掉。
+lifecycle_guard_enabled = true
+lifecycle_guard_poll_seconds = 5
+lifecycle_guard_allow_background = false
+
 
 # =============================================================================
-# 自定义段 2：游戏注册表
+# 自定义段 2：BetterGI 桥接覆盖项
+# ----------------------------------------------------------------------------
+# 2026-11-07：原独立插件 bettergi_companion 的 Bridge 逻辑已物理并入本插件
+# 的 bettergi/ 子包。这里的值**优先于** bettergi/config.toml 里的同名项。
+#
+# ⚠ 之所以要留这一层覆盖口：
+#   宿主安装场景下插件目录可能被安装流程替换，bettergi/config.toml 里的
+#   端口/路径设置会丢；面板里的值更稳。
+#
+# 不写这一段 = 完全沿用 bettergi/config.toml 的默认值
+# （127.0.0.1:17890/bettergi，控制通道启用）。
+# ----------------------------------------------------------------------------
+
+[genshin_game_buddy.bettergi]
+
+[genshin_game_buddy.bettergi.webhook]
+# 监听地址。host = "127.0.0.1" = 只接受本机回环，**不暴露到局域网**
+# （安全默认值，不要改成 0.0.0.0）。
+host = "127.0.0.1"
+# 监听端口。17890 = 与原独立插件一致；换端口的话 BetterGI 侧的
+# JS 代理脚本也要跟着改（那边填的就是这个端口）。
+port = 17890
+# 接收路径。BetterGI 的 WebHook 设置里要填同样的路径。
+path = "/bettergi"
+# 防重放窗口（秒）。payload 里带 timestamp 且偏差超过这个值就拒收（409）。
+# 0 = 关闭该校验。
+replay_window_s = 300
+
+[genshin_game_buddy.bettergi.control]
+# 反向控制总开关（YUI → BetterGI 指挥干活）。
+#   true  = 启用（默认）。@llm_tool command_bettergi 走这条通道。
+#   false = 关闭，只保留正向（BetterGI → YUI 台词）。
+enabled = true
+# 指令发出后等 BetterGI 回执的秒数。超时 = 判定失败并如实告诉用户。
+ack_timeout_s = 15
+# BetterGI 侧 GET /bettergi/command 的长轮询保持时长（秒）。
+poll_hold_s = 5
+# 启动后等多少秒做第一次「通道通没通」的自检。
+self_check_delay_s = 15
+# 没连上时每隔多少秒再提醒一次。
+self_check_repeat_s = 120
+# 最多提醒几次（0 = 完全不提醒）。
+self_check_max = 2
+
+
+# =============================================================================
+# 自定义段 3：游戏注册表
 # -----------------------------------------------------------------------------
 # 设计约定（重要，避免身份与内容重复定义）：
 #   - 本段是"身份真源"：game_id / display_name / aliases / terms_dir / enabled
