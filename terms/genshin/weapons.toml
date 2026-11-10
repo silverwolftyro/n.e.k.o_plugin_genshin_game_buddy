@@ -1,5 +1,5 @@
 schema_version = 1
-generated_at = "2026-11-10T10:15:19+08:00"
+generated_at = "2026-11-11T01:54:15+08:00"
 source = "genshin-db (theBowja/genshin-db)"
 source_repo = "https://github.com/theBowja/genshin-db"
 source_commit = "8e5badd60b5d894284ccc927a56c9683529d2592"
@@ -7,68 +7,42 @@ source_path = "src/data/ChineseSimplified/weapons/*.json"
 source_license = "MIT（上游仓库 LICENSE；本插件只取名称/数值/效果描述等事实性数据）"
 
 [[weapons]]
-name = "风鹰剑"
-slug = "aquilafavonia"
-rarity = 5
-weapon_type = "单手剑"
-weapon_type_code = "WEAPON_SWORD_ONE_HAND"
-base_atk = 47.537
-main_stat = "物理伤害加成"
-main_stat_value = "9%"
-passive = "西风之鹰的抗争"
-passive_detail = "攻击力提高20%；受到伤害时触发：高扬抗争旗号的西风鹰之魂苏醒，恢复等同于攻击力的100%的生命值，并对周围的敌人造成200%攻击力的伤害。该效果每15秒只能触发一次。"
-ascension_materials = ["摩拉", "高塔孤王的破瓦", "沉重号角", "牢固的箭簇", "高塔孤王的残垣", "黑铜号角", "锐利的箭簇", "高塔孤王的断片", "黑晶号角", "历战的箭簇"]
-
-[[weapons]]
-name = "护摩之杖"
-slug = "staffofhoma"
-rarity = 5
-weapon_type = "长柄武器"
-weapon_type_code = "WEAPON_POLE"
-base_atk = 45.9364
-main_stat = "暴击伤害"
-main_stat_value = "14.4%"
-passive = "无羁的朱赤之蝶"
-passive_detail = "生命值提升20%。此外，基于装备该武器的角色生命值上限的0.8%，获得攻击力加成。当装备该武器的角色生命值低于50%时，进一步获得1%基于生命值上限的攻击力提升。"
-ascension_materials = ["摩拉", "漆黑陨铁的一粒", "地脉的旧枝", "史莱姆凝液", "漆黑陨铁的一片", "地脉的枯叶", "史莱姆清", "漆黑陨铁的一角", "地脉的新芽", "史莱姆原浆"]
-
-[[weapons]]
-name = "雾切之回光"
-slug = "mistsplitterreforged"
+name = "赦罪"
+slug = "absolution"
 rarity = 5
 weapon_type = "单手剑"
 weapon_type_code = "WEAPON_SWORD_ONE_HAND"
 base_atk = 47.537
 main_stat = "暴击伤害"
 main_stat_value = "9.6%"
-passive = "雾切御腰物"
-passive_detail = "获得12%所有元素伤害加成，并能获得「雾切之巴印」的威势。雾切之巴印：持有1/2/3层雾切之巴印时，获得8/16/28%自己的元素类型的元素伤害加成。在下列情况下，角色将各获得1层雾切之巴印：普通攻击造成元素伤害时，持续5秒；施放元素爆发时，持续10秒；此外，角色元素能量低于100%时，将获得1层雾切之巴印，此雾切之巴印会在角色的元素能量充满时消失。每层雾切之巴印的持续时间独立计算。"
-ascension_materials = ["摩拉", "远海夷地的瑚枝", "混沌机关", "破旧的刀镡", "远海夷地的玉枝", "混沌枢纽", "影打刀镡", "远海夷地的琼枝", "混沌真眼", "名刀镡"]
+passive = "死之契"
+passive_detail = "暴击伤害提升20%；生命之契的数值增加时，装备者造成的伤害提升16%。该效果持续6秒，至多叠加3次。"
+ascension_materials = ["摩拉", "悠古弦音的残章", "老旧的役人怀表", "啮合齿轮", "悠古弦音的断章", "役人的制式怀表", "机关正齿轮", "悠古弦音的乐章", "役人的时时刻刻", "奇械机芯齿轮"]
 
 [[weapons]]
-name = "天空之翼"
-slug = "skywardharp"
-rarity = 5
-weapon_type = "弓"
-weapon_type_code = "WEAPON_BOW"
-base_atk = 47.537
-main_stat = "暴击率"
-main_stat_value = "4.8%"
-passive = "回响长天的诗歌"
-passive_detail = "暴击伤害提高20%；攻击命中时有60%概率造成125%攻击力的小范围物理伤害，该效果每4秒只能触发一次。"
-ascension_materials = ["摩拉", "凛风奔狼的始龀", "地脉的旧枝", "牢固的箭簇", "凛风奔狼的裂齿", "地脉的枯叶", "锐利的箭簇", "凛风奔狼的断牙", "地脉的新芽", "历战的箭簇"]
-
-[[weapons]]
-name = "阿莫斯之弓"
-slug = "amosbow"
-rarity = 5
-weapon_type = "弓"
-weapon_type_code = "WEAPON_BOW"
-base_atk = 45.9364
+name = "恶王丸"
+slug = "akuoumaru"
+rarity = 4
+weapon_type = "双手剑"
+weapon_type_code = "WEAPON_CLAYMORE"
+base_atk = 42.401
 main_stat = "攻击力"
-main_stat_value = "10.8%"
-passive = "矢志不忘"
-passive_detail = "普通攻击与重击造成的伤害提升12%；普通攻击与重击的箭矢发射后每经过0.1秒，伤害还会提升8%，至多提升5次。"
+main_stat_value = "9%"
+passive = "驭浪的海祇民"
+passive_detail = "队伍中所有角色的元素能量上限的总和，每1点能使装备此武器的角色的元素爆发造成的伤害提高0.12%，通过这种方式，元素爆发造成的伤害至多提高40%。"
+ascension_materials = ["摩拉", "远海夷地的瑚枝", "隐兽指爪", "破旧的刀镡", "远海夷地的玉枝", "隐兽利爪", "影打刀镡", "远海夷地的琼枝", "隐兽鬼爪", "名刀镡"]
+
+[[weapons]]
+name = "暗巷猎手"
+slug = "alleyhunter"
+rarity = 4
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 43.7349
+main_stat = "攻击力"
+main_stat_value = "6%"
+passive = "街巷伏击"
+passive_detail = "装备该武器的角色处于队伍后台时，每1秒角色造成的伤害提升2%，最多通过这种方式获得20%的伤害提升；在场上超过4秒后，上述伤害提升效果每1秒会流失4%，直到降低至0%。"
 ascension_materials = ["摩拉", "狮牙斗士的枷锁", "混沌装置", "史莱姆凝液", "狮牙斗士的铁链", "混沌回路", "史莱姆清", "狮牙斗士的镣铐", "混沌炉心", "史莱姆原浆"]
 
 [[weapons]]
@@ -85,17 +59,381 @@ passive_detail = "施放元素战技后，获得1个胤种，该效果每5秒至
 ascension_materials = ["摩拉", "远海夷地的瑚枝", "混沌机关", "破旧的刀镡", "远海夷地的玉枝", "混沌枢纽", "影打刀镡", "远海夷地的琼枝", "混沌真眼", "名刀镡"]
 
 [[weapons]]
-name = "薙草之稻光"
-slug = "engulfinglightning"
+name = "阿莫斯之弓"
+slug = "amosbow"
+rarity = 5
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 45.9364
+main_stat = "攻击力"
+main_stat_value = "10.8%"
+passive = "矢志不忘"
+passive_detail = "普通攻击与重击造成的伤害提升12%；普通攻击与重击的箭矢发射后每经过0.1秒，伤害还会提升8%，至多提升5次。"
+ascension_materials = ["摩拉", "狮牙斗士的枷锁", "混沌装置", "史莱姆凝液", "狮牙斗士的铁链", "混沌回路", "史莱姆清", "狮牙斗士的镣铐", "混沌炉心", "史莱姆原浆"]
+
+[[weapons]]
+name = "尘光七谕"
+slug = "angelosheptades"
+rarity = 5
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 49.1377
+main_stat = "攻击力"
+main_stat_value = "3.6%"
+passive = "末临者的华冠"
+passive_detail = "攻击力提升12%。装备者创造护盾后的20秒内，获得「先导之光」效果：依据装备者的攻击力，每1000点攻击力都会使队伍中自己的当前场上角色造成的伤害提升10%，至多提升26%。此外，装备者创造护盾时，还会获得「指引者的餍足」效果，使装备者恢复14点元素能量，该效果每14秒至多触发一次；在不处于战斗状态下开启各类宝箱时，也会获得该效果。装备者处于队伍后台时，依然能触发上述效果。\n魔导·秘仪：队伍中自己的魔导角色位于队伍后台时，也能获得「先导之光」中50%的伤害提升效果。"
+ascension_materials = ["摩拉", "奇巧秘器的残件", "失色的焰剑", "毁损机轴", "奇巧秘器的模本", "残失的焰剑", "加固机轴", "奇巧秘器的继业", "宝饰的焰剑", "精制机轴"]
+
+[[weapons]]
+name = "学徒笔记"
+slug = "apprenticesnotes"
+rarity = 1
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 23.245
+main_stat = ""
+main_stat_value = ""
+passive = ""
+passive_detail = ""
+ascension_materials = ["摩拉", "高塔孤王的破瓦", "沉重号角", "破损的面具", "高塔孤王的残垣", "黑铜号角", "污秽的面具", "高塔孤王的断片"]
+
+[[weapons]]
+name = "若水"
+slug = "aquasimulacra"
+rarity = 5
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 44.3358
+main_stat = "暴击伤害"
+main_stat_value = "19.2%"
+passive = "洗濯诸类之形"
+passive_detail = "生命值提升16%。周围存在敌人时，装备该武器的角色造成的伤害都会提升20%，不论该角色处于场上或是处于队伍后台。"
+ascension_materials = ["摩拉", "孤云寒林的光砂", "晦暗刻像", "浮游干核", "孤云寒林的辉岩", "夤夜刻像", "浮游幽核", "孤云寒林的圣骸", "幽邃刻像", "浮游晶化核"]
+
+[[weapons]]
+name = "风鹰剑"
+slug = "aquilafavonia"
+rarity = 5
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 47.537
+main_stat = "物理伤害加成"
+main_stat_value = "9%"
+passive = "西风之鹰的抗争"
+passive_detail = "攻击力提高20%；受到伤害时触发：高扬抗争旗号的西风鹰之魂苏醒，恢复等同于攻击力的100%的生命值，并对周围的敌人造成200%攻击力的伤害。该效果每15秒只能触发一次。"
+ascension_materials = ["摩拉", "高塔孤王的破瓦", "沉重号角", "牢固的箭簇", "高塔孤王的残垣", "黑铜号角", "锐利的箭簇", "高塔孤王的断片", "黑晶号角", "历战的箭簇"]
+
+[[weapons]]
+name = "苍纹角杯"
+slug = "ashgravendrinkinghorn"
+rarity = 4
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 42.401
+main_stat = "生命值"
+main_stat_value = "9%"
+passive = "图帕克之握"
+passive_detail = "攻击命中敌人时，在目标位置基于生命值上限的40%，造成范围伤害。该效果每15秒至多触发一次。"
+ascension_materials = ["摩拉", "神合秘烟的思绪", "秘源轴", "稚嫩的尖齿", "神合秘烟的预感", "秘源机鞘", "老练的坚齿", "神合秘烟的征兆", "秘源真芯", "横行霸者的利齿"]
+
+[[weapons]]
+name = "星鹫赤羽"
+slug = "astralvulturescrimsonplumage"
+rarity = 5
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 45.9364
+main_stat = "暴击伤害"
+main_stat_value = "14.4%"
+passive = "眸中的月珥"
+passive_detail = "触发扩散或星扩散反应后的12秒内，攻击力提高24%。此外，队伍中存在至少1/2名与装备者元素类型不同的角色时，装备者重击造成的伤害提高20%/48%，元素爆发造成的伤害提高10%/24%。"
+ascension_materials = ["摩拉", "神合秘烟的思绪", "折光的胚芽", "卫从的木哨", "神合秘烟的预感", "惑光的阔叶", "战士的铁哨", "神合秘烟的征兆", "迷光的蜷叶之心", "龙冠武士的金哨"]
+
+[[weapons]]
+name = "超越之匙"
+slug = "ateaspoonoftranscendence"
+rarity = 5
+weapon_type = "双手剑"
+weapon_type_code = "WEAPON_CLAYMORE"
+base_atk = 47.537
+main_stat = "暴击伤害"
+main_stat_value = "9.6%"
+passive = "白女皇的升变"
+passive_detail = "攻击力提升28%。\n此外，装备者的重击每次命中敌人后，都会短暂达成「超越」：使装备者的星超导和星扩散反应伤害提升16%，持续5秒。该效果至多叠加3层，每0.2秒至多叠加一层。"
+ascension_materials = ["摩拉", "终北遗嗣的哀荣", "残损的月铁", "磨损的执凭", "终北遗嗣的迷顽", "空竭的月铁", "精致的执凭", "终北遗嗣的祷献", "无秽的月铁", "霜镌的执凭"]
+
+[[weapons]]
+name = "黑蚀"
+slug = "athameartis"
+rarity = 5
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 45.9364
+main_stat = "暴击率"
+main_stat_value = "7.2%"
+passive = "白日王的灼辉"
+passive_detail = "元素爆发造成的暴击伤害提升16%；元素爆发命中敌人时，将获得「白昼之刃」效果：攻击力提升20%，除装备者以外，队伍中附近的当前场上角色攻击力提升16%，持续3秒。\n此外，队伍拥有「魔导·秘仪」效果时，「白昼之刃」的效果额外提升75%。装备者处于队伍后台时，依然能触发上述效果。"
+ascension_materials = ["摩拉", "高塔孤王的破瓦", "霜夜的残照", "毁损机轴", "高塔孤王的残垣", "霜夜的柔辉", "加固机轴", "高塔孤王的断片", "霜夜的煌荣", "精制机轴"]
+
+[[weapons]]
+name = "焚曜千阳"
+slug = "athousandblazingsuns"
+rarity = 5
+weapon_type = "双手剑"
+weapon_type_code = "WEAPON_CLAYMORE"
+base_atk = 49.1377
+main_stat = "暴击率"
+main_stat_value = "2.4%"
+passive = "落日重燃的黎明"
+passive_detail = "施放元素战技或元素爆发时，获得「焚光」效果：暴击伤害提高20%，攻击力提升28%，该效果持续6秒，每10秒至多触发一次。\n持续期间内，普通攻击或重击造成元素伤害后，将使此次「焚光」效果的持续时间延长2秒，该效果每1秒至多触发一次，至多通过这种方式使持续时间延长6秒。\n此外，处于夜魂加持状态下时，「焚光」效果提高75%，且「焚光」效果在装备者处于后台时不进行计时。"
+ascension_materials = ["摩拉", "贡祭炽心的惶恐", "秘源轴", "稚嫩的尖齿", "贡祭炽心的踌躇", "秘源机鞘", "老练的坚齿", "贡祭炽心的决绝", "秘源真芯", "横行霸者的利齿"]
+
+[[weapons]]
+name = "千夜浮梦"
+slug = "athousandfloatingdreams"
+rarity = 5
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 44.3358
+main_stat = "元素精通"
+main_stat_value = "58"
+passive = "千夜的曙歌"
+passive_detail = "队伍中每个其他角色，都会依据元素类型与装备者相同与否，为装备者提供提升效果。相同：元素精通提升32点；不同：装备者元素类型的元素伤害加成提升10%。上述提升效果每种至多叠加3层。此外，队伍中装备者以外的附近角色的元素精通提升40点，多件同名武器产生的此效果可以叠加。"
+ascension_materials = ["摩拉", "绿洲花园的追忆", "破缺棱晶", "蕈兽孢子", "绿洲花园的恩惠", "混浊棱晶", "荧光孢粉", "绿洲花园的哀思", "辉光棱晶", "孢囊晶尘"]
+
+[[weapons]]
+name = "苍耀"
+slug = "azurelight"
+rarity = 5
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 47.537
+main_stat = "暴击率"
+main_stat_value = "4.8%"
+passive = "白山的馈赐"
+passive_detail = "施放元素战技后的12秒内，攻击力提升24%。持续期间，装备者的元素能量为0时，攻击力还会提升24%，且暴击伤害提升40%。"
+ascension_materials = ["摩拉", "神合秘烟的思绪", "折光的胚芽", "卫从的木哨", "神合秘烟的预感", "惑光的阔叶", "战士的铁哨", "神合秘烟的征兆", "迷光的蜷叶之心", "龙冠武士的金哨"]
+
+[[weapons]]
+name = "无垠蔚蓝之歌"
+slug = "balladoftheboundlessblue"
+rarity = 4
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 43.7349
+main_stat = "元素充能效率"
+main_stat_value = "6.7%"
+passive = "蔚蓝深空"
+passive_detail = "普通攻击或重击命中敌人后的6秒内，普通攻击造成的伤害提升8%，重击造成的伤害提升6%。该效果至多叠加3次，每0.3秒至多触发一次。"
+ascension_materials = ["摩拉", "凛风奔狼的始龀", "脆弱的骨片", "寻宝鸦印", "凛风奔狼的裂齿", "结实的骨片", "藏银鸦印", "凛风奔狼的断牙", "石化的骨片", "攫金鸦印"]
+
+[[weapons]]
+name = "峡湾长歌"
+slug = "balladofthefjords"
+rarity = 4
+weapon_type = "长柄武器"
+weapon_type_code = "WEAPON_POLE"
+base_atk = 42.401
+main_stat = "暴击率"
+main_stat_value = "6%"
+passive = "冰原的诸多故事"
+passive_detail = "队伍中存在至少三种不同元素类型的角色时，元素精通提升120点。"
+ascension_materials = ["摩拉", "无垢之海的苦盏", "来自何处的待放之花", "骗骗花蜜", "无垢之海的酒盏", "何人所珍藏之花", "微光花蜜", "无垢之海的银杯", "漫游者的盛放之花", "原素花蜜"]
+
+[[weapons]]
+name = "苇海信标"
+slug = "beaconofthereedsea"
+rarity = 5
+weapon_type = "双手剑"
+weapon_type_code = "WEAPON_CLAYMORE"
+base_atk = 45.9364
+main_stat = "暴击率"
+main_stat_value = "7.2%"
+passive = "沙海守望"
+passive_detail = "元素战技命中敌人后，攻击力提升20%，持续8秒；受到伤害后，攻击力提升20%，持续8秒。上述2种效果角色处于队伍后台时也能触发。此外，不处于护盾庇护下时，生命值上限提高32%。"
+ascension_materials = ["摩拉", "烈日威权的残响", "残毁的横脊", "褪色红绸", "烈日威权的余光", "密固的横脊", "镶边红绸", "烈日威权的梦想", "锲纹的横脊", "织金红绸"]
+
+[[weapons]]
+name = "新手长枪"
+slug = "beginnersprotector"
+rarity = 1
+weapon_type = "长柄武器"
+weapon_type_code = "WEAPON_POLE"
+base_atk = 23.245
+main_stat = ""
+main_stat_value = ""
+passive = ""
+passive_detail = ""
+ascension_materials = ["摩拉", "狮牙斗士的枷锁", "混沌装置", "导能绘卷", "狮牙斗士的铁链", "混沌回路", "封魔绘卷", "狮牙斗士的镣铐"]
+
+[[weapons]]
+name = "蝶变"
+slug = "beyondthechrysalis"
+rarity = 5
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 47.537
+main_stat = "暴击伤害"
+main_stat_value = "9.6%"
+passive = "破茧的自由舞"
+passive_detail = "装备者每次施放元素战技或元素爆发时，将按照以下顺序，依次获得以下三种效果中的一种：\n忠忱之风：装备者的暴击伤害提升56%，持续10秒；\n叛弃之风：装备者造成的星扩散反应伤害提升36%，持续10秒；\n丰获之风：为装备者恢复5点元素能量，每4秒至多通过这种方式恢复5点元素能量。\n装备者退场时，将移除上述效果，并重置其顺序。"
+ascension_materials = ["摩拉", "苍星军势的始动", "灵生空根", "嵌合种", "苍星军势的集结", "灵生分蘖节", "并生嵌合胞", "苍星军势的鸣令", "灵生盘枝心", "源生嵌合体"]
+
+[[weapons]]
+name = "黑岩绯玉"
+slug = "blackcliffagate"
+rarity = 4
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 42.401
+main_stat = "暴击伤害"
+main_stat_value = "12%"
+passive = "乘胜追击"
+passive_detail = "击败敌人后，攻击力提升12%，持续30秒。该效果至多叠加3层，每层持续时间独立。"
+ascension_materials = ["摩拉", "孤云寒林的光砂", "猎兵祭刀", "导能绘卷", "孤云寒林的辉岩", "特工祭刀", "封魔绘卷", "孤云寒林的圣骸", "督察长祭刀", "禁咒绘卷"]
+
+[[weapons]]
+name = "黑岩长剑"
+slug = "blackclifflongsword"
+rarity = 4
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 43.7349
+main_stat = "暴击伤害"
+main_stat_value = "8%"
+passive = "乘胜追击"
+passive_detail = "击败敌人后，攻击力提升12%，持续30秒。该效果至多叠加3层，每层持续时间独立。"
+ascension_materials = ["摩拉", "孤云寒林的光砂", "猎兵祭刀", "牢固的箭簇", "孤云寒林的辉岩", "特工祭刀", "锐利的箭簇", "孤云寒林的圣骸", "督察长祭刀", "历战的箭簇"]
+
+[[weapons]]
+name = "黑岩刺枪"
+slug = "blackcliffpole"
+rarity = 4
+weapon_type = "长柄武器"
+weapon_type_code = "WEAPON_POLE"
+base_atk = 42.401
+main_stat = "暴击伤害"
+main_stat_value = "12%"
+passive = "乘胜追击"
+passive_detail = "击败敌人后，攻击力提升12%，持续30秒。该效果至多叠加3层，每层持续时间独立。"
+ascension_materials = ["摩拉", "雾海云间的铅丹", "雾虚花粉", "新兵的徽记", "雾海云间的汞丹", "雾虚草囊", "士官的徽记", "雾海云间的金丹", "雾虚灯芯", "尉官的徽记"]
+
+[[weapons]]
+name = "黑岩斩刀"
+slug = "blackcliffslasher"
+rarity = 4
+weapon_type = "双手剑"
+weapon_type_code = "WEAPON_CLAYMORE"
+base_atk = 42.401
+main_stat = "暴击伤害"
+main_stat_value = "12%"
+passive = "乘胜追击"
+passive_detail = "击败敌人后，攻击力提升12%，持续30秒。该效果至多叠加3层，每层持续时间独立。"
+ascension_materials = ["摩拉", "雾海云间的铅丹", "雾虚花粉", "新兵的徽记", "雾海云间的汞丹", "雾虚草囊", "士官的徽记", "雾海云间的金丹", "雾虚灯芯", "尉官的徽记"]
+
+[[weapons]]
+name = "黑岩战弓"
+slug = "blackcliffwarbow"
+rarity = 4
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 43.7349
+main_stat = "暴击伤害"
+main_stat_value = "8%"
+passive = "乘胜追击"
+passive_detail = "击败敌人后，攻击力提升12%，持续30秒。该效果至多叠加3层，每层持续时间独立。"
+ascension_materials = ["摩拉", "孤云寒林的光砂", "猎兵祭刀", "骗骗花蜜", "孤云寒林的辉岩", "特工祭刀", "微光花蜜", "孤云寒林的圣骸", "督察长祭刀", "原素花蜜"]
+
+[[weapons]]
+name = "乌髓孑灯"
+slug = "blackmarrowlantern"
+rarity = 4
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 41.0671
+main_stat = "元素精通"
+main_stat_value = "48"
+passive = "结契的凭证"
+passive_detail = "绽放反应造成的伤害提升48%，月绽放反应伤害提升12%。月兆·满辉：月绽放反应伤害额外提升12%。"
+ascension_materials = ["摩拉", "奇巧秘器的残件", "霜夜的残照", "磨损的执凭", "奇巧秘器的模本", "霜夜的柔辉", "精致的执凭", "奇巧秘器的继业", "霜夜的煌荣", "霜镌的执凭"]
+
+[[weapons]]
+name = "黑缨枪"
+slug = "blacktassel"
+rarity = 3
+weapon_type = "长柄武器"
+weapon_type_code = "WEAPON_POLE"
+base_atk = 37.6075
+main_stat = "生命值"
+main_stat_value = "10.2%"
+passive = "克柔"
+passive_detail = "对史莱姆类敌人造成的伤害增加40%。"
+ascension_materials = ["摩拉", "漆黑陨铁的一粒", "脆弱的骨片", "牢固的箭簇", "漆黑陨铁的一片", "结实的骨片", "锐利的箭簇", "漆黑陨铁的一角", "石化的骨片", "历战的箭簇"]
+
+[[weapons]]
+name = "救赎之斩"
+slug = "bladeofatonement"
+rarity = 4
+weapon_type = "双手剑"
+weapon_type_code = "WEAPON_CLAYMORE"
+base_atk = 43.7349
+main_stat = "攻击力"
+main_stat_value = "6%"
+passive = "罪责的悔赎"
+passive_detail = "触发元素反应的12秒内，装备者的元素精通提升64点；触发星烁反应的12秒内，装备者的攻击力提升16%。装备者处于队伍后台时，依然能触发上述效果。"
+ascension_materials = ["摩拉", "苍星军势的始动", "灵生空根", "嵌合种", "苍星军势的集结", "灵生分蘖节", "并生嵌合胞", "苍星军势的鸣令", "灵生盘枝心", "源生嵌合体"]
+
+[[weapons]]
+name = "血染荒城"
+slug = "bloodsoakedruins"
 rarity = 5
 weapon_type = "长柄武器"
 weapon_type_code = "WEAPON_POLE"
-base_atk = 45.9364
-main_stat = "元素充能效率"
-main_stat_value = "12%"
-passive = "非时之梦·常世灶食"
-passive_detail = "攻击力获得提升，提升程度相当于元素充能效率超出100%部分的28%，至多通过这种方式提升80%。施放元素爆发后的12秒内，元素充能效率提升30%。"
-ascension_materials = ["摩拉", "今昔剧画之恶尉", "混沌机关", "破旧的刀镡", "今昔剧画之虎啮", "混沌枢纽", "影打刀镡", "今昔剧画之一角", "混沌真眼", "名刀镡"]
+base_atk = 47.537
+main_stat = "暴击率"
+main_stat_value = "4.8%"
+passive = "哀恸的赞礼"
+passive_detail = "施放元素爆发后的3.5秒内，装备者对敌人造成的月感电反应伤害提高36%。此外，装备者触发月感电反应后，将获得「荒落的挽歌」：暴击伤害提高28%，持续6秒；并为装备者恢复12点元素能量，每14秒至多通过这种方式恢复一次元素能量。"
+ascension_materials = ["摩拉", "长夜燧火的余烬", "幽雾化形", "磨损的执凭", "长夜燧火的残照", "幽雾片甲", "精致的执凭", "长夜燧火的明焰", "幽雾兜盔", "霜镌的执凭"]
+
+[[weapons]]
+name = "沐浴龙血的剑"
+slug = "bloodtaintedgreatsword"
+rarity = 3
+weapon_type = "双手剑"
+weapon_type_code = "WEAPON_CLAYMORE"
+base_atk = 37.6075
+main_stat = "元素精通"
+main_stat_value = "41"
+passive = "踏火息雷"
+passive_detail = "对处于火元素或雷元素影响下的敌人，造成的伤害提高12%。"
+ascension_materials = ["摩拉", "凛风奔狼的始龀", "地脉的旧枝", "牢固的箭簇", "凛风奔狼的裂齿", "地脉的枯叶", "锐利的箭簇", "凛风奔狼的断牙", "地脉的新芽", "历战的箭簇"]
+
+[[weapons]]
+name = "柔风游弦"
+slug = "breezebornerefrain"
+rarity = 4
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 42.401
+main_stat = "暴击率"
+main_stat_value = "6%"
+passive = "蝰蛇的谣歌"
+passive_detail = "元素充能效率提升20%。装备者的元素战技或元素爆发命中敌人时，获得一层「纯净者的圣咏」，该效果至多叠加3层，每0.03秒至多获得一层。叠加至3层时，将清除所有「纯净者的圣咏」，获得「蛇信的死毒」：使队伍中附近的所有角色造成的星烁反应伤害提升24%，持续12秒，期间无法再次获得「纯净者的圣咏」。装备者处于队伍后台时，依然能触发上述效果。"
+ascension_materials = ["摩拉", "凛雪帝皇的复生", "沉积残片", "嵌合种", "凛雪帝皇的庆仪", "沉积结块", "并生嵌合胞", "凛雪帝皇的悲恤", "沉积增生物", "源生嵌合体"]
+
+[[weapons]]
+name = "厄水之祸"
+slug = "calamityofeshu"
+rarity = 4
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 43.7349
+main_stat = "攻击力"
+main_stat_value = "6%"
+passive = "弥漫的边界"
+passive_detail = "角色处于护盾庇护下时，普通攻击和重击造成的伤害提升20%，普通攻击和重击的暴击率提升8%。"
+ascension_materials = ["摩拉", "谵妄圣主的朽败", "折光的胚芽", "卫从的木哨", "谵妄圣主的余哀", "惑光的阔叶", "战士的铁哨", "谵妄圣主的容光", "迷光的蜷叶之心", "龙冠武士的金哨"]
 
 [[weapons]]
 name = "息灾"
@@ -111,17 +449,1460 @@ passive_detail = "获得12%所有元素伤害加成；施放元素战技后，�
 ascension_materials = ["摩拉", "雾海云间的铅丹", "雾虚花粉", "骗骗花蜜", "雾海云间的汞丹", "雾虚草囊", "微光花蜜", "雾海云间的金丹", "雾虚灯芯", "原素花蜜"]
 
 [[weapons]]
-name = "和璞鸢"
-slug = "primordialjadewingedspear"
+name = "金流监督"
+slug = "cashflowsupervision"
+rarity = 5
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 47.537
+main_stat = "暴击率"
+main_stat_value = "4.8%"
+passive = "黄金的血潮"
+passive_detail = "攻击力提升16%。当前生命值提升或降低时，普通攻击造成的伤害提升16%，重击造成的伤害提升14%，造成的星超导反应伤害提升14%。该效果持续4秒，至多叠加3层，每0.3秒至多触发一次；处于叠加3层的状态下时，攻击速度提升8%。"
+ascension_materials = ["摩拉", "无垢之海的苦盏", "老旧的役人怀表", "异海凝珠", "无垢之海的酒盏", "役人的制式怀表", "异海之块", "无垢之海的银杯", "役人的时时刻刻", "异色结晶石"]
+
+[[weapons]]
+name = "碎链"
+slug = "chainbreaker"
+rarity = 4
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 43.7349
+main_stat = "攻击力"
+main_stat_value = "6%"
+passive = "花与落羽的长歌"
+passive_detail = "队伍中每有一名纳塔角色或与装备者元素类型不同的角色，装备者获得4.8%攻击力提升；上述角色不少于3名时，装备者的元素精通提升24点。"
+ascension_materials = ["摩拉", "神合秘烟的思绪", "羽状鳍翅", "稚嫩的尖齿", "神合秘烟的预感", "月色鳍翅", "老练的坚齿", "神合秘烟的征兆", "渊光鳍翅", "横行霸者的利齿"]
+
+[[weapons]]
+name = "辰砂之纺锤"
+slug = "cinnabarspindle"
+rarity = 4
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 41.0671
+main_stat = "防御力"
+main_stat_value = "15%"
+passive = "无垢之心"
+passive_detail = "元素战技造成的伤害值提高，提高数值相当于防御力的40%。该效果每1.5秒最多触发一次，并将在元素战技造成伤害后的0.1秒后清除效果。"
+ascension_materials = ["摩拉", "高塔孤王的破瓦", "混沌装置", "破损的面具", "高塔孤王的残垣", "混沌回路", "污秽的面具", "高塔孤王的断片", "混沌炉心", "不祥的面具"]
+
+[[weapons]]
+name = "群王局戏"
+slug = "clashofkings"
+rarity = 4
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 42.401
+main_stat = "暴击率"
+main_stat_value = "6%"
+passive = "被遗忘的昼夜"
+passive_detail = "装备者施放元素战技后，获得持续6秒的「棋中法度」：攻击力提升20%，元素精通提升100点，该效果每12秒至多触发一次，无法叠加。持续期间，装备者的重击命中敌人时，还会使上述效果的持续时间延长6秒，至多通过这种方式使持续时间延长6秒。"
+ascension_materials = ["摩拉", "谧林涓露的铜符", "破缺棱晶", "褪色红绸", "谧林涓露的铁符", "混浊棱晶", "镶边红绸", "谧林涓露的银符", "辉光棱晶", "织金红绸"]
+
+[[weapons]]
+name = "筑云"
+slug = "cloudforged"
+rarity = 4
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 42.401
+main_stat = "元素精通"
+main_stat_value = "36"
+passive = "镌岩为坊"
+passive_detail = "元素能量减少后，装备者的元素精通提升40点。该效果持续18秒，至多叠加2层。"
+ascension_materials = ["摩拉", "漆黑陨铁的一粒", "残毁的剑柄", "新兵的徽记", "漆黑陨铁的一片", "裂断的剑柄", "士官的徽记", "漆黑陨铁的一角", "未熄的剑柄", "尉官的徽记"]
+
+[[weapons]]
+name = "钢轮弓"
+slug = "compoundbow"
+rarity = 4
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 41.0671
+main_stat = "物理伤害加成"
+main_stat_value = "15%"
+passive = "注能之矢"
+passive_detail = "普通攻击与重击命中时，提升4%攻击力与1.2%普通攻击速度。该效果持续6秒，最多可以叠加4层，每0.3秒只能触发一次。"
+ascension_materials = ["摩拉", "漆黑陨铁的一粒", "脆弱的骨片", "新兵的徽记", "漆黑陨铁的一片", "结实的骨片", "士官的徽记", "漆黑陨铁的一角", "石化的骨片", "尉官的徽记"]
+
+[[weapons]]
+name = "冷刃"
+slug = "coolsteel"
+rarity = 3
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 38.7413
+main_stat = "攻击力"
+main_stat_value = "7.7%"
+passive = "止水融冰"
+passive_detail = "对处于水元素或冰元素影响下的敌人，造成的伤害提高12%。"
+ascension_materials = ["摩拉", "高塔孤王的破瓦", "沉重号角", "牢固的箭簇", "高塔孤王的残垣", "黑铜号角", "锐利的箭簇", "高塔孤王的断片", "黑晶号角", "历战的箭簇"]
+
+[[weapons]]
+name = "霜雪誓约"
+slug = "covenantoffrostandsnow"
+rarity = 4
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 42.401
+main_stat = "防御力"
+main_stat_value = "11.3%"
+passive = "法度的制衡"
+passive_detail = "装备者施放元素战技后的12秒内，元素精通提升120点。"
+ascension_materials = ["摩拉", "苍星军势的始动", "灵生空根", "嵌合种", "苍星军势的集结", "灵生分蘖节", "并生嵌合胞", "苍星军势的鸣令", "灵生盘枝心", "源生嵌合体"]
+
+[[weapons]]
+name = "鹤鸣余音"
+slug = "cranesechoingcall"
+rarity = 5
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 49.1377
+main_stat = "攻击力"
+main_stat_value = "3.6%"
+passive = "云笈降真要诀"
+passive_detail = "装备者下落攻击命中敌人后，队伍中附近的所有角色下落攻击造成的伤害提高28%，持续20秒；队伍中附近的角色的下落攻击命中敌人时，为装备者恢复2.5点元素能量，每0.7秒至多通过这种方式恢复一次元素能量，装备者处于队伍后台时依然能通过这种方式恢复元素能量。"
+ascension_materials = ["摩拉", "雾海云间的铅丹", "羽状鳍翅", "导能绘卷", "雾海云间的汞丹", "月色鳍翅", "封魔绘卷", "雾海云间的金丹", "渊光鳍翅", "禁咒绘卷"]
+
+[[weapons]]
+name = "流月针"
+slug = "crescentpike"
+rarity = 4
+weapon_type = "长柄武器"
+weapon_type_code = "WEAPON_POLE"
+base_atk = 43.7349
+main_stat = "物理伤害加成"
+main_stat_value = "7.5%"
+passive = "注能之针"
+passive_detail = "获得元素微粒或元素晶球后的5秒内，普通攻击和重击额外造成20%攻击力伤害。"
+ascension_materials = ["摩拉", "孤云寒林的光砂", "猎兵祭刀", "寻宝鸦印", "孤云寒林的辉岩", "特工祭刀", "藏银鸦印", "孤云寒林的圣骸", "督察长祭刀", "攫金鸦印"]
+
+[[weapons]]
+name = "赤月之形"
+slug = "crimsonmoonssemblance"
 rarity = 5
 weapon_type = "长柄武器"
 weapon_type_code = "WEAPON_POLE"
 base_atk = 47.537
 main_stat = "暴击率"
 main_stat_value = "4.8%"
-passive = "昭理的鸢之枪"
-passive_detail = "命中敌人时自身攻击力提高3.2%，持续6秒，最高可以叠加7层。该效果每0.3秒最多触发一次。满层状态时伤害提升12%。"
-ascension_materials = ["摩拉", "孤云寒林的光砂", "猎兵祭刀", "新兵的徽记", "孤云寒林的辉岩", "特工祭刀", "士官的徽记", "孤云寒林的圣骸", "督察长祭刀", "尉官的徽记"]
+passive = "烬日之影"
+passive_detail = "重击命中敌人时，赋予生命值上限25%的生命之契，该效果每14秒至多触发一次。此外，装备者具有生命之契时，造成的伤害提升12%；若生命之契的数值大于等于生命值上限的30%，造成的伤害将进一步提升24%。"
+ascension_materials = ["摩拉", "无垢之海的苦盏", "残毁的剑柄", "啮合齿轮", "无垢之海的酒盏", "裂断的剑柄", "机关正齿轮", "无垢之海的银杯", "未熄的剑柄", "奇械机芯齿轮"]
+
+[[weapons]]
+name = "暗铁剑"
+slug = "darkironsword"
+rarity = 3
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 38.7413
+main_stat = "元素精通"
+main_stat_value = "31"
+passive = "过载"
+passive_detail = "触发超载、超导、星超导、感电、原激化、超激化、超绽放、月感电或雷元素扩散反应后的12秒内，攻击力提高20%。"
+ascension_materials = ["摩拉", "孤云寒林的光砂", "猎兵祭刀", "破损的面具", "孤云寒林的辉岩", "特工祭刀", "污秽的面具", "孤云寒林的圣骸", "督察长祭刀", "不祥的面具"]
+
+[[weapons]]
+name = "霜辰"
+slug = "dawningfrost"
+rarity = 4
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 42.401
+main_stat = "暴击伤害"
+main_stat_value = "12%"
+passive = "深宵的胎梦"
+passive_detail = "重击命中敌人后的10秒内，元素精通提升72点；元素战技命中敌人后的10秒内，元素精通提升48点。"
+ascension_materials = ["摩拉", "奇巧秘器的残件", "霜夜的残照", "磨损的执凭", "奇巧秘器的模本", "霜夜的柔辉", "精致的执凭", "奇巧秘器的继业", "霜夜的煌荣", "霜镌的执凭"]
+
+[[weapons]]
+name = "决斗之枪"
+slug = "deathmatch"
+rarity = 4
+weapon_type = "长柄武器"
+weapon_type_code = "WEAPON_POLE"
+base_atk = 41.0671
+main_stat = "暴击率"
+main_stat_value = "8%"
+passive = "角斗士"
+passive_detail = "身边至少有2个敌人时，获得16%攻击力提升与16%防御力提升；身边的敌人少于2个时，获得24%攻击力提升。"
+ascension_materials = ["摩拉", "凛风奔狼的始龀", "地脉的旧枝", "骗骗花蜜", "凛风奔狼的裂齿", "地脉的枯叶", "微光花蜜", "凛风奔狼的断牙", "地脉的新芽", "原素花蜜"]
+
+[[weapons]]
+name = "以理服人"
+slug = "debateclub"
+rarity = 3
+weapon_type = "双手剑"
+weapon_type_code = "WEAPON_CLAYMORE"
+base_atk = 38.7413
+main_stat = "攻击力"
+main_stat_value = "7.7%"
+passive = "有话直说"
+passive_detail = "施放元素战技后，普通攻击和重击命中时会在小范围内额外造成60%攻击力的伤害。该效果持续15秒，伤害每3秒只能触发一次。"
+ascension_materials = ["摩拉", "雾海云间的铅丹", "雾虚花粉", "破损的面具", "雾海云间的汞丹", "雾虚草囊", "污秽的面具", "雾海云间的金丹", "雾虚灯芯", "不祥的面具"]
+
+[[weapons]]
+name = "沙中伟贤的对答"
+slug = "dialoguesofthedesertsages"
+rarity = 4
+weapon_type = "长柄武器"
+weapon_type_code = "WEAPON_POLE"
+base_atk = 42.401
+main_stat = "生命值"
+main_stat_value = "9%"
+passive = "均衡的原理"
+passive_detail = "进行治疗时，恢复8点能量，该效果每10秒至多触发一次，角色处于队伍后台时也能触发。"
+ascension_materials = ["摩拉", "谧林涓露的铜符", "羽状鳍翅", "浮游干核", "谧林涓露的铁符", "月色鳍翅", "浮游幽核", "谧林涓露的银符", "渊光鳍翅", "浮游晶化核"]
+
+[[weapons]]
+name = "灾悔"
+slug = "disasterandremorse"
+rarity = 5
+weapon_type = "长柄武器"
+weapon_type_code = "WEAPON_POLE"
+base_atk = 47.537
+main_stat = "暴击率"
+main_stat_value = "4.8%"
+passive = "祸咎一击"
+passive_detail = "装备者施放元素战技后，获得持续17秒的「纷争之途」，和分别持续3秒的「无赦」与「无愈」效果，每18秒至多触发一次。\n无赦：装备者的普通攻击与重击伤害提升40%。\n无愈：装备者的元素战技与元素爆发伤害提升40%。\n「纷争之途」期间，装备者的普通攻击与重击命中敌人时，将延长1秒「无愈」；装备者的元素战技与元素爆发命中敌人时，将延长1秒「无赦」。上述效果每0.1秒分别至多触发一次。「纷争之途」结束或装备者退场将解除「无赦」与「无愈」。\n魔导·秘仪：上述所有伤害提升效果提升75%。"
+ascension_materials = ["摩拉", "高塔孤王的破瓦", "失光块骨", "骗骗花蜜", "高塔孤王的残垣", "稀光遗骼", "微光花蜜", "高塔孤王的断片", "繁光躯外骸", "原素花蜜"]
+
+[[weapons]]
+name = "嘟嘟可故事集"
+slug = "dodocotales"
+rarity = 4
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 41.0671
+main_stat = "攻击力"
+main_stat_value = "12%"
+passive = "嘟嘟！大冒险"
+passive_detail = "普通攻击命中敌人后的6秒内，重击造成的伤害提升16%；重击命中敌人后的6秒内，攻击力提升8%。"
+ascension_materials = ["摩拉", "凛风奔狼的始龀", "地脉的旧枝", "破损的面具", "凛风奔狼的裂齿", "地脉的枯叶", "污秽的面具", "凛风奔狼的断牙", "地脉的新芽", "不祥的面具"]
+
+[[weapons]]
+name = "匣里灭辰"
+slug = "dragonsbane"
+rarity = 4
+weapon_type = "长柄武器"
+weapon_type_code = "WEAPON_POLE"
+base_atk = 41.0671
+main_stat = "元素精通"
+main_stat_value = "48"
+passive = "踏火止水"
+passive_detail = "对处于水元素或火元素影响下的敌人，造成的伤害提高20%。"
+ascension_materials = ["摩拉", "雾海云间的铅丹", "雾虚花粉", "导能绘卷", "雾海云间的汞丹", "雾虚草囊", "封魔绘卷", "雾海云间的金丹", "雾虚灯芯", "禁咒绘卷"]
+
+[[weapons]]
+name = "龙脊长枪"
+slug = "dragonspinespear"
+rarity = 4
+weapon_type = "长柄武器"
+weapon_type_code = "WEAPON_POLE"
+base_atk = 41.0671
+main_stat = "物理伤害加成"
+main_stat_value = "15%"
+passive = "霜葬"
+passive_detail = "普通攻击与重击命中敌人时，有60%概率在敌人上方生成恒冰晶核并坠落，造成80%攻击力的范围伤害。若敌人处于冰元素影响下，则造成200%攻击力的伤害。该效果每10秒至多触发一次。"
+ascension_materials = ["摩拉", "凛风奔狼的始龀", "雾虚花粉", "新兵的徽记", "凛风奔狼的裂齿", "雾虚草囊", "士官的徽记", "凛风奔狼的断牙", "雾虚灯芯", "尉官的徽记"]
+
+[[weapons]]
+name = "无锋剑"
+slug = "dullblade"
+rarity = 1
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 23.245
+main_stat = ""
+main_stat_value = ""
+passive = ""
+passive_detail = ""
+ascension_materials = ["摩拉", "高塔孤王的破瓦", "沉重号角", "牢固的箭簇", "高塔孤王的残垣", "黑铜号角", "锐利的箭簇", "高塔孤王的断片"]
+
+[[weapons]]
+name = "撼地者"
+slug = "earthshaker"
+rarity = 4
+weapon_type = "双手剑"
+weapon_type_code = "WEAPON_CLAYMORE"
+base_atk = 43.7349
+main_stat = "攻击力"
+main_stat_value = "6%"
+passive = "苍翠之路的誓言"
+passive_detail = "队伍中的角色触发火元素相关反应后，装备者元素战技造成的伤害提升16%，持续8秒。该效果队伍中的角色处于队伍后台时也能触发。"
+ascension_materials = ["摩拉", "贡祭炽心的惶恐", "聚燃的石块", "卫从的木哨", "贡祭炽心的踌躇", "聚燃的命种", "战士的铁哨", "贡祭炽心的决绝", "聚燃的游像眼", "龙冠武士的金哨"]
+
+[[weapons]]
+name = "寸心余响"
+slug = "echoesoftheheart"
+rarity = 4
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 43.7349
+main_stat = "攻击力"
+main_stat_value = "6%"
+passive = "誓言的回音"
+passive_detail = "触发元素反应的12秒内，装备者的元素精通提升60点；触发星烁反应的12秒内，装备者造成的星烁反应伤害提升16%。装备者处于队伍后台时，依然能触发上述效果。"
+ascension_materials = ["摩拉", "苍星军势的始动", "沉积残片", "幻造萤屑", "苍星军势的集结", "沉积结块", "幻造裂晶", "苍星军势的鸣令", "沉积增生物", "幻造晶鳞石"]
+
+[[weapons]]
+name = "终末嗟叹之诗"
+slug = "elegyfortheend"
+rarity = 5
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 45.9364
+main_stat = "元素充能效率"
+main_stat_value = "12%"
+passive = "别离的思念之歌"
+passive_detail = "飘游风中的「千年的大乐章」的一部分。元素精通提高60点；元素战技或元素爆发命中敌人时，角色获得一枚追思之符，每0.2秒内至多触发一次，角色处于队伍后台也能触发。拥有4枚追思之符时，将消耗所有追思之符，使附近的队伍中所有角色获得持续12秒的「千年的大乐章·别离之歌」效果：元素精通提高100点，攻击力提升20%。触发后20秒内，无法再次获得追思之符。「千年的大乐章」触发的多种数值效果中，同类数值效果不可叠加。"
+ascension_materials = ["摩拉", "凛风奔狼的始龀", "沉重号角", "新兵的徽记", "凛风奔狼的裂齿", "黑铜号角", "士官的徽记", "凛风奔狼的断牙", "黑晶号角", "尉官的徽记"]
+
+[[weapons]]
+name = "引火之源"
+slug = "emberwell"
+rarity = 4
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 42.401
+main_stat = "元素精通"
+main_stat_value = "36"
+passive = "燃于雪原的星火"
+passive_detail = "触发元素反应的12秒内，装备者的攻击力提升16%；触发星烁反应的12秒内，装备者造成的星烁反应伤害提升16%。装备者处于队伍后台时，依然能触发上述效果。"
+ascension_materials = ["摩拉", "苍星军势的始动", "沉积残片", "幻造萤屑", "苍星军势的集结", "沉积结块", "幻造裂晶", "苍星军势的鸣令", "沉积增生物", "幻造晶鳞石"]
+
+[[weapons]]
+name = "翡玉法球"
+slug = "emeraldorb"
+rarity = 3
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 39.8751
+main_stat = "元素精通"
+main_stat_value = "20"
+passive = "激流"
+passive_detail = "触发蒸发、感电、冰冻、绽放、月感电、月绽放或水元素扩散后的12秒内，攻击力提高20%。"
+ascension_materials = ["摩拉", "孤云寒林的光砂", "猎兵祭刀", "寻宝鸦印", "孤云寒林的辉岩", "特工祭刀", "藏银鸦印", "孤云寒林的圣骸", "督察长祭刀", "攫金鸦印"]
+
+[[weapons]]
+name = "竭泽"
+slug = "endoftheline"
+rarity = 4
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 42.401
+main_stat = "元素充能效率"
+main_stat_value = "10%"
+passive = "网破"
+passive_detail = "施放元素战技后，将触发「沿洄」效果，在攻击命中敌人时造成80%攻击力的范围伤害，该效果将在15秒或触发3次范围伤害后移除。每2秒至多通过这种方式造成一次范围伤害，每12秒至多触发一次沿洄。"
+ascension_materials = ["摩拉", "烈日威权的残响", "失活菌核", "蕈兽孢子", "烈日威权的余光", "休眠菌核", "荧光孢粉", "烈日威权的梦想", "茁壮菌核", "孢囊晶尘"]
+
+[[weapons]]
+name = "薙草之稻光"
+slug = "engulfinglightning"
+rarity = 5
+weapon_type = "长柄武器"
+weapon_type_code = "WEAPON_POLE"
+base_atk = 45.9364
+main_stat = "元素充能效率"
+main_stat_value = "12%"
+passive = "非时之梦·常世灶食"
+passive_detail = "攻击力获得提升，提升程度相当于元素充能效率超出100%部分的28%，至多通过这种方式提升80%。施放元素爆发后的12秒内，元素充能效率提升30%。"
+ascension_materials = ["摩拉", "今昔剧画之恶尉", "混沌机关", "破旧的刀镡", "今昔剧画之虎啮", "混沌枢纽", "影打刀镡", "今昔剧画之一角", "混沌真眼", "名刀镡"]
+
+[[weapons]]
+name = "天光的纺琴"
+slug = "etherlightspindlelute"
+rarity = 4
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 42.401
+main_stat = "元素充能效率"
+main_stat_value = "10%"
+passive = "最后的歌者"
+passive_detail = "施放元素战技后的20秒内，装备者的元素精通提升100点。"
+ascension_materials = ["摩拉", "终北遗嗣的哀荣", "失光块骨", "磨损的执凭", "终北遗嗣的迷顽", "稀光遗骼", "精致的执凭", "终北遗嗣的祷献", "繁光躯外骸", "霜镌的执凭"]
+
+[[weapons]]
+name = "不灭月华"
+slug = "everlastingmoonglow"
+rarity = 5
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 45.9364
+main_stat = "生命值"
+main_stat_value = "10.8%"
+passive = "白夜皓月"
+passive_detail = "治疗加成提升10%；普通攻击造成的伤害增加，增加值为装备该武器的角色生命值上限的1%。在施放元素爆发后的12秒内，普通攻击命中敌人时恢复0.6点元素能量，每0.1秒至多通过这种方式恢复一次元素能量。"
+ascension_materials = ["摩拉", "远海夷地的瑚枝", "黯淡棱镜", "浮游干核", "远海夷地的玉枝", "水晶棱镜", "浮游幽核", "远海夷地的琼枝", "偏光棱镜", "浮游晶化核"]
+
+[[weapons]]
+name = "星锋剑"
+slug = "exaiphanesblade"
+rarity = 5
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 45.9364
+main_stat = "暴击率"
+main_stat_value = "7.2%"
+passive = "旅者之路"
+passive_detail = "旅行者装备时，命中敌人后，攻击力提升16%，持续8秒，并使旅行者恢复3点元素能量。该效果每5秒至多触发一次，角色处于队伍后台也能触发。"
+ascension_materials = ["摩拉"]
+
+[[weapons]]
+name = "昭心"
+slug = "eyeofperception"
+rarity = 4
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 41.0671
+main_stat = "攻击力"
+main_stat_value = "12%"
+passive = "回响"
+passive_detail = "普通攻击与重击命中时，有50%几率发射一枚昭心法球，造成240%攻击力伤害，至多在敌人之间弹射4次。该效果每12秒至多触发一次。"
+ascension_materials = ["摩拉", "雾海云间的铅丹", "雾虚花粉", "破损的面具", "雾海云间的汞丹", "雾虚草囊", "污秽的面具", "雾海云间的金丹", "雾虚灯芯", "不祥的面具"]
+
+[[weapons]]
+name = "落霞"
+slug = "fadingtwilight"
+rarity = 4
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 43.7349
+main_stat = "元素充能效率"
+main_stat_value = "6.7%"
+passive = "渊中霞彩"
+passive_detail = "具有夕暮、流霞、朝晖三种状态，分别能使造成的伤害提升6%/10%/14%。攻击命中敌人后，将转换为下一种状态，每7秒至多转换一次状态。装备该武器的角色处于队伍后台时该效果依旧能触发转换。"
+ascension_materials = ["摩拉", "漆黑陨铁的一粒", "猎兵祭刀", "导能绘卷", "漆黑陨铁的一片", "特工祭刀", "封魔绘卷", "漆黑陨铁的一角", "督察长祭刀", "禁咒绘卷"]
+
+[[weapons]]
+name = "山王长牙"
+slug = "fangofthemountainking"
+rarity = 5
+weapon_type = "双手剑"
+weapon_type_code = "WEAPON_CLAYMORE"
+base_atk = 49.1377
+main_stat = "暴击率"
+main_stat_value = "2.4%"
+passive = "绿松石之狩"
+passive_detail = "元素战技命中敌人后，会获得1层「悬木祝赐」，该效果每0.5秒至多触发1次；队伍中附近的角色触发了燃烧或烈绽放反应后，装备者会获得3层悬木祝赐，该效果每2秒至多触发1次，队伍中的角色处于队伍后台时也能触发。悬木祝赐：元素战技伤害和元素爆发伤害提升10%，持续6秒，至多叠加6层，每层持续时间独立计算。"
+ascension_materials = ["摩拉", "谵妄圣主的朽败", "聚燃的石块", "卫从的木哨", "谵妄圣主的余哀", "聚燃的命种", "战士的铁哨", "谵妄圣主的容光", "聚燃的游像眼", "龙冠武士的金哨"]
+
+[[weapons]]
+name = "西风秘典"
+slug = "favoniuscodex"
+rarity = 4
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 42.401
+main_stat = "元素充能效率"
+main_stat_value = "10%"
+passive = "顺风而行"
+passive_detail = "攻击造成暴击时，有60%的几率产生少量元素微粒，能为角色恢复6点元素能量。该效果每12秒只能触发一次。"
+ascension_materials = ["摩拉", "高塔孤王的破瓦", "沉重号角", "导能绘卷", "高塔孤王的残垣", "黑铜号角", "封魔绘卷", "高塔孤王的断片", "黑晶号角", "禁咒绘卷"]
+
+[[weapons]]
+name = "西风大剑"
+slug = "favoniusgreatsword"
+rarity = 4
+weapon_type = "双手剑"
+weapon_type_code = "WEAPON_CLAYMORE"
+base_atk = 41.0671
+main_stat = "元素充能效率"
+main_stat_value = "13.3%"
+passive = "顺风而行"
+passive_detail = "攻击造成暴击时，有60%的几率产生少量元素微粒，能为角色恢复6点元素能量。该效果每12秒只能触发一次。"
+ascension_materials = ["摩拉", "狮牙斗士的枷锁", "混沌装置", "新兵的徽记", "狮牙斗士的铁链", "混沌回路", "士官的徽记", "狮牙斗士的镣铐", "混沌炉心", "尉官的徽记"]
+
+[[weapons]]
+name = "西风长枪"
+slug = "favoniuslance"
+rarity = 4
+weapon_type = "长柄武器"
+weapon_type_code = "WEAPON_POLE"
+base_atk = 43.7349
+main_stat = "元素充能效率"
+main_stat_value = "6.7%"
+passive = "顺风而行"
+passive_detail = "攻击造成暴击时，有60%的几率产生少量元素微粒，能为角色恢复6点元素能量。该效果每12秒只能触发一次。"
+ascension_materials = ["摩拉", "狮牙斗士的枷锁", "混沌装置", "史莱姆凝液", "狮牙斗士的铁链", "混沌回路", "史莱姆清", "狮牙斗士的镣铐", "混沌炉心", "史莱姆原浆"]
+
+[[weapons]]
+name = "西风剑"
+slug = "favoniussword"
+rarity = 4
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 41.0671
+main_stat = "元素充能效率"
+main_stat_value = "13.3%"
+passive = "顺风而行"
+passive_detail = "攻击造成暴击时，有60%的几率产生少量元素微粒，能为角色恢复6点元素能量。该效果每12秒只能触发一次。"
+ascension_materials = ["摩拉", "高塔孤王的破瓦", "沉重号角", "牢固的箭簇", "高塔孤王的残垣", "黑铜号角", "锐利的箭簇", "高塔孤王的断片", "黑晶号角", "历战的箭簇"]
+
+[[weapons]]
+name = "西风猎弓"
+slug = "favoniuswarbow"
+rarity = 4
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 41.0671
+main_stat = "元素充能效率"
+main_stat_value = "13.3%"
+passive = "顺风而行"
+passive_detail = "攻击造成暴击时，有60%的几率产生少量元素微粒，能为角色恢复6点元素能量。该效果每12秒只能触发一次。"
+ascension_materials = ["摩拉", "狮牙斗士的枷锁", "混沌装置", "骗骗花蜜", "狮牙斗士的铁链", "混沌回路", "微光花蜜", "狮牙斗士的镣铐", "混沌炉心", "原素花蜜"]
+
+[[weapons]]
+name = "铁影阔剑"
+slug = "ferrousshadow"
+rarity = 3
+weapon_type = "双手剑"
+weapon_type_code = "WEAPON_CLAYMORE"
+base_atk = 38.7413
+main_stat = "生命值"
+main_stat_value = "7.7%"
+passive = "不屈"
+passive_detail = "生命值低于70%时，重击不会轻易被打断，并提高30%重击伤害。"
+ascension_materials = ["摩拉", "高塔孤王的破瓦", "沉重号角", "骗骗花蜜", "高塔孤王的残垣", "黑铜号角", "微光花蜜", "高塔孤王的断片", "黑晶号角", "原素花蜜"]
+
+[[weapons]]
+name = "腐殖之剑"
+slug = "festeringdesire"
+rarity = 4
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 42.401
+main_stat = "元素充能效率"
+main_stat_value = "10%"
+passive = "无尽的渴慕"
+passive_detail = "元素战技造成的伤害增加16%，元素战技的暴击率提升6%。"
+ascension_materials = ["摩拉", "狮牙斗士的枷锁", "沉重号角", "新兵的徽记", "狮牙斗士的铁链", "黑铜号角", "士官的徽记", "狮牙斗士的镣铐", "黑晶号角", "尉官的徽记"]
+
+[[weapons]]
+name = "吃虎鱼刀"
+slug = "filletblade"
+rarity = 3
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 38.7413
+main_stat = "攻击力"
+main_stat_value = "7.7%"
+passive = "决"
+passive_detail = "攻击命中时，有50%的概率对单个敌人造成240%攻击力的伤害。该效果每15秒只能触发一次。"
+ascension_materials = ["摩拉", "雾海云间的铅丹", "雾虚花粉", "寻宝鸦印", "雾海云间的汞丹", "雾虚草囊", "藏银鸦印", "雾海云间的金丹", "雾虚灯芯", "攫金鸦印"]
+
+[[weapons]]
+name = "海渊终曲"
+slug = "finaleofthedeep"
+rarity = 4
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 43.7349
+main_stat = "攻击力"
+main_stat_value = "6%"
+passive = "最终的崇高"
+passive_detail = "施放元素战技时，攻击力提升12%，持续15秒，并赋予生命值上限25%的生命之契，该效果每10秒至多触发一次。生命之契清除时，基于清除值的2.4%提升至多150点攻击力，持续15秒。"
+ascension_materials = ["摩拉", "纯圣露滴的滤渣", "浊水的一滴", "破旧的刀镡", "纯圣露滴的凝华", "浊水的一掬", "影打刀镡", "纯圣露滴的醴泉", "初生的浊水幻灵", "名刀镡"]
+
+[[weapons]]
+name = "拾慧铸熔"
+slug = "flameforgedinsight"
+rarity = 4
+weapon_type = "双手剑"
+weapon_type_code = "WEAPON_CLAYMORE"
+base_atk = 42.401
+main_stat = "元素精通"
+main_stat_value = "36"
+passive = "盛放的思绪"
+passive_detail = "触发感电、月感电、绽放、月绽放、结晶或月结晶反应时，恢复12点元素能量，并在接下来的15秒内使元素精通提升60点。该效果每15秒至多触发一次。装备者处于队伍后台时，依然能触发上述效果。"
+ascension_materials = ["摩拉", "谵妄圣主的朽败", "冷裂壳块", "异海凝珠", "谵妄圣主的余哀", "蕴热的背壳", "异海之块", "谵妄圣主的容光", "明燃的棱状壳", "异色结晶石"]
+
+[[weapons]]
+name = "灰河渡手"
+slug = "fleuvecendreferryman"
+rarity = 4
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 42.401
+main_stat = "元素充能效率"
+main_stat_value = "10%"
+passive = "铁骨"
+passive_detail = "元素战技暴击率提升8%；此外，施放元素战技后的5秒内，元素充能效率提升16%。"
+ascension_materials = ["摩拉", "悠古弦音的残章", "浊水的一滴", "异海凝珠", "悠古弦音的断章", "浊水的一掬", "异海之块", "悠古弦音的乐章", "初生的浊水幻灵", "异色结晶石"]
+
+[[weapons]]
+name = "缀花之翎"
+slug = "flowerwreathedfeathers"
+rarity = 4
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 42.401
+main_stat = "攻击力"
+main_stat_value = "9%"
+passive = "未至的花序"
+passive_detail = "滑翔消耗的体力降低15%。进行瞄准射击时，每0.5秒提升重击造成的伤害6%，该效果最多叠加6层，并将在不处于瞄准状态下10秒后移除。"
+ascension_materials = ["摩拉", "神合秘烟的思绪", "聚燃的石块", "卫从的木哨", "神合秘烟的预感", "聚燃的命种", "战士的铁哨", "神合秘烟的征兆", "聚燃的游像眼", "龙冠武士的金哨"]
+
+[[weapons]]
+name = "纯水流华"
+slug = "flowingpurity"
+rarity = 4
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 43.7349
+main_stat = "攻击力"
+main_stat_value = "6%"
+passive = "未完的杰作"
+passive_detail = "施放元素战技时，所有元素伤害加成提升8%，持续15秒，并赋予生命值上限24%的生命之契，该效果每10秒至多触发一次。生命之契清除时，每清除1000点将会提供2%所有元素伤害加成，至多通过这种方式获得12%所有元素伤害加成，持续15秒。"
+ascension_materials = ["摩拉", "纯圣露滴的滤渣", "隙间之核", "异海凝珠", "纯圣露滴的凝华", "外世突触", "异海之块", "纯圣露滴的醴泉", "异界生命核", "异色结晶石"]
+
+[[weapons]]
+name = "息燧之笛"
+slug = "fluteofezpitzal"
+rarity = 4
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 41.0671
+main_stat = "防御力"
+main_stat_value = "15%"
+passive = "镜与烟色的隐谜"
+passive_detail = "施放元素战技时，防御力提升16%，持续15秒。"
+ascension_materials = ["摩拉", "贡祭炽心的惶恐", "残毁的剑柄", "稚嫩的尖齿", "贡祭炽心的踌躇", "裂断的剑柄", "老练的坚齿", "贡祭炽心的决绝", "未熄的剑柄", "横行霸者的利齿"]
+
+[[weapons]]
+name = "虹的行迹"
+slug = "footprintoftherainbow"
+rarity = 4
+weapon_type = "长柄武器"
+weapon_type_code = "WEAPON_POLE"
+base_atk = 42.401
+main_stat = "防御力"
+main_stat_value = "11.3%"
+passive = "流水与泉的约定"
+passive_detail = "施放元素战技时，防御力提升16%，持续15秒。"
+ascension_materials = ["摩拉", "谵妄圣主的朽败", "秘源轴", "卫从的木哨", "谵妄圣主的余哀", "秘源机鞘", "战士的铁哨", "谵妄圣主的容光", "秘源真芯", "龙冠武士的金哨"]
+
+[[weapons]]
+name = "森林王器"
+slug = "forestregalia"
+rarity = 4
+weapon_type = "双手剑"
+weapon_type_code = "WEAPON_CLAYMORE"
+base_atk = 43.7349
+main_stat = "元素充能效率"
+main_stat_value = "6.7%"
+passive = "森林的瑞佑"
+passive_detail = "触发燃烧、原激化、超激化、蔓激化、绽放、月绽放、超绽放或烈绽放后，将在角色周围产生至多存在10秒的「种识之叶」。拾取种识之叶的角色元素精通提升60点，持续12秒。每20秒至多通过这种方式产生一枚种识之叶。角色处于队伍后台时也能触发。种识之叶的效果无法叠加。"
+ascension_materials = ["摩拉", "谧林涓露的铜符", "混沌容器", "褪色红绸", "谧林涓露的铁符", "混沌模块", "镶边红绸", "谧林涓露的银符", "混沌锚栓", "织金红绸"]
+
+[[weapons]]
+name = "金律铸影"
+slug = "forgedbythegoldenmelody"
+rarity = 4
+weapon_type = "双手剑"
+weapon_type_code = "WEAPON_CLAYMORE"
+base_atk = 42.401
+main_stat = "暴击率"
+main_stat_value = "6%"
+passive = "交奏的昼与夜"
+passive_detail = "每10秒，装备者按照以下顺序，分别奏响对应效果的「谐律乐章」：攻击力提升18%/元素精通提升120点/星烁反应伤害提升28%，每种乐章效果持续10秒，装备者处于队伍后台时，依然能触发上述效果。\n触发星烁反应后，还会额外获得持续12秒的、与触发星烁反应时演奏乐章效果相同的「谐律乐章·复调」，该效果可以与原本的乐章效果叠加，每12秒至多触发一次。"
+ascension_materials = ["摩拉", "纯圣露滴的滤渣", "残毁的剑柄", "异海凝珠", "纯圣露滴的凝华", "裂断的剑柄", "异海之块", "纯圣露滴的醴泉", "未熄的剑柄", "异色结晶石"]
+
+[[weapons]]
+name = "支离轮光"
+slug = "fracturedhalo"
+rarity = 5
+weapon_type = "长柄武器"
+weapon_type_code = "WEAPON_POLE"
+base_atk = 45.9364
+main_stat = "暴击伤害"
+main_stat_value = "14.4%"
+passive = "洁霜的玉冕"
+passive_detail = "施放元素战技或元素爆发后的20秒内，攻击力提升24%。持续期间内，若装备者创造了护盾，则接下来的20秒内，还会获得「流电圣敕」效果：队伍中附近所有角色触发的月感电反应造成的伤害提升40%。"
+ascension_materials = ["摩拉", "贡祭炽心的惶恐", "冷裂壳块", "稚嫩的尖齿", "贡祭炽心的踌躇", "蕴热的背壳", "老练的坚齿", "贡祭炽心的决绝", "明燃的棱状壳", "横行霸者的利齿"]
+
+[[weapons]]
+name = "苍古自由之誓"
+slug = "freedomsworn"
+rarity = 5
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 45.9364
+main_stat = "元素精通"
+main_stat_value = "43"
+passive = "抗争的践行之歌"
+passive_detail = "飘游风中的「千年的大乐章」的一部分。造成的伤害提高10%；触发元素反应时，角色获得一枚奋起之符，每0.5秒内至多触发一次，角色处于队伍后台也能触发。拥有2枚奋起之符时，将消耗所有奋起之符，使附近的队伍中所有角色获得持续12秒的「千年的大乐章·抗争之歌」效果：普通攻击、重击、下落攻击造成的伤害提高16%，攻击力提升20%。触发后20秒内，无法再次获得奋起之符。「千年的大乐章」触发的多种数值效果中，同类数值效果不可叠加。"
+ascension_materials = ["摩拉", "狮牙斗士的枷锁", "混沌装置", "导能绘卷", "狮牙斗士的铁链", "混沌回路", "封魔绘卷", "狮牙斗士的镣铐", "混沌炉心", "禁咒绘卷"]
+
+[[weapons]]
+name = "忍冬之果"
+slug = "frostbearer"
+rarity = 4
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 42.401
+main_stat = "攻击力"
+main_stat_value = "9%"
+passive = "霜葬"
+passive_detail = "普通攻击与重击命中敌人时，有60%概率在敌人上方生成恒冰晶核并坠落，造成80%攻击力的范围伤害。若敌人处于冰元素影响下，则造成200%攻击力的伤害。该效果每10秒至多触发一次。"
+ascension_materials = ["摩拉", "狮牙斗士的枷锁", "混沌装置", "骗骗花蜜", "狮牙斗士的铁链", "混沌回路", "微光花蜜", "狮牙斗士的镣铐", "混沌炉心", "原素花蜜"]
+
+[[weapons]]
+name = "寒息"
+slug = "frostbreath"
+rarity = 4
+weapon_type = "长柄武器"
+weapon_type_code = "WEAPON_POLE"
+base_atk = 42.401
+main_stat = "元素充能效率"
+main_stat_value = "10%"
+passive = "万顷一掷"
+passive_detail = "触发冰元素或水元素相关反应后的15秒内，装备者的攻击力提升20%，并为队伍中自己的其他角色恢复6点元素能量。该效果每16秒至多触发一次。"
+ascension_materials = ["摩拉", "藏窖灵浆的斟酌", "沉积残片", "嵌合种", "藏窖灵浆的酩酊", "沉积结块", "并生嵌合胞", "藏窖灵浆的酣畅", "沉积增生物", "源生嵌合体"]
+
+[[weapons]]
+name = "硕果钩"
+slug = "fruitfulhook"
+rarity = 4
+weapon_type = "双手剑"
+weapon_type_code = "WEAPON_CLAYMORE"
+base_atk = 43.7349
+main_stat = "攻击力"
+main_stat_value = "6%"
+passive = "坠枝之重"
+passive_detail = "下落攻击的暴击率提升16%；下落攻击命中敌人后，普通攻击、重击、下落攻击造成的伤害提升16%，持续10秒。"
+ascension_materials = ["摩拉", "神合秘烟的思绪", "秘源轴", "稚嫩的尖齿", "神合秘烟的预感", "秘源机鞘", "老练的坚齿", "神合秘烟的征兆", "秘源真芯", "横行霸者的利齿"]
+
+[[weapons]]
+name = "盈满之实"
+slug = "fruitoffulfillment"
+rarity = 4
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 42.401
+main_stat = "元素充能效率"
+main_stat_value = "10%"
+passive = "圆满之相"
+passive_detail = "触发元素反应后，获得「盈缺」效果：元素精通提升24点，攻击力降低5%。每0.3秒至多获得一层盈缺效果，至多叠加5层。未触发元素反应时将每6秒失去一层。角色处于队伍后台时也能触发效果。"
+ascension_materials = ["摩拉", "绿洲花园的追忆", "晦暗刻像", "蕈兽孢子", "绿洲花园的恩惠", "夤夜刻像", "荧光孢粉", "绿洲花园的哀思", "幽邃刻像", "孢囊晶尘"]
+
+[[weapons]]
+name = "狼的武功歌"
+slug = "gestofthemightywolf"
+rarity = 5
+weapon_type = "双手剑"
+weapon_type_code = "WEAPON_CLAYMORE"
+base_atk = 45.9364
+main_stat = "暴击率"
+main_stat_value = "7.2%"
+passive = "不灭的骑士道"
+passive_detail = "攻击速度提升10%。普通攻击命中敌人/施放元素战技/开始重击时，装备者将分别获得1/2/2层「四风诗系」：造成的伤害提升7.5%，该效果持续4秒，至多叠加4次，每0.01秒至多触发一次。\n此外，队伍拥有「魔导·秘仪」效果时，每层「四风诗系」还会使装备者的暴击伤害提高7.5%。"
+ascension_materials = ["摩拉", "凛风奔狼的始龀", "深黯的裂眼", "新兵的徽记", "凛风奔狼的裂齿", "深黯的怪核", "士官的徽记", "凛风奔狼的断牙", "深黯的钩喙", "尉官的徽记"]
+
+[[weapons]]
+name = "霜结的誓金枝"
+slug = "goldenfrostboundoath"
+rarity = 5
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 44.3358
+main_stat = "暴击伤害"
+main_stat_value = "19.2%"
+passive = "与君致意的黎明"
+passive_detail = "防御力提高16%。装备者的元素战技或月结晶攻击命中敌人时，将获得持续6秒的「霜妖精的报恩」效果：装备者造成的岩元素伤害提升40%，月结晶反应伤害提升40%；持续期间，若装备者附近存在月笼，则队伍中附近的所有其他角色还会获得「霜妖精的恶戏」效果：造成的岩元素伤害提升20%，月结晶反应伤害提升20%。装备者处于队伍后台时，依然能触发上述效果。"
+ascension_materials = ["摩拉", "长夜燧火的余烬", "失色的焰剑", "磨损的执凭", "长夜燧火的残照", "残失的焰剑", "精致的执凭", "长夜燧火的明焰", "宝饰的焰剑", "霜镌的执凭"]
+
+[[weapons]]
+name = "白辰之环"
+slug = "hakushinring"
+rarity = 4
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 43.7349
+main_stat = "元素充能效率"
+main_stat_value = "6.7%"
+passive = "樱之斋宫"
+passive_detail = "装备该武器的角色触发雷元素相关反应后，队伍中附近的与该元素反应相关的元素类型的角色，获得10%对应元素的元素伤害加成，持续6秒。通过这种方式，角色获得的元素伤害加成无法叠加。"
+ascension_materials = ["摩拉", "远海夷地的瑚枝", "黯淡棱镜", "导能绘卷", "远海夷地的玉枝", "水晶棱镜", "封魔绘卷", "远海夷地的琼枝", "偏光棱镜", "禁咒绘卷"]
+
+[[weapons]]
+name = "钺矛"
+slug = "halberd"
+rarity = 3
+weapon_type = "长柄武器"
+weapon_type_code = "WEAPON_POLE"
+base_atk = 39.8751
+main_stat = "攻击力"
+main_stat_value = "5.1%"
+passive = "沉重"
+passive_detail = "对普通攻击命中的敌人造成160%攻击力的额外伤害。该效果每10秒只能触发一次。"
+ascension_materials = ["摩拉", "雾海云间的铅丹", "雾虚花粉", "骗骗花蜜", "雾海云间的汞丹", "雾虚草囊", "微光花蜜", "雾海云间的金丹", "雾虚灯芯", "原素花蜜"]
+
+[[weapons]]
+name = "破魔之弓"
+slug = "hamayumi"
+rarity = 4
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 41.0671
+main_stat = "攻击力"
+main_stat_value = "12%"
+passive = "浅濑之弭"
+passive_detail = "普通攻击造成的伤害提升16%，重击造成的伤害提升12%。当装备该武器的角色元素能量等于100%时，这个效果提升100%。"
+ascension_materials = ["摩拉", "鸣神御灵的明惠", "黯淡棱镜", "牢固的箭簇", "鸣神御灵的欢喜", "水晶棱镜", "锐利的箭簇", "鸣神御灵的亲爱", "偏光棱镜", "历战的箭簇"]
+
+[[weapons]]
+name = "波乱月白经津"
+slug = "harangeppakufutsu"
+rarity = 5
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 45.9364
+main_stat = "暴击率"
+main_stat_value = "7.2%"
+passive = "白刃流转"
+passive_detail = "获得12%所有元素伤害加成；队伍中附近的其他角色在施放元素战技时，会为装备该武器的角色产生1层「波穗」效果，至多叠加2层，每0.3秒最多触发1次。装备该武器的角色施放元素战技时，如果有积累的「波穗」效果，则将消耗已有的「波穗」，获得「波乱」：根据消耗的层数，每层提升20%普通攻击伤害，持续8秒。"
+ascension_materials = ["摩拉", "鸣神御灵的明惠", "晦暗刻像", "破旧的刀镡", "鸣神御灵的欢喜", "夤夜刻像", "影打刀镡", "鸣神御灵的亲爱", "幽邃刻像", "名刀镡"]
+
+[[weapons]]
+name = "黎明神剑"
+slug = "harbingerofdawn"
+rarity = 3
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 38.7413
+main_stat = "暴击伤害"
+main_stat_value = "10.2%"
+passive = "激励"
+passive_detail = "生命值高于90%时，暴击率提升14%。"
+ascension_materials = ["摩拉", "凛风奔狼的始龀", "地脉的旧枝", "史莱姆凝液", "凛风奔狼的裂齿", "地脉的枯叶", "史莱姆清", "凛风奔狼的断牙", "地脉的新芽", "史莱姆原浆"]
+
+[[weapons]]
+name = "熔猎异端之刃"
+slug = "hereticsmoltenblade"
+rarity = 4
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 42.401
+main_stat = "暴击率"
+main_stat_value = "6%"
+passive = "独光的赐坠"
+passive_detail = "装备者施放元素战技后，获得「映落瞳中的初光」：持续期间，将记录装备者的移动距离，每秒都将基于上一秒记录的移动距离，使装备者获得最低18%、最高36%的攻击力加成。该效果持续14秒，每14秒至多触发一次，并会在装备者退场时移除。"
+ascension_materials = ["摩拉", "贡祭炽心的惶恐", "冷裂壳块", "卫从的木哨", "贡祭炽心的踌躇", "蕴热的背壳", "战士的铁哨", "贡祭炽心的决绝", "明燃的棱状壳", "龙冠武士的金哨"]
+
+[[weapons]]
+name = "猎弓"
+slug = "huntersbow"
+rarity = 1
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 23.245
+main_stat = ""
+main_stat_value = ""
+passive = ""
+passive_detail = ""
+ascension_materials = ["摩拉", "凛风奔狼的始龀", "地脉的旧枝", "寻宝鸦印", "凛风奔狼的裂齿", "地脉的枯叶", "藏银鸦印", "凛风奔狼的断牙"]
+
+[[weapons]]
+name = "猎人之径"
+slug = "hunterspath"
+rarity = 5
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 44.3358
+main_stat = "暴击率"
+main_stat_value = "9.6%"
+passive = "兽径的终点"
+passive_detail = "获得12%所有元素伤害加成。重击命中敌人后，将获得「无休止的狩猎」：重击造成的伤害值提高，提高值相当于元素精通数值的160%。该效果将在生效12次或10秒后消失，每12秒至多获得一次无休止的狩猎。"
+ascension_materials = ["摩拉", "烈日威权的残响", "失活菌核", "褪色红绸", "烈日威权的余光", "休眠菌核", "镶边红绸", "烈日威权的梦想", "茁壮菌核", "织金红绸"]
+
+[[weapons]]
+name = "漩流颂歌"
+slug = "hymnofthemaelstrom"
+rarity = 5
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 44.3358
+main_stat = "生命值"
+main_stat_value = "14.4%"
+passive = "沉眠的回旋曲"
+passive_detail = "治疗加成提升4%；\n进行治疗时，装备者获得「告真的蜜酿」效果：生命值上限提升4%，且基于装备者生命值上限超过40000的部分，每1000点生命值上限都会使队伍中自己的当前场上角色的攻击力提升0.4%，通过这种方式至多提升8%。该效果持续10秒，至多叠加3层。\n队伍中附近的角色触发冻结反应或星扩散反应后的5秒内，上述效果中生命值上限与攻击力提升的效果额外提高75%。\n装备者处于队伍后台时，依然能触发上述效果。"
+ascension_materials = ["摩拉", "藏窖灵浆的斟酌", "沉积残片", "幻造萤屑", "藏窖灵浆的酩酊", "沉积结块", "幻造裂晶", "藏窖灵浆的酣畅", "沉积增生物", "幻造晶鳞石"]
+
+[[weapons]]
+name = "鹮穿之喙"
+slug = "ibispiercer"
+rarity = 4
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 43.7349
+main_stat = "攻击力"
+main_stat_value = "6%"
+passive = "秘智之眸的青睐"
+passive_detail = "重击命中敌人后的6秒内，角色元素精通提升40点。该效果至多叠加2层，每0.5秒至多触发一次。"
+ascension_materials = ["摩拉", "谧林涓露的铜符", "来自何处的待放之花", "褪色红绸", "谧林涓露的铁符", "何人所珍藏之花", "镶边红绸", "谧林涓露的银符", "漫游者的盛放之花", "织金红绸"]
+
+[[weapons]]
+name = "铁尖枪"
+slug = "ironpoint"
+rarity = 2
+weapon_type = "长柄武器"
+weapon_type_code = "WEAPON_POLE"
+base_atk = 32.93
+main_stat = ""
+main_stat_value = ""
+passive = ""
+passive_detail = ""
+ascension_materials = ["摩拉", "狮牙斗士的枷锁", "混沌装置", "导能绘卷", "狮牙斗士的铁链", "混沌回路", "封魔绘卷", "狮牙斗士的镣铐"]
+
+[[weapons]]
+name = "铁蜂刺"
+slug = "ironsting"
+rarity = 4
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 42.401
+main_stat = "元素精通"
+main_stat_value = "36"
+passive = "注能之刺"
+passive_detail = "造成元素伤害后的6秒内，角色造成的伤害提高6%，该效果最多叠加2层。该效果每1秒可以触发一次。"
+ascension_materials = ["摩拉", "漆黑陨铁的一粒", "脆弱的骨片", "骗骗花蜜", "漆黑陨铁的一片", "结实的骨片", "微光花蜜", "漆黑陨铁的一角", "石化的骨片", "原素花蜜"]
+
+[[weapons]]
+name = "碧落之珑"
+slug = "jadefallssplendor"
+rarity = 5
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 45.9364
+main_stat = "生命值"
+main_stat_value = "10.8%"
+passive = "定土玉圭"
+passive_detail = "施放元素爆发或创造护盾后的3秒内，将产生「定土玉圭」效果：每2.5秒恢复4.5点元素能量，并基于装备者的生命值上限，每1000点使其对应元素类型的元素伤害加成提高0.3%，至多提高12%。装备该武器的角色处于队伍后台时，依然能产生「定土玉圭」效果。"
+ascension_materials = ["摩拉", "孤云寒林的光砂", "来自何处的待放之花", "蕈兽孢子", "孤云寒林的辉岩", "何人所珍藏之花", "荧光孢粉", "孤云寒林的圣骸", "漫游者的盛放之花", "孢囊晶尘"]
+
+[[weapons]]
+name = "悬黎千钧"
+slug = "jadevista"
+rarity = 4
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 42.401
+main_stat = "暴击率"
+main_stat_value = "6%"
+passive = "缀夜为烛"
+passive_detail = "除装备者外，队伍中每有一名角色：元素类型与装备者相同：装备者的元素精通提升64点；元素类型与装备者不同：装备者的攻击力提升12%。上述两种效果总共至多叠加3层，元素类型相同的效果优先生效。"
+ascension_materials = ["摩拉", "漆黑陨铁的一粒", "脆弱的骨片", "新兵的徽记", "漆黑陨铁的一片", "结实的骨片", "士官的徽记", "漆黑陨铁的一角", "石化的骨片", "尉官的徽记"]
+
+[[weapons]]
+name = "笼钓瓶一心"
+slug = "kagotsurubeisshin"
+rarity = 4
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 42.401
+main_stat = "攻击力"
+main_stat_value = "9%"
+passive = "澄澄一心传"
+passive_detail = "普通攻击、重击或下落攻击命中敌人时，将卷起切落风，造成180%攻击力的范围伤害，并且使攻击力提升15%，持续8秒。该效果每8秒至多触发一次。"
+ascension_materials = ["摩拉", "今昔剧画之恶尉", "晦暗刻像", "浮游干核", "今昔剧画之虎啮", "夤夜刻像", "浮游幽核", "今昔剧画之一角", "幽邃刻像", "浮游晶化核"]
+
+[[weapons]]
+name = "神乐之真意"
+slug = "kagurasverity"
+rarity = 5
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 45.9364
+main_stat = "暴击伤害"
+main_stat_value = "14.4%"
+passive = "神樱神游神乐舞"
+passive_detail = "施放元素战技时，将获得「神乐舞」的效果，使装备该武器的角色的元素战技造成的伤害提高12%，造成的星超导反应伤害提升12%，该效果持续24秒，至多叠加3层。持有3层时，该角色获得12%所有元素伤害加成。"
+ascension_materials = ["摩拉", "今昔剧画之恶尉", "隐兽指爪", "浮游干核", "今昔剧画之虎啮", "隐兽利爪", "浮游幽核", "今昔剧画之一角", "隐兽鬼爪", "浮游晶化核"]
+
+[[weapons]]
+name = "桂木斩长正"
+slug = "katsuragikirinagamasa"
+rarity = 4
+weapon_type = "双手剑"
+weapon_type_code = "WEAPON_CLAYMORE"
+base_atk = 42.401
+main_stat = "元素充能效率"
+main_stat_value = "10%"
+passive = "名士振舞"
+passive_detail = "元素战技造成的伤害提升6%。元素战技命中后，角色流失3点元素能量，并在此后的6秒内，每2秒恢复3点元素能量。该效果每10秒至多触发一次，角色处于队伍后台也能触发。"
+ascension_materials = ["摩拉", "鸣神御灵的明惠", "混沌机关", "破旧的刀镡", "鸣神御灵的欢喜", "混沌枢纽", "影打刀镡", "鸣神御灵的亲爱", "混沌真眼", "名刀镡"]
+
+[[weapons]]
+name = "圣显之钥"
+slug = "keyofkhajnisut"
+rarity = 5
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 44.3358
+main_stat = "生命值"
+main_stat_value = "14.4%"
+passive = "沉入沙海的史诗"
+passive_detail = "生命值提升20%。元素战技命中敌人时，将产生持续20秒的「宏大诗篇」效果：基于装备者生命值上限的0.12%，获得元素精通提升，该效果每0.3秒至多触发一次，至多叠加3层。该效果叠加至3层或3层的持续时间刷新时，将基于装备者生命值上限的0.2%，为队伍中附近所有角色提供元素精通提升，持续20秒。"
+ascension_materials = ["摩拉", "谧林涓露的铜符", "破缺棱晶", "褪色红绸", "谧林涓露的铁符", "混浊棱晶", "镶边红绸", "谧林涓露的银符", "辉光棱晶", "织金红绸"]
+
+[[weapons]]
+name = "王下近侍"
+slug = "kingssquire"
+rarity = 4
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 41.0671
+main_stat = "攻击力"
+main_stat_value = "12%"
+passive = "迷宫之王的教导"
+passive_detail = "施放元素战技或元素爆发时，将获得「森林教诲」的效果，元素精通提升60点，持续12秒。该效果将在切换角色时移除。森林教诲的持续时间结束或被移除时，将对附近一名敌人造成100%攻击力的伤害。森林教诲每20秒至多触发一次。"
+ascension_materials = ["摩拉", "烈日威权的残响", "失活菌核", "牢固的箭簇", "烈日威权的余光", "休眠菌核", "锐利的箭簇", "烈日威权的梦想", "茁壮菌核", "历战的箭簇"]
+
+[[weapons]]
+name = "喜多院十文字"
+slug = "kitaincrossspear"
+rarity = 4
+weapon_type = "长柄武器"
+weapon_type_code = "WEAPON_POLE"
+base_atk = 43.7349
+main_stat = "元素精通"
+main_stat_value = "24"
+passive = "名士振舞"
+passive_detail = "元素战技造成的伤害提升6%。元素战技命中后，角色流失3点元素能量，并在此后的6秒内，每2秒恢复3点元素能量。该效果每10秒至多触发一次，角色处于队伍后台也能触发。"
+ascension_materials = ["摩拉", "今昔剧画之恶尉", "混沌机关", "寻宝鸦印", "今昔剧画之虎啮", "混沌枢纽", "藏银鸦印", "今昔剧画之一角", "混沌真眼", "攫金鸦印"]
+
+[[weapons]]
+name = "朏魄含光"
+slug = "lightbearingmoonshard"
+rarity = 5
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 44.3358
+main_stat = "暴击伤害"
+main_stat_value = "19.2%"
+passive = "琅玕衍义"
+passive_detail = "防御力提高20%。装备者施放元素战技后的5秒内，月结晶反应伤害提升64%。"
+ascension_materials = ["摩拉", "漆黑陨铁的一粒", "幽雾化形", "毁损机轴", "漆黑陨铁的一片", "幽雾片甲", "加固机轴", "漆黑陨铁的一角", "幽雾兜盔", "精制机轴"]
+
+[[weapons]]
+name = "裁叶萃光"
+slug = "lightoffoliarincision"
+rarity = 5
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 44.3358
+main_stat = "暴击伤害"
+main_stat_value = "19.2%"
+passive = "白月枝芒"
+passive_detail = "暴击率提升4%；普通攻击造成元素伤害后，获得「裁叶」效果：普通攻击和元素战技造成的伤害提高，提高值相当于元素精通的120%。该效果在生效28次或12秒后消失，每12秒至多获得一次「裁叶」效果。"
+ascension_materials = ["摩拉", "谧林涓露的铜符", "残毁的横脊", "褪色红绸", "谧林涓露的铁符", "密固的横脊", "镶边红绸", "谧林涓露的银符", "锲纹的横脊", "织金红绸"]
+
+[[weapons]]
+name = "匣里龙吟"
+slug = "lionsroar"
+rarity = 4
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 42.401
+main_stat = "攻击力"
+main_stat_value = "9%"
+passive = "踏火息雷"
+passive_detail = "对处于火元素或雷元素影响下的敌人，造成的伤害提高20%。"
+ascension_materials = ["摩拉", "孤云寒林的光砂", "猎兵祭刀", "寻宝鸦印", "孤云寒林的辉岩", "特工祭刀", "藏银鸦印", "孤云寒林的圣骸", "督察长祭刀", "攫金鸦印"]
+
+[[weapons]]
+name = "千岩古剑"
+slug = "lithicblade"
+rarity = 4
+weapon_type = "双手剑"
+weapon_type_code = "WEAPON_CLAYMORE"
+base_atk = 42.401
+main_stat = "攻击力"
+main_stat_value = "9%"
+passive = "千岩诀·同心"
+passive_detail = "队伍中每有一位璃月角色，装备该武器的角色便获得7%攻击力提升与3%暴击率提升。至多获得4层提升效果。"
+ascension_materials = ["摩拉", "孤云寒林的光砂", "猎兵祭刀", "牢固的箭簇", "孤云寒林的辉岩", "特工祭刀", "锐利的箭簇", "孤云寒林的圣骸", "督察长祭刀", "历战的箭簇"]
+
+[[weapons]]
+name = "千岩长枪"
+slug = "lithicspear"
+rarity = 4
+weapon_type = "长柄武器"
+weapon_type_code = "WEAPON_POLE"
+base_atk = 43.7349
+main_stat = "攻击力"
+main_stat_value = "6%"
+passive = "千岩诀·同心"
+passive_detail = "队伍中每有一位璃月角色，装备此武器的角色便获得7%攻击力提升与3%暴击率提升。至多获得4层提升效果。"
+ascension_materials = ["摩拉", "漆黑陨铁的一粒", "脆弱的骨片", "牢固的箭簇", "漆黑陨铁的一片", "结实的骨片", "锐利的箭簇", "漆黑陨铁的一角", "石化的骨片", "历战的箭簇"]
+
+[[weapons]]
+name = "四风原典"
+slug = "lostprayertothesacredwinds"
+rarity = 5
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 45.9364
+main_stat = "暴击率"
+main_stat_value = "7.2%"
+passive = "无边际的眷顾"
+passive_detail = "移动速度提高10%；在场上每4秒获得8%元素伤害加成。该效果最多叠加4层，持续直到角色倒下或离场。"
+ascension_materials = ["摩拉", "狮牙斗士的枷锁", "混沌装置", "史莱姆凝液", "狮牙斗士的铁链", "混沌回路", "史莱姆清", "狮牙斗士的镣铐", "混沌炉心", "史莱姆原浆"]
+
+[[weapons]]
+name = "柔灯挽歌"
+slug = "lumidouceelegy"
+rarity = 5
+weapon_type = "长柄武器"
+weapon_type_code = "WEAPON_POLE"
+base_atk = 45.9364
+main_stat = "暴击率"
+main_stat_value = "7.2%"
+passive = "白晓的序曲"
+passive_detail = "攻击力提升15%；装备者对敌人触发燃烧反应或对处于燃烧状态下的敌人造成草元素伤害后，造成的伤害提高18%。该效果持续8秒，至多叠加2层；叠加至2层或2层的持续时间刷新时，恢复12点元素能量，每12秒至多通过这种方式恢复一次元素能量。上述2种效果角色处于队伍后台时也能触发。"
+ascension_materials = ["摩拉", "无垢之海的苦盏", "残毁的剑柄", "骗骗花蜜", "无垢之海的酒盏", "裂断的剑柄", "微光花蜜", "无垢之海的银杯", "未熄的剑柄", "原素花蜜"]
+
+[[weapons]]
+name = "衔珠海皇"
+slug = "luxurioussealord"
+rarity = 4
+weapon_type = "双手剑"
+weapon_type_code = "WEAPON_CLAYMORE"
+base_atk = 41.0671
+main_stat = "攻击力"
+main_stat_value = "12%"
+passive = "海洋的胜利"
+passive_detail = "元素爆发造成的伤害提升12%。元素爆发命中敌人时，有100%概率召唤大鲔冲击，造成100%攻击力的范围伤害。该效果每15秒至多触发一次。"
+ascension_materials = ["摩拉", "漆黑陨铁的一粒", "脆弱的骨片", "史莱姆凝液", "漆黑陨铁的一片", "结实的骨片", "史莱姆清", "漆黑陨铁的一角", "石化的骨片", "史莱姆原浆"]
+
+[[weapons]]
+name = "魔导绪论"
+slug = "magicguide"
+rarity = 3
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 37.6075
+main_stat = "元素精通"
+main_stat_value = "41"
+passive = "止水息雷"
+passive_detail = "对处于水元素或雷元素影响下的敌人，造成的伤害提高12%。"
+ascension_materials = ["摩拉", "高塔孤王的破瓦", "沉重号角", "史莱姆凝液", "高塔孤王的残垣", "黑铜号角", "史莱姆清", "高塔孤王的断片", "黑晶号角", "史莱姆原浆"]
+
+[[weapons]]
+name = "饰铁之花"
+slug = "mailedflower"
+rarity = 4
+weapon_type = "双手剑"
+weapon_type_code = "WEAPON_CLAYMORE"
+base_atk = 43.7349
+main_stat = "元素精通"
+main_stat_value = "24"
+passive = "风与花的密语"
+passive_detail = "元素战技命中敌人或触发元素反应后的8秒内，攻击力提升12%，元素精通提升48点。"
+ascension_materials = ["摩拉", "狮牙斗士的枷锁", "残毁的横脊", "浮游干核", "狮牙斗士的铁链", "密固的横脊", "浮游幽核", "狮牙斗士的镣铐", "锲纹的横脊", "浮游晶化核"]
+
+[[weapons]]
+name = "玛海菈的水色"
+slug = "makhairaaquamarine"
+rarity = 4
+weapon_type = "双手剑"
+weapon_type_code = "WEAPON_CLAYMORE"
+base_atk = 42.401
+main_stat = "元素精通"
+main_stat_value = "36"
+passive = "沙上楼阁"
+passive_detail = "每10秒，产生如下效果：基于装备者的元素精通的24%，提升该角色的攻击力，并基于该提升的30%为队伍中附近的其他角色提升攻击力，持续12秒，多件同名武器产生的此效果可以叠加。角色处于队伍后台时也能触发效果。"
+ascension_materials = ["摩拉", "烈日威权的残响", "混沌容器", "寻宝鸦印", "烈日威权的余光", "混沌模块", "藏银鸦印", "烈日威权的梦想", "混沌锚栓", "攫金鸦印"]
+
+[[weapons]]
+name = "万国诸海图谱"
+slug = "mappamare"
+rarity = 4
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 43.7349
+main_stat = "元素精通"
+main_stat_value = "24"
+passive = "注能之卷"
+passive_detail = "触发元素反应后的10秒内，获得8%元素伤害加成，该效果最多可以叠加2层。"
+ascension_materials = ["摩拉", "漆黑陨铁的一粒", "脆弱的骨片", "史莱姆凝液", "漆黑陨铁的一片", "结实的骨片", "史莱姆清", "漆黑陨铁的一角", "石化的骨片", "史莱姆原浆"]
+
+[[weapons]]
+name = "万能钥匙"
+slug = "masterkey"
+rarity = 4
+weapon_type = "双手剑"
+weapon_type_code = "WEAPON_CLAYMORE"
+base_atk = 41.0671
+main_stat = "元素充能效率"
+main_stat_value = "13.3%"
+passive = "迎刃而解"
+passive_detail = "触发元素反应后的12秒内，元素精通提升60点。月兆·满辉：该效果中的元素精通额外提升60点。装备者处于队伍后台时，依然能触发上述效果。"
+ascension_materials = ["摩拉", "终北遗嗣的哀荣", "失光块骨", "毁损机轴", "终北遗嗣的迷顽", "稀光遗骼", "加固机轴", "终北遗嗣的祷献", "繁光躯外骸", "精制机轴"]
+
+[[weapons]]
+name = "尘世之锁"
+slug = "memoryofdust"
+rarity = 5
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 45.9364
+main_stat = "攻击力"
+main_stat_value = "10.8%"
+passive = "金璋皇极"
+passive_detail = "护盾强效提升20%。攻击命中后的8秒内，攻击力提升4%。该效果至多可叠加5层，每0.3秒只能触发一次。此外，处于护盾庇护下时，该效果的攻击力提升效果提高100%。"
+ascension_materials = ["摩拉", "漆黑陨铁的一粒", "脆弱的骨片", "破损的面具", "漆黑陨铁的一片", "结实的骨片", "污秽的面具", "漆黑陨铁的一角", "石化的骨片", "不祥的面具"]
+
+[[weapons]]
+name = "信使"
+slug = "messenger"
+rarity = 3
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 39.8751
+main_stat = "暴击伤害"
+main_stat_value = "6.8%"
+passive = "飞矢传书"
+passive_detail = "重击若命中要害，则额外造成100%攻击力的伤害，该伤害必定暴击。此效果每10秒只能触发一次。"
+ascension_materials = ["摩拉", "雾海云间的铅丹", "雾虚花粉", "寻宝鸦印", "雾海云间的汞丹", "雾虚草囊", "藏银鸦印", "雾海云间的金丹", "雾虚灯芯", "攫金鸦印"]
+
+[[weapons]]
+name = "风信之锋"
+slug = "missivewindspear"
+rarity = 4
+weapon_type = "长柄武器"
+weapon_type_code = "WEAPON_POLE"
+base_atk = 42.401
+main_stat = "攻击力"
+main_stat_value = "9%"
+passive = "不至之风"
+passive_detail = "触发元素反应后的10秒内，攻击力提升12%，元素精通提升48点。"
+ascension_materials = ["摩拉", "凛风奔狼的始龀", "晦暗刻像", "史莱姆凝液", "凛风奔狼的裂齿", "夤夜刻像", "史莱姆清", "凛风奔狼的断牙", "幽邃刻像", "史莱姆原浆"]
+
+[[weapons]]
+name = "雾切之回光"
+slug = "mistsplitterreforged"
+rarity = 5
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 47.537
+main_stat = "暴击伤害"
+main_stat_value = "9.6%"
+passive = "雾切御腰物"
+passive_detail = "获得12%所有元素伤害加成，并能获得「雾切之巴印」的威势。雾切之巴印：持有1/2/3层雾切之巴印时，获得8/16/28%自己的元素类型的元素伤害加成。在下列情况下，角色将各获得1层雾切之巴印：普通攻击造成元素伤害时，持续5秒；施放元素爆发时，持续10秒；此外，角色元素能量低于100%时，将获得1层雾切之巴印，此雾切之巴印会在角色的元素能量充满时消失。每层雾切之巴印的持续时间独立计算。"
+ascension_materials = ["摩拉", "远海夷地的瑚枝", "混沌机关", "破旧的刀镡", "远海夷地的玉枝", "混沌枢纽", "影打刀镡", "远海夷地的琼枝", "混沌真眼", "名刀镡"]
+
+[[weapons]]
+name = "幽夜华尔兹"
+slug = "mitternachtswaltz"
+rarity = 4
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 42.401
+main_stat = "物理伤害加成"
+main_stat_value = "11.3%"
+passive = "极夜二重奏"
+passive_detail = "普通攻击命中敌人后的5秒内，元素战技造成的伤害提升20%；元素战技命中敌人后的5秒内，普通攻击造成的伤害提升20%。"
+ascension_materials = ["摩拉", "高塔孤王的破瓦", "沉重号角", "寻宝鸦印", "高塔孤王的残垣", "黑铜号角", "藏银鸦印", "高塔孤王的断片", "黑晶号角", "攫金鸦印"]
+
+[[weapons]]
+name = "贯月矢"
+slug = "moonpiercer"
+rarity = 4
+weapon_type = "长柄武器"
+weapon_type_code = "WEAPON_POLE"
+base_atk = 43.7349
+main_stat = "元素精通"
+main_stat_value = "24"
+passive = "幽林月影"
+passive_detail = "触发燃烧、原激化、超激化、蔓激化、绽放、月绽放、超绽放或烈绽放后，将在角色周围产生至多存在10秒的「苏生之叶」。拾取苏生之叶的角色攻击力提升16%，持续12秒。每20秒至多通过这种方式产生一枚苏生之叶。角色处于队伍后台时也能触发。"
+ascension_materials = ["摩拉", "绿洲花园的追忆", "混沌容器", "新兵的徽记", "绿洲花园的恩惠", "混沌模块", "士官的徽记", "绿洲花园的哀思", "混沌锚栓", "尉官的徽记"]
+
+[[weapons]]
+name = "织月者的曙色"
+slug = "moonweaversdawn"
+rarity = 4
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 43.7349
+main_stat = "攻击力"
+main_stat_value = "6%"
+passive = "秘银的血告"
+passive_detail = "元素爆发造成的伤害提高20%；装备者的元素能量上限不超过60/40点时，元素爆发造成的伤害额外提高16%/28%。"
+ascension_materials = ["摩拉", "终北遗嗣的哀荣", "失光块骨", "毁损机轴", "终北遗嗣的迷顽", "稀光遗骼", "加固机轴", "终北遗嗣的祷献", "繁光躯外骸", "精制机轴"]
+
+[[weapons]]
+name = "镇山之钉"
+slug = "mountainbracingbolt"
+rarity = 4
+weapon_type = "长柄武器"
+weapon_type_code = "WEAPON_POLE"
+base_atk = 43.7349
+main_stat = "元素充能效率"
+main_stat_value = "6.7%"
+passive = "越峰之望"
+passive_detail = "攀爬消耗的体力降低15%，元素战技造成的伤害提升12%；此外，队伍中附近的其他角色施放元素战技后，装备者的元素战技造成的伤害还会提升12%，持续8秒。"
+ascension_materials = ["摩拉", "谵妄圣主的朽败", "聚燃的石块", "骗骗花蜜", "谵妄圣主的余哀", "聚燃的命种", "微光花蜜", "谵妄圣主的容光", "聚燃的游像眼", "原素花蜜"]
+
+[[weapons]]
+name = "曚云之月"
+slug = "mouunsmoon"
+rarity = 4
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 43.7349
+main_stat = "攻击力"
+main_stat_value = "6%"
+passive = "驭浪的海祇民"
+passive_detail = "队伍中所有角色的元素能量上限的总和，每1点能使装备此武器的角色的元素爆发造成的伤害提高0.12%，通过这种方式，元素爆发造成的伤害至多提高40%。"
+ascension_materials = ["摩拉", "鸣神御灵的明惠", "黯淡棱镜", "浮游干核", "鸣神御灵的欢喜", "水晶棱镜", "浮游幽核", "鸣神御灵的亲爱", "偏光棱镜", "浮游晶化核"]
+
+[[weapons]]
+name = "新枝"
+slug = "newbough"
+rarity = 4
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 42.401
+main_stat = "暴击伤害"
+main_stat_value = "12%"
+passive = "叶脉蔓生"
+passive_detail = "施放元素战技后的12秒内，装备者的攻击命中敌人时，会获得「蓊郁」：攻击力提升4%，元素精通提升20点。该效果持续6秒，至多叠加3层，每1秒至多触发一次。装备者处于队伍后台时，依然能触发上述效果。\n辉映·星烁：「蓊郁」效果改为攻击力提升6%，且装备者造成的星烁反应伤害提升8%。"
+ascension_materials = ["摩拉", "藏窖灵浆的斟酌", "灵生空根", "嵌合种", "藏窖灵浆的酩酊", "灵生分蘖节", "并生嵌合胞", "藏窖灵浆的酣畅", "灵生盘枝心", "源生嵌合体"]
+
+[[weapons]]
+name = "纺夜天镜"
+slug = "nightweaverslookingglass"
+rarity = 5
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 44.3358
+main_stat = "元素精通"
+main_stat_value = "58"
+passive = "千年的祷咏歌"
+passive_detail = "元素战技造成水元素或草元素伤害时，装备者获得「终北圣言」效果：元素精通提升60点，持续4.5秒；队伍中附近的角色触发月绽放反应时，装备者获得「朔月诗篇」效果：元素精通提升60点，持续10秒；「终北圣言」效果与「朔月诗篇」效果同时存在时，队伍中附近的所有角色触发的绽放反应造成的伤害提升120%，超绽放、烈绽放反应造成的伤害提升80%，月绽放反应伤害提升40%，该效果无法叠加。装备者处于队伍后台时，依然能触发上述效果。"
+ascension_materials = ["摩拉", "奇巧秘器的残件", "霜夜的残照", "毁损机轴", "奇巧秘器的模本", "霜夜的柔辉", "加固机轴", "奇巧秘器的继业", "霜夜的煌荣", "精制机轴"]
+
+[[weapons]]
+name = "帷间夜曲"
+slug = "nocturnescurtaincall"
+rarity = 5
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 44.3358
+main_stat = "暴击伤害"
+main_stat_value = "19.2%"
+passive = "十字路的旅歌"
+passive_detail = "生命值上限提高10%。装备者触发月曜反应或对敌人造成月曜反应伤害时，将为装备者恢复14点元素能量，并获得持续12秒的「丰饶海的神酒」效果：生命值上限进一步提高14%，月曜反应伤害的暴击伤害提升60%。恢复元素能量效果每18秒至多触发一次，装备者处于队伍后台时，依然能触发上述效果。"
+ascension_materials = ["摩拉", "终北遗嗣的哀荣", "深黯的裂眼", "磨损的执凭", "终北遗嗣的迷顽", "深黯的怪核", "精致的执凭", "终北遗嗣的祷献", "深黯的钩喙", "霜镌的执凭"]
+
+[[weapons]]
+name = "证誓之明瞳"
+slug = "oathsworneye"
+rarity = 4
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 43.7349
+main_stat = "攻击力"
+main_stat_value = "6%"
+passive = "微光的海渊民"
+passive_detail = "施放元素战技后，元素充能效率提升24%，持续10秒。"
+ascension_materials = ["摩拉", "远海夷地的瑚枝", "隐兽指爪", "浮游干核", "远海夷地的玉枝", "隐兽利爪", "浮游幽核", "远海夷地的琼枝", "隐兽鬼爪", "浮游晶化核"]
+
+[[weapons]]
+name = "佣兵重剑"
+slug = "oldmercspal"
+rarity = 2
+weapon_type = "双手剑"
+weapon_type_code = "WEAPON_CLAYMORE"
+base_atk = 32.93
+main_stat = ""
+main_stat_value = ""
+passive = ""
+passive_detail = ""
+ascension_materials = ["摩拉", "凛风奔狼的始龀", "地脉的旧枝", "史莱姆凝液", "凛风奔狼的裂齿", "地脉的枯叶", "史莱姆清", "凛风奔狼的断牙"]
+
+[[weapons]]
+name = "异世界行记"
+slug = "otherworldlystory"
+rarity = 3
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 38.7413
+main_stat = "元素充能效率"
+main_stat_value = "8.5%"
+passive = "能量沐浴"
+passive_detail = "获得元素微粒或元素晶球时，恢复1%生命值。"
+ascension_materials = ["摩拉", "狮牙斗士的枷锁", "混沌装置", "破损的面具", "狮牙斗士的铁链", "混沌回路", "污秽的面具", "狮牙斗士的镣铐", "混沌炉心", "不祥的面具"]
+
+[[weapons]]
+name = "岩峰巡歌"
+slug = "peakpatrolsong"
+rarity = 5
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 44.3358
+main_stat = "防御力"
+main_stat_value = "18%"
+passive = "不凋的盛年"
+passive_detail = "普通攻击或下落攻击命中敌人后，将获得「荣花之歌」：防御力提高8%，并获得10%所有元素伤害加成，该效果持续6秒，至多叠加2层，每0.1秒至多触发一次。该效果叠加至2层或2层的持续时间刷新时，基于装备者的防御力，每1000点使队伍中附近所有角色的所有元素伤害加成提高8%，至多提高25.6%，持续15秒。"
+ascension_materials = ["摩拉", "神合秘烟的思绪", "秘源轴", "稚嫩的尖齿", "神合秘烟的预感", "秘源机鞘", "老练的坚齿", "神合秘烟的征兆", "秘源真芯", "横行霸者的利齿"]
+
+[[weapons]]
+name = "口袋魔导书"
+slug = "pocketgrimoire"
+rarity = 2
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 32.93
+main_stat = ""
+main_stat_value = ""
+passive = ""
+passive_detail = ""
+ascension_materials = ["摩拉", "高塔孤王的破瓦", "沉重号角", "破损的面具", "高塔孤王的残垣", "黑铜号角", "污秽的面具", "高塔孤王的断片"]
+
+[[weapons]]
+name = "冬极白星"
+slug = "polarstar"
+rarity = 5
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 45.9364
+main_stat = "暴击率"
+main_stat_value = "7.2%"
+passive = "极昼的先兆者"
+passive_detail = "元素战技和元素爆发造成的伤害提高12%；普通攻击、重击、元素战技或元素爆发命中敌人后，将产生1层持续12秒的「白夜极星」效果。处于1/2/3/4层「白夜极星」效果下时，攻击力将提高10/20/30/48%。由普通攻击、重击、元素战技或元素爆发产生的「白夜极星」将分别独立存在。"
+ascension_materials = ["摩拉", "今昔剧画之恶尉", "隐兽指爪", "浮游干核", "今昔剧画之虎啮", "隐兽利爪", "浮游幽核", "今昔剧画之一角", "隐兽鬼爪", "浮游晶化核"]
+
+[[weapons]]
+name = "便携动力锯"
+slug = "portablepowersaw"
+rarity = 4
+weapon_type = "双手剑"
+weapon_type_code = "WEAPON_CLAYMORE"
+base_atk = 41.0671
+main_stat = "生命值"
+main_stat_value = "12%"
+passive = "船工号子"
+passive_detail = "受到治疗或进行治疗时，将赋予一枚坚忍标记，持续30秒，至多拥有三枚坚忍标记。施放元素战技或元素爆发时，将消耗所有的坚忍标记，产生持续10秒的「奋起」效果：每枚消耗的坚忍标记提高40点元素精通，并在效果产生2秒后，每枚消耗的坚忍标记为装备者恢复2点元素能量。每15秒至多触发一次奋起效果；角色处于队伍后台时也能获得坚忍标记。"
+ascension_materials = ["摩拉", "无垢之海的苦盏", "隙间之核", "啮合齿轮", "无垢之海的酒盏", "外世突触", "机关正齿轮", "无垢之海的银杯", "异界生命核", "奇械机芯齿轮"]
+
+[[weapons]]
+name = "掠食者"
+slug = "predator"
+rarity = 4
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 42.401
+main_stat = "攻击力"
+main_stat_value = "9%"
+passive = "强力攻击"
+passive_detail = "仅在以下平台生效：\n\"PlayStation®\"\n对敌人造成冰元素伤害后，普通攻击与重击造成的伤害提高10%，该效果持续6秒，至多叠加2次；此外，埃洛伊装备掠食者时，攻击力提升66点。"
+ascension_materials = ["摩拉", "鸣神御灵的明惠", "黯淡棱镜", "牢固的箭簇", "鸣神御灵的欢喜", "水晶棱镜", "锐利的箭簇", "鸣神御灵的亲爱", "偏光棱镜", "历战的箭簇"]
 
 [[weapons]]
 name = "磐岩结绿"
@@ -135,3 +1916,1394 @@ main_stat_value = "9.6%"
 passive = "护国的无垢之心"
 passive_detail = "生命值提升20%。此外，基于装备该武器的角色生命值上限的1.2%，获得攻击力加成。"
 ascension_materials = ["摩拉", "雾海云间的铅丹", "雾虚花粉", "寻宝鸦印", "雾海云间的汞丹", "雾虚草囊", "藏银鸦印", "雾海云间的金丹", "雾虚灯芯", "攫金鸦印"]
+
+[[weapons]]
+name = "和璞鸢"
+slug = "primordialjadewingedspear"
+rarity = 5
+weapon_type = "长柄武器"
+weapon_type_code = "WEAPON_POLE"
+base_atk = 47.537
+main_stat = "暴击率"
+main_stat_value = "4.8%"
+passive = "昭理的鸢之枪"
+passive_detail = "命中敌人时自身攻击力提高3.2%，持续6秒，最高可以叠加7层。该效果每0.3秒最多触发一次。满层状态时伤害提升12%。"
+ascension_materials = ["摩拉", "孤云寒林的光砂", "猎兵祭刀", "新兵的徽记", "孤云寒林的辉岩", "特工祭刀", "士官的徽记", "孤云寒林的圣骸", "督察长祭刀", "尉官的徽记"]
+
+[[weapons]]
+name = "「一心传」名刀"
+slug = "prizedisshinblade"
+rarity = 4
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 42.401
+main_stat = "攻击力"
+main_stat_value = "9%"
+passive = "徊徊切舍刀"
+passive_detail = "普通攻击、重击或下落攻击命中敌人时，将释放祟灵，造成180%攻击力的范围伤害，并且恢复等同于攻击力100%的生命值。该效果每8秒至多触发一次；装备该武器的角色造成的伤害降低50%。"
+ascension_materials = ["摩拉"]
+
+[[weapons]]
+name = "勘探钻机"
+slug = "prospectorsdrill"
+rarity = 4
+weapon_type = "长柄武器"
+weapon_type_code = "WEAPON_POLE"
+base_atk = 43.7349
+main_stat = "攻击力"
+main_stat_value = "6%"
+passive = "石匠号子"
+passive_detail = "受到治疗或进行治疗时，将赋予一枚团结标记，持续30秒，至多拥有三枚团结标记。施放元素战技或元素爆发时，将消耗所有的团结标记，产生持续10秒的「抗争」效果：每枚消耗的团结标记提高3%攻击力与7%所有元素伤害加成。每15秒至多触发一次抗争效果；角色处于队伍后台时也能获得团结标记。"
+ascension_materials = ["摩拉", "悠古弦音的残章", "老旧的役人怀表", "啮合齿轮", "悠古弦音的断章", "役人的制式怀表", "机关正齿轮", "悠古弦音的乐章", "役人的时时刻刻", "奇械机芯齿轮"]
+
+[[weapons]]
+name = "掘金之锹"
+slug = "prospectorsshovel"
+rarity = 4
+weapon_type = "长柄武器"
+weapon_type_code = "WEAPON_POLE"
+base_atk = 42.401
+main_stat = "攻击力"
+main_stat_value = "9%"
+passive = "当机立断"
+passive_detail = "感电反应造成的伤害提升48%，月感电反应造成的伤害提升12%。月兆·满辉：月感电反应造成的伤害额外提升12%。"
+ascension_materials = ["摩拉", "长夜燧火的余烬", "幽雾化形", "毁损机轴", "长夜燧火的残照", "幽雾片甲", "加固机轴", "长夜燧火的明焰", "幽雾兜盔", "精制机轴"]
+
+[[weapons]]
+name = "试作金珀"
+slug = "prototypeamber"
+rarity = 4
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 42.401
+main_stat = "生命值"
+main_stat_value = "9%"
+passive = "炊金"
+passive_detail = "施放元素爆发后6秒内，每2秒恢复4点元素能量，队伍中的所有角色每2秒恢复4%生命值。"
+ascension_materials = ["摩拉", "雾海云间的铅丹", "雾虚花粉", "牢固的箭簇", "雾海云间的汞丹", "雾虚草囊", "锐利的箭簇", "雾海云间的金丹", "雾虚灯芯", "历战的箭簇"]
+
+[[weapons]]
+name = "试作古华"
+slug = "prototypearchaic"
+rarity = 4
+weapon_type = "双手剑"
+weapon_type_code = "WEAPON_CLAYMORE"
+base_atk = 43.7349
+main_stat = "攻击力"
+main_stat_value = "6%"
+passive = "粉碎"
+passive_detail = "普通攻击和重击命中时，有50%的概率对小范围内的敌人造成240%攻击力的额外伤害。该效果每15秒只能触发一次。"
+ascension_materials = ["摩拉", "漆黑陨铁的一粒", "脆弱的骨片", "破损的面具", "漆黑陨铁的一片", "结实的骨片", "污秽的面具", "漆黑陨铁的一角", "石化的骨片", "不祥的面具"]
+
+[[weapons]]
+name = "试作澹月"
+slug = "prototypecrescent"
+rarity = 4
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 42.401
+main_stat = "攻击力"
+main_stat_value = "9%"
+passive = "离簇不归"
+passive_detail = "重击若命中要害，则提升10%移动速度与36%攻击力，持续10秒。"
+ascension_materials = ["摩拉", "雾海云间的铅丹", "雾虚花粉", "寻宝鸦印", "雾海云间的汞丹", "雾虚草囊", "藏银鸦印", "雾海云间的金丹", "雾虚灯芯", "攫金鸦印"]
+
+[[weapons]]
+name = "试作斩岩"
+slug = "prototyperancour"
+rarity = 4
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 43.7349
+main_stat = "物理伤害加成"
+main_stat_value = "7.5%"
+passive = "碎石"
+passive_detail = "普通攻击或重击命中时，攻击力和防御力提高4%，持续6秒，最多叠加4层。该效果每0.3秒只能触发一次。"
+ascension_materials = ["摩拉", "雾海云间的铅丹", "雾虚花粉", "新兵的徽记", "雾海云间的汞丹", "雾虚草囊", "士官的徽记", "雾海云间的金丹", "雾虚灯芯", "尉官的徽记"]
+
+[[weapons]]
+name = "试作星镰"
+slug = "prototypestarglitter"
+rarity = 4
+weapon_type = "长柄武器"
+weapon_type_code = "WEAPON_POLE"
+base_atk = 42.401
+main_stat = "元素充能效率"
+main_stat_value = "10%"
+passive = "嗜魔"
+passive_detail = "施放元素战技后，普通攻击和重击造成的伤害提高8%。该效果持续12秒，最多叠加2层。"
+ascension_materials = ["摩拉", "漆黑陨铁的一粒", "脆弱的骨片", "破损的面具", "漆黑陨铁的一片", "结实的骨片", "污秽的面具", "漆黑陨铁的一角", "石化的骨片", "不祥的面具"]
+
+[[weapons]]
+name = "虹蛇的雨弦"
+slug = "rainbowserpentsrainbow"
+rarity = 4
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 42.401
+main_stat = "元素充能效率"
+main_stat_value = "10%"
+passive = "圣座外的星语"
+passive_detail = "装备者处于队伍后台时，装备者的攻击命中敌人后的8秒内，攻击力提升28%。"
+ascension_materials = ["摩拉", "神合秘烟的思绪", "折光的胚芽", "磨损的执凭", "神合秘烟的预感", "惑光的阔叶", "精致的执凭", "神合秘烟的征兆", "迷光的蜷叶之心", "霜镌的执凭"]
+
+[[weapons]]
+name = "雨裁"
+slug = "rainslasher"
+rarity = 4
+weapon_type = "双手剑"
+weapon_type_code = "WEAPON_CLAYMORE"
+base_atk = 42.401
+main_stat = "元素精通"
+main_stat_value = "36"
+passive = "止水息雷"
+passive_detail = "对处于水元素或雷元素影响下的敌人，造成的伤害提高20%。"
+ascension_materials = ["摩拉", "雾海云间的铅丹", "雾虚花粉", "导能绘卷", "雾海云间的汞丹", "雾虚草囊", "封魔绘卷", "雾海云间的金丹", "雾虚灯芯", "禁咒绘卷"]
+
+[[weapons]]
+name = "测距规"
+slug = "rangegauge"
+rarity = 4
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 43.7349
+main_stat = "攻击力"
+main_stat_value = "6%"
+passive = "石匠号子"
+passive_detail = "受到治疗或进行治疗时，将赋予一枚团结标记，持续30秒，至多拥有三枚团结标记。施放元素战技或元素爆发时，将消耗所有的团结标记，产生持续10秒的「抗争」效果：每枚消耗的团结标记提高3%攻击力与7%所有元素伤害加成。每15秒至多触发一次抗争效果；角色处于队伍后台时也能获得团结标记。"
+ascension_materials = ["摩拉", "悠古弦音的残章", "浊水的一滴", "异海凝珠", "悠古弦音的断章", "浊水的一掬", "异海之块", "悠古弦音的乐章", "初生的浊水幻灵", "异色结晶石"]
+
+[[weapons]]
+name = "鸦羽弓"
+slug = "ravenbow"
+rarity = 3
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 39.8751
+main_stat = "元素精通"
+main_stat_value = "20"
+passive = "踏火止水"
+passive_detail = "对处于水元素或火元素影响下的敌人，造成的伤害提高12%。"
+ascension_materials = ["摩拉", "高塔孤王的破瓦", "沉重号角", "牢固的箭簇", "高塔孤王的残垣", "黑铜号角", "锐利的箭簇", "高塔孤王的断片", "黑晶号角", "历战的箭簇"]
+
+[[weapons]]
+name = "反曲弓"
+slug = "recurvebow"
+rarity = 3
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 37.6075
+main_stat = "生命值"
+main_stat_value = "10.2%"
+passive = "收割"
+passive_detail = "击败敌人时，恢复8%生命值。"
+ascension_materials = ["摩拉", "狮牙斗士的枷锁", "混沌装置", "导能绘卷", "狮牙斗士的铁链", "混沌回路", "封魔绘卷", "狮牙斗士的镣铐", "混沌炉心", "禁咒绘卷"]
+
+[[weapons]]
+name = "赤角石溃杵"
+slug = "redhornstonethresher"
+rarity = 5
+weapon_type = "双手剑"
+weapon_type_code = "WEAPON_CLAYMORE"
+base_atk = 44.3358
+main_stat = "暴击伤害"
+main_stat_value = "19.2%"
+passive = "御伽大王御伽话"
+passive_detail = "防御力提高28%；普通攻击与重击造成的伤害值提高，提高数值相当于防御力的40%。"
+ascension_materials = ["摩拉", "鸣神御灵的明惠", "隐兽指爪", "破旧的刀镡", "鸣神御灵的欢喜", "隐兽利爪", "影打刀镡", "鸣神御灵的亲爱", "隐兽鬼爪", "名刀镡"]
+
+[[weapons]]
+name = "真语秘匣"
+slug = "reliquaryoftruth"
+rarity = 5
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 44.3358
+main_stat = "暴击伤害"
+main_stat_value = "19.2%"
+passive = "伪言的真意"
+passive_detail = "暴击率提升8%。施放元素战技时，装备者获得「伪言之秘」效果：元素精通提升80点，持续12秒。装备者对敌人造成月绽放反应伤害时，装备者获得「真识之月」效果：暴击伤害提升24%，持续4秒。「伪言之秘」效果与「真识之月」效果同时存在时，这些效果分别提升50%。"
+ascension_materials = ["摩拉", "绿洲花园的追忆", "失光块骨", "蕈兽孢子", "绿洲花园的恩惠", "稀光遗骼", "荧光孢粉", "绿洲花园的哀思", "繁光躯外骸", "孢囊晶尘"]
+
+[[weapons]]
+name = "公义的酬报"
+slug = "rightfulreward"
+rarity = 4
+weapon_type = "长柄武器"
+weapon_type_code = "WEAPON_POLE"
+base_atk = 43.7349
+main_stat = "生命值"
+main_stat_value = "6%"
+passive = "枪尖一点"
+passive_detail = "受到治疗时，恢复8点能量，该效果每10秒至多触发一次，角色处于队伍后台时也能触发。"
+ascension_materials = ["摩拉", "无垢之海的苦盏", "隙间之核", "啮合齿轮", "无垢之海的酒盏", "外世突触", "机关正齿轮", "无垢之海的银杯", "异界生命核", "奇械机芯齿轮"]
+
+[[weapons]]
+name = "木棉之环"
+slug = "ringofyaxche"
+rarity = 4
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 42.401
+main_stat = "生命值"
+main_stat_value = "9%"
+passive = "丰沃之陆的回声"
+passive_detail = "施放元素战技时，获得「玉锻之冕」效果：每1000点生命值上限都会使普通攻击造成的伤害提升0.6%，持续10秒。通过这种方式至多使普通攻击造成的伤害提升16%。"
+ascension_materials = ["摩拉", "谵妄圣主的朽败", "意志破碎的残片", "破损的面具", "谵妄圣主的余哀", "意志明晰的寄偶", "污秽的面具", "谵妄圣主的容光", "意志巡游的符像", "不祥的面具"]
+
+[[weapons]]
+name = "宗室长弓"
+slug = "royalbow"
+rarity = 4
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 42.401
+main_stat = "攻击力"
+main_stat_value = "9%"
+passive = "专注"
+passive_detail = "攻击造成伤害时，暴击率提升8%，最多堆叠5次。攻击造成暴击后，移除已有的专注效果。"
+ascension_materials = ["摩拉", "狮牙斗士的枷锁", "混沌装置", "导能绘卷", "狮牙斗士的铁链", "混沌回路", "封魔绘卷", "狮牙斗士的镣铐", "混沌炉心", "禁咒绘卷"]
+
+[[weapons]]
+name = "宗室大剑"
+slug = "royalgreatsword"
+rarity = 4
+weapon_type = "双手剑"
+weapon_type_code = "WEAPON_CLAYMORE"
+base_atk = 43.7349
+main_stat = "攻击力"
+main_stat_value = "6%"
+passive = "专注"
+passive_detail = "攻击造成伤害时，暴击率提升8%，最多堆叠5次。攻击造成暴击后，移除已有的专注效果。"
+ascension_materials = ["摩拉", "狮牙斗士的枷锁", "混沌装置", "史莱姆凝液", "狮牙斗士的铁链", "混沌回路", "史莱姆清", "狮牙斗士的镣铐", "混沌炉心", "史莱姆原浆"]
+
+[[weapons]]
+name = "宗室秘法录"
+slug = "royalgrimoire"
+rarity = 4
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 43.7349
+main_stat = "攻击力"
+main_stat_value = "6%"
+passive = "专注"
+passive_detail = "攻击造成伤害时，暴击率提升8%，最多堆叠5次。攻击造成暴击后，移除已有的专注效果。"
+ascension_materials = ["摩拉", "高塔孤王的破瓦", "沉重号角", "新兵的徽记", "高塔孤王的残垣", "黑铜号角", "士官的徽记", "高塔孤王的断片", "黑晶号角", "尉官的徽记"]
+
+[[weapons]]
+name = "宗室长剑"
+slug = "royallongsword"
+rarity = 4
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 42.401
+main_stat = "攻击力"
+main_stat_value = "9%"
+passive = "专注"
+passive_detail = "攻击造成伤害时，暴击率提升8%，最多堆叠5次。攻击造成暴击后，移除已有的专注效果。"
+ascension_materials = ["摩拉", "高塔孤王的破瓦", "沉重号角", "破损的面具", "高塔孤王的残垣", "黑铜号角", "污秽的面具", "高塔孤王的断片", "黑晶号角", "不祥的面具"]
+
+[[weapons]]
+name = "宗室猎枪"
+slug = "royalspear"
+rarity = 4
+weapon_type = "长柄武器"
+weapon_type_code = "WEAPON_POLE"
+base_atk = 43.7349
+main_stat = "攻击力"
+main_stat_value = "6%"
+passive = "专注"
+passive_detail = "攻击造成伤害时，暴击率提升8%，最多堆叠5次。攻击造成暴击后，移除已有的专注效果。"
+ascension_materials = ["摩拉", "雾海云间的铅丹", "雾虚花粉", "新兵的徽记", "雾海云间的汞丹", "雾虚草囊", "士官的徽记", "雾海云间的金丹", "雾虚灯芯", "尉官的徽记"]
+
+[[weapons]]
+name = "弓藏"
+slug = "rust"
+rarity = 4
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 42.401
+main_stat = "攻击力"
+main_stat_value = "9%"
+passive = "速射弓斗"
+passive_detail = "普通攻击造成的伤害提升40%，重击造成的伤害下降10%。"
+ascension_materials = ["摩拉", "孤云寒林的光砂", "猎兵祭刀", "破损的面具", "孤云寒林的辉岩", "特工祭刀", "污秽的面具", "孤云寒林的圣骸", "督察长祭刀", "不祥的面具"]
+
+[[weapons]]
+name = "圣祭者的辉杖"
+slug = "sacrificersstaff"
+rarity = 4
+weapon_type = "长柄武器"
+weapon_type_code = "WEAPON_POLE"
+base_atk = 45.0687
+main_stat = "暴击率"
+main_stat_value = "2%"
+passive = "未染的觖望"
+passive_detail = "元素战技命中敌人后的6秒内，攻击力提升8%，元素充能效率提升6%。该效果至多叠加3层，装备者处于队伍后台时依然能触发。"
+ascension_materials = ["摩拉", "长夜燧火的余烬", "幽雾化形", "毁损机轴", "长夜燧火的残照", "幽雾片甲", "加固机轴", "长夜燧火的明焰", "幽雾兜盔", "精制机轴"]
+
+[[weapons]]
+name = "祭礼弓"
+slug = "sacrificialbow"
+rarity = 4
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 43.7349
+main_stat = "元素充能效率"
+main_stat_value = "6.7%"
+passive = "气定神闲"
+passive_detail = "元素战技造成伤害时，有40%的概率重置该技能的冷却时间，该效果每30秒只能触发一次。"
+ascension_materials = ["摩拉", "凛风奔狼的始龀", "地脉的旧枝", "史莱姆凝液", "凛风奔狼的裂齿", "地脉的枯叶", "史莱姆清", "凛风奔狼的断牙", "地脉的新芽", "史莱姆原浆"]
+
+[[weapons]]
+name = "祭礼残章"
+slug = "sacrificialfragments"
+rarity = 4
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 41.0671
+main_stat = "元素精通"
+main_stat_value = "48"
+passive = "气定神闲"
+passive_detail = "元素战技造成伤害时，有40%的概率重置该技能的冷却时间，该效果每30秒只能触发一次。"
+ascension_materials = ["摩拉", "狮牙斗士的枷锁", "混沌装置", "寻宝鸦印", "狮牙斗士的铁链", "混沌回路", "藏银鸦印", "狮牙斗士的镣铐", "混沌炉心", "攫金鸦印"]
+
+[[weapons]]
+name = "祭礼大剑"
+slug = "sacrificialgreatsword"
+rarity = 4
+weapon_type = "双手剑"
+weapon_type_code = "WEAPON_CLAYMORE"
+base_atk = 43.7349
+main_stat = "元素充能效率"
+main_stat_value = "6.7%"
+passive = "气定神闲"
+passive_detail = "元素战技造成伤害时，有40%的概率重置该技能的冷却时间，该效果每30秒只能触发一次。"
+ascension_materials = ["摩拉", "凛风奔狼的始龀", "地脉的旧枝", "牢固的箭簇", "凛风奔狼的裂齿", "地脉的枯叶", "锐利的箭簇", "凛风奔狼的断牙", "地脉的新芽", "历战的箭簇"]
+
+[[weapons]]
+name = "遗祀玉珑"
+slug = "sacrificialjade"
+rarity = 4
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 41.0671
+main_stat = "暴击率"
+main_stat_value = "8%"
+passive = "碧玉流转"
+passive_detail = "处于队伍后台超过5秒后，生命值上限提升32%，元素精通提升40点。装备者登场并留在场上10秒后，该效果将失效。"
+ascension_materials = ["摩拉", "孤云寒林的光砂", "雾虚花粉", "导能绘卷", "孤云寒林的辉岩", "雾虚草囊", "封魔绘卷", "孤云寒林的圣骸", "雾虚灯芯", "禁咒绘卷"]
+
+[[weapons]]
+name = "祭礼剑"
+slug = "sacrificialsword"
+rarity = 4
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 41.0671
+main_stat = "元素充能效率"
+main_stat_value = "13.3%"
+passive = "气定神闲"
+passive_detail = "元素战技造成伤害时，有40%的概率重置该技能的冷却时间，该效果每30秒只能触发一次。"
+ascension_materials = ["摩拉", "狮牙斗士的枷锁", "混沌装置", "导能绘卷", "狮牙斗士的铁链", "混沌回路", "封魔绘卷", "狮牙斗士的镣铐", "混沌炉心", "禁咒绘卷"]
+
+[[weapons]]
+name = "原木刀"
+slug = "sapwoodblade"
+rarity = 4
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 43.7349
+main_stat = "元素充能效率"
+main_stat_value = "6.7%"
+passive = "森林的瑞佑"
+passive_detail = "触发燃烧、原激化、超激化、蔓激化、绽放、月绽放、超绽放或烈绽放后，将在角色周围产生至多存在10秒的「种识之叶」。拾取种识之叶的角色元素精通提升60点，持续12秒。每20秒至多通过这种方式产生一枚种识之叶。角色处于队伍后台时也能触发。种识之叶的效果无法叠加。"
+ascension_materials = ["摩拉", "谧林涓露的铜符", "混沌容器", "褪色红绸", "谧林涓露的铁符", "混沌模块", "镶边红绸", "谧林涓露的银符", "混沌锚栓", "织金红绸"]
+
+[[weapons]]
+name = "烈阳之嗣"
+slug = "scionoftheblazingsun"
+rarity = 4
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 43.7349
+main_stat = "暴击率"
+main_stat_value = "4%"
+passive = "阳炎古道"
+passive_detail = "重击命中敌人后，会向命中的敌人降下阳炎矢，造成攻击力60%的伤害，并为受到阳炎矢伤害的敌人施加持续10秒的灼心效果。装备者的重击对处于灼心状态下的敌人造成的伤害提升28%。阳炎矢每10秒至多触发一次。"
+ascension_materials = ["摩拉", "烈日威权的残响", "来自何处的待放之花", "蕈兽孢子", "烈日威权的余光", "何人所珍藏之花", "荧光孢粉", "烈日威权的梦想", "漫游者的盛放之花", "孢囊晶尘"]
+
+[[weapons]]
+name = "历练的猎弓"
+slug = "seasonedhuntersbow"
+rarity = 2
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 32.93
+main_stat = ""
+main_stat_value = ""
+passive = ""
+passive_detail = ""
+ascension_materials = ["摩拉", "凛风奔狼的始龀", "地脉的旧枝", "寻宝鸦印", "凛风奔狼的裂齿", "地脉的枯叶", "藏银鸦印", "凛风奔狼的断牙"]
+
+[[weapons]]
+name = "冷寂迸音"
+slug = "sequenceofsolitude"
+rarity = 4
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 42.401
+main_stat = "生命值"
+main_stat_value = "9%"
+passive = "静发"
+passive_detail = "攻击命中敌人时，在目标位置基于生命值上限的40%，造成范围伤害。该效果每15秒至多触发一次。"
+ascension_materials = ["摩拉", "悠古弦音的残章", "冷裂壳块", "啮合齿轮", "悠古弦音的断章", "蕴热的背壳", "机关正齿轮", "悠古弦音的乐章", "明燃的棱状壳", "奇械机芯齿轮"]
+
+[[weapons]]
+name = "谧音吹哨"
+slug = "serenityscall"
+rarity = 4
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 41.0671
+main_stat = "元素充能效率"
+main_stat_value = "13.3%"
+passive = "沉声止语"
+passive_detail = "触发元素反应后的12秒内，生命值上限提高16%。月兆·满辉：该效果中的生命值上限额外提高16%。装备者处于队伍后台时，依然能触发上述效果。"
+ascension_materials = ["摩拉", "奇巧秘器的残件", "霜夜的残照", "磨损的执凭", "奇巧秘器的模本", "霜夜的柔辉", "精致的执凭", "奇巧秘器的继业", "霜夜的煌荣", "霜镌的执凭"]
+
+[[weapons]]
+name = "螭骨剑"
+slug = "serpentspine"
+rarity = 4
+weapon_type = "双手剑"
+weapon_type_code = "WEAPON_CLAYMORE"
+base_atk = 42.401
+main_stat = "暴击率"
+main_stat_value = "6%"
+passive = "破浪"
+passive_detail = "角色在场上时，每4秒提升6%造成的伤害，3%受到的伤害。该效果最多叠加5层，不随角色退场重置，受到伤害后会减少1层效果。"
+ascension_materials = ["摩拉", "漆黑陨铁的一粒", "脆弱的骨片", "骗骗花蜜", "漆黑陨铁的一片", "结实的骨片", "微光花蜜", "漆黑陨铁的一角", "石化的骨片", "原素花蜜"]
+
+[[weapons]]
+name = "神射手之誓"
+slug = "sharpshootersoath"
+rarity = 3
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 38.7413
+main_stat = "暴击伤害"
+main_stat_value = "10.2%"
+passive = "精准"
+passive_detail = "针对要害造成的伤害提升24%。"
+ascension_materials = ["摩拉", "凛风奔狼的始龀", "地脉的旧枝", "史莱姆凝液", "凛风奔狼的裂齿", "地脉的枯叶", "史莱姆清", "凛风奔狼的断牙", "地脉的新芽", "史莱姆原浆"]
+
+[[weapons]]
+name = "银釭"
+slug = "silverlight"
+rarity = 4
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 42.401
+main_stat = "攻击力"
+main_stat_value = "9%"
+passive = "翦霞照水"
+passive_detail = "施放元素战技后的12秒内，元素精通提升52点。该效果至多叠加2层，每层持续时间独立计算。"
+ascension_materials = ["摩拉", "漆黑陨铁的一粒", "脆弱的骨片", "新兵的徽记", "漆黑陨铁的一片", "结实的骨片", "士官的徽记", "漆黑陨铁的一角", "石化的骨片", "尉官的徽记"]
+
+[[weapons]]
+name = "白雨心弦"
+slug = "silvershowerheartstrings"
+rarity = 5
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 44.3358
+main_stat = "生命值"
+main_stat_value = "14.4%"
+passive = "德吕阿的夜曲"
+passive_detail = "装备者能获得「疗护」效果，持有1/2/3层疗护时，生命值上限提升12%/24%/40%。在下列情况下，装备者将各获得1层疗护：施放元素战技时，持续25秒；生命之契的数值增加时，持续25秒；进行治疗时，持续20秒，装备者处于队伍后台时依然能触发。每层疗护的持续时间独立计算。此外，处于3层疗护状态下时，元素爆发的暴击率提升28%，该效果将在疗护不足3层4秒后移除。"
+ascension_materials = ["摩拉", "纯圣露滴的滤渣", "羽状鳍翅", "异海凝珠", "纯圣露滴的凝华", "月色鳍翅", "异海之块", "纯圣露滴的醴泉", "渊光鳍翅", "异色结晶石"]
+
+[[weapons]]
+name = "银剑"
+slug = "silversword"
+rarity = 2
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 32.93
+main_stat = ""
+main_stat_value = ""
+passive = ""
+passive_detail = ""
+ascension_materials = ["摩拉", "高塔孤王的破瓦", "沉重号角", "牢固的箭簇", "高塔孤王的残垣", "黑铜号角", "锐利的箭簇", "高塔孤王的断片"]
+
+[[weapons]]
+name = "飞天大御剑"
+slug = "skyridergreatsword"
+rarity = 3
+weapon_type = "双手剑"
+weapon_type_code = "WEAPON_CLAYMORE"
+base_atk = 38.7413
+main_stat = "物理伤害加成"
+main_stat_value = "9.6%"
+passive = "勇气"
+passive_detail = "普通攻击和重击命中时，攻击力提高6%，持续6秒，最多叠加4层。该效果每0.5秒只能触发一次。"
+ascension_materials = ["摩拉", "漆黑陨铁的一粒", "脆弱的骨片", "寻宝鸦印", "漆黑陨铁的一片", "结实的骨片", "藏银鸦印", "漆黑陨铁的一角", "石化的骨片", "攫金鸦印"]
+
+[[weapons]]
+name = "飞天御剑"
+slug = "skyridersword"
+rarity = 3
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 37.6075
+main_stat = "元素充能效率"
+main_stat_value = "11.3%"
+passive = "决心"
+passive_detail = "施放元素爆发后，提高12%攻击力和移动速度，持续15秒。"
+ascension_materials = ["摩拉", "漆黑陨铁的一粒", "脆弱的骨片", "新兵的徽记", "漆黑陨铁的一片", "结实的骨片", "士官的徽记", "漆黑陨铁的一角", "石化的骨片", "尉官的徽记"]
+
+[[weapons]]
+name = "天空之卷"
+slug = "skywardatlas"
+rarity = 5
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 47.537
+main_stat = "攻击力"
+main_stat_value = "7.2%"
+passive = "浮游四方的灵云"
+passive_detail = "元素伤害加成提升12%；普通攻击命中时，有50%的概率获得高天流云的青睐，在15秒内主动攻击附近的敌人，造成等同于160%攻击力的伤害。该效果每30秒只能触发一次。"
+ascension_materials = ["摩拉", "凛风奔狼的始龀", "地脉的旧枝", "牢固的箭簇", "凛风奔狼的裂齿", "地脉的枯叶", "锐利的箭簇", "凛风奔狼的断牙", "地脉的新芽", "历战的箭簇"]
+
+[[weapons]]
+name = "天空之刃"
+slug = "skywardblade"
+rarity = 5
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 45.9364
+main_stat = "元素充能效率"
+main_stat_value = "12%"
+passive = "穿刺高天的利齿"
+passive_detail = "暴击率提升4%；施放元素爆发时，获得破空之势：移动速度提升10%，攻击速度提升10%，普通攻击与重击命中时，额外造成20%攻击力的伤害，持续12秒。"
+ascension_materials = ["摩拉", "凛风奔狼的始龀", "地脉的旧枝", "史莱姆凝液", "凛风奔狼的裂齿", "地脉的枯叶", "史莱姆清", "凛风奔狼的断牙", "地脉的新芽", "史莱姆原浆"]
+
+[[weapons]]
+name = "天空之翼"
+slug = "skywardharp"
+rarity = 5
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 47.537
+main_stat = "暴击率"
+main_stat_value = "4.8%"
+passive = "回响长天的诗歌"
+passive_detail = "暴击伤害提高20%；攻击命中时有60%概率造成125%攻击力的小范围物理伤害，该效果每4秒只能触发一次。"
+ascension_materials = ["摩拉", "凛风奔狼的始龀", "地脉的旧枝", "牢固的箭簇", "凛风奔狼的裂齿", "地脉的枯叶", "锐利的箭簇", "凛风奔狼的断牙", "地脉的新芽", "历战的箭簇"]
+
+[[weapons]]
+name = "天空之傲"
+slug = "skywardpride"
+rarity = 5
+weapon_type = "双手剑"
+weapon_type_code = "WEAPON_CLAYMORE"
+base_atk = 47.537
+main_stat = "元素充能效率"
+main_stat_value = "8%"
+passive = "斩裂晴空的龙脊"
+passive_detail = "造成的伤害提高8%；施放元素爆发后：普通攻击和重击命中时会发出真空刃，对路径上的敌人造成80%攻击力的伤害，持续20秒或直至发出8次真空刃。"
+ascension_materials = ["摩拉", "凛风奔狼的始龀", "地脉的旧枝", "史莱姆凝液", "凛风奔狼的裂齿", "地脉的枯叶", "史莱姆清", "凛风奔狼的断牙", "地脉的新芽", "史莱姆原浆"]
+
+[[weapons]]
+name = "天空之脊"
+slug = "skywardspine"
+rarity = 5
+weapon_type = "长柄武器"
+weapon_type_code = "WEAPON_POLE"
+base_atk = 47.537
+main_stat = "元素充能效率"
+main_stat_value = "8%"
+passive = "斫断黑翼的利齿"
+passive_detail = "暴击率提升8%，普通攻击速度提升12%。此外，普通攻击与重击命中敌人时，有50%概率触发真空刃，在小范围内造成额外40%攻击力的伤害。该效果每2秒至多触发一次。"
+ascension_materials = ["摩拉", "狮牙斗士的枷锁", "混沌装置", "导能绘卷", "狮牙斗士的铁链", "混沌回路", "封魔绘卷", "狮牙斗士的镣铐", "混沌炉心", "禁咒绘卷"]
+
+[[weapons]]
+name = "弹弓"
+slug = "slingshot"
+rarity = 3
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 37.6075
+main_stat = "暴击率"
+main_stat_value = "6.8%"
+passive = "弹弓"
+passive_detail = "普通攻击与重击的箭矢若在发射后的0.3秒内击中敌人，则造成的伤害增加36%；否则，造成的伤害下降10%。"
+ascension_materials = ["摩拉", "孤云寒林的光砂", "猎兵祭刀", "破损的面具", "孤云寒林的辉岩", "特工祭刀", "污秽的面具", "孤云寒林的圣骸", "督察长祭刀", "不祥的面具"]
+
+[[weapons]]
+name = "罗网勾针"
+slug = "snarehook"
+rarity = 4
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 41.0671
+main_stat = "元素充能效率"
+main_stat_value = "13.3%"
+passive = "矫捷无影"
+passive_detail = "触发元素反应后的12秒内，元素精通提升60点。月兆·满辉：该效果中的元素精通额外提升60点。装备者处于队伍后台时，依然能触发上述效果。"
+ascension_materials = ["摩拉", "长夜燧火的余烬", "幽雾化形", "牢固的箭簇", "长夜燧火的残照", "幽雾片甲", "锐利的箭簇", "长夜燧火的明焰", "幽雾兜盔", "历战的箭簇"]
+
+[[weapons]]
+name = "雪葬的星银"
+slug = "snowtombedstarsilver"
+rarity = 4
+weapon_type = "双手剑"
+weapon_type_code = "WEAPON_CLAYMORE"
+base_atk = 43.7349
+main_stat = "物理伤害加成"
+main_stat_value = "7.5%"
+passive = "霜葬"
+passive_detail = "普通攻击与重击命中敌人时，有60%概率在敌人上方生成恒冰晶核并坠落，造成80%攻击力的范围伤害。若敌人处于冰元素影响下，则造成200%攻击力的伤害。该效果每10秒至多触发一次。"
+ascension_materials = ["摩拉", "高塔孤王的破瓦", "沉重号角", "史莱姆凝液", "高塔孤王的残垣", "黑铜号角", "史莱姆清", "高塔孤王的断片", "黑晶号角", "史莱姆原浆"]
+
+[[weapons]]
+name = "匣里日月"
+slug = "solarpearl"
+rarity = 4
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 42.401
+main_stat = "暴击率"
+main_stat_value = "6%"
+passive = "日月辉"
+passive_detail = "普通攻击命中后的6秒内，元素战技与元素爆发的伤害提高20%；元素战技与元素爆发命中后的6秒内，普通攻击的伤害提高20%。"
+ascension_materials = ["摩拉", "孤云寒林的光砂", "猎兵祭刀", "骗骗花蜜", "孤云寒林的辉岩", "特工祭刀", "微光花蜜", "孤云寒林的圣骸", "督察长祭刀", "原素花蜜"]
+
+[[weapons]]
+name = "松籁响起之时"
+slug = "songofbrokenpines"
+rarity = 5
+weapon_type = "双手剑"
+weapon_type_code = "WEAPON_CLAYMORE"
+base_atk = 49.1377
+main_stat = "物理伤害加成"
+main_stat_value = "4.5%"
+passive = "揭旗的叛逆之歌"
+passive_detail = "飘游风中的「千年的大乐章」的一部分。攻击力提高16%；普通攻击或重击命中敌人时，角色获得一枚低语之符，每0.3秒内至多触发一次。拥有4枚低语之符时，将消耗所有低语之符，使附近的队伍中所有角色获得持续12秒的「千年的大乐章·揭旗之歌」效果：普通攻击速度提高12%，攻击力提升20%。触发后20秒内，无法再次获得低语之符。「千年的大乐章」触发的多种数值效果中，同类数值效果不可叠加。"
+ascension_materials = ["摩拉", "高塔孤王的破瓦", "沉重号角", "破损的面具", "高塔孤王的残垣", "黑铜号角", "污秽的面具", "高塔孤王的断片", "黑晶号角", "不祥的面具"]
+
+[[weapons]]
+name = "静谧之曲"
+slug = "songofstillness"
+rarity = 4
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 42.401
+main_stat = "攻击力"
+main_stat_value = "9%"
+passive = "深海弦振"
+passive_detail = "受到治疗后，造成的伤害提升16%，持续8秒。角色处于队伍后台也能触发。"
+ascension_materials = ["摩拉", "悠古弦音的残章", "浊水的一滴", "牢固的箭簇", "悠古弦音的断章", "浊水的一掬", "锐利的箭簇", "悠古弦音的乐章", "初生的浊水幻灵", "历战的箭簇"]
+
+[[weapons]]
+name = "戍望谣歌"
+slug = "songofthevigil"
+rarity = 4
+weapon_type = "长柄武器"
+weapon_type_code = "WEAPON_POLE"
+base_atk = 43.7349
+main_stat = "元素精通"
+main_stat_value = "24"
+passive = "旧日和弦"
+passive_detail = "触发元素反应后，为装备者恢复4点元素能量，该效果每9秒至多触发一次；触发星烁反应的12秒内，装备者的攻击力提升20%。装备者处于队伍后台时，依然能触发上述效果。"
+ascension_materials = ["摩拉", "凛雪帝皇的复生", "灵生空根", "幻造萤屑", "凛雪帝皇的庆仪", "灵生分蘖节", "幻造裂晶", "凛雪帝皇的悲恤", "灵生盘枝心", "幻造晶鳞石"]
+
+[[weapons]]
+name = "静水流涌之辉"
+slug = "splendoroftranquilwaters"
+rarity = 5
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 44.3358
+main_stat = "暴击伤害"
+main_stat_value = "19.2%"
+passive = "湖光的朝与暮"
+passive_detail = "装备者的当前生命值提升或降低时，元素战技造成的伤害提升8%，该效果持续6秒，至多叠加3次，每0.2秒至多触发一次；队伍中其他角色的当前生命值提升或降低时，装备者的生命值上限提升14%，该效果持续6秒，至多叠加2次，每0.2秒至多触发一次。装备者处于队伍后台时，依然能触发上述效果。"
+ascension_materials = ["摩拉", "纯圣露滴的滤渣", "浊水的一滴", "异海凝珠", "纯圣露滴的凝华", "浊水的一掬", "异海之块", "纯圣露滴的醴泉", "初生的浊水幻灵", "异色结晶石"]
+
+[[weapons]]
+name = "护摩之杖"
+slug = "staffofhoma"
+rarity = 5
+weapon_type = "长柄武器"
+weapon_type_code = "WEAPON_POLE"
+base_atk = 45.9364
+main_stat = "暴击伤害"
+main_stat_value = "14.4%"
+passive = "无羁的朱赤之蝶"
+passive_detail = "生命值提升20%。此外，基于装备该武器的角色生命值上限的0.8%，获得攻击力加成。当装备该武器的角色生命值低于50%时，进一步获得1%基于生命值上限的攻击力提升。"
+ascension_materials = ["摩拉", "漆黑陨铁的一粒", "地脉的旧枝", "史莱姆凝液", "漆黑陨铁的一片", "地脉的枯叶", "史莱姆清", "漆黑陨铁的一角", "地脉的新芽", "史莱姆原浆"]
+
+[[weapons]]
+name = "赤沙之杖"
+slug = "staffofthescarletsands"
+rarity = 5
+weapon_type = "长柄武器"
+weapon_type_code = "WEAPON_POLE"
+base_atk = 44.3358
+main_stat = "暴击率"
+main_stat_value = "9.6%"
+passive = "蜃气尽头的热梦"
+passive_detail = "基于装备者元素精通的52%，获得攻击力加成。元素战技命中敌人时，将产生持续10秒的「赤沙之梦」效果：基于装备者元素精通的28%，获得攻击力加成，该效果至多叠加3层。"
+ascension_materials = ["摩拉", "绿洲花园的追忆", "混沌容器", "蕈兽孢子", "绿洲花园的恩惠", "混沌模块", "荧光孢粉", "绿洲花园的哀思", "混沌锚栓", "孢囊晶尘"]
+
+[[weapons]]
+name = "祭星者之望"
+slug = "starcallerswatch"
+rarity = 5
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 44.3358
+main_stat = "元素精通"
+main_stat_value = "58"
+passive = "奉予风阳的禋祀"
+passive_detail = "元素精通提升100点。装备者创造护盾后的15秒内，获得「照夜之镜」效果：队伍中自己的当前场上角色对附近的敌人造成的伤害提升28%，每14秒至多获得一次「照夜之镜」效果。"
+ascension_materials = ["摩拉", "谵妄圣主的朽败", "意志破碎的残片", "卫从的木哨", "谵妄圣主的余哀", "意志明晰的寄偶", "战士的铁哨", "谵妄圣主的容光", "意志巡游的符像", "龙冠武士的金哨"]
+
+[[weapons]]
+name = "秘星典谕"
+slug = "starsealededict"
+rarity = 5
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 44.3358
+main_stat = "暴击伤害"
+main_stat_value = "19.2%"
+passive = "辰星的流迹"
+passive_detail = "暴击伤害提升24%。施放元素战技时，装备者获得「晶质调合」效果：元素精通提升48点，持续20秒；持续期间，队伍中附近的角色触发元素反应时，装备者还会获得一层「炬中法度」，使元素精通进一步提升24点，该效果至多叠加3层，持续至「晶质调合」效果结束或再次施放元素战技。\n辉映·星超导：每层「炬中法度」还会使装备者造成的星超导反应伤害的暴击伤害提升12%。\n装备者处于队伍后台时，依然能触发上述效果。"
+ascension_materials = ["摩拉", "凛雪帝皇的复生", "雪结片心", "幻造萤屑", "凛雪帝皇的庆仪", "雪结镜心", "幻造裂晶", "凛雪帝皇的悲恤", "雪结无明心", "幻造晶鳞石"]
+
+[[weapons]]
+name = "弥坚骨"
+slug = "sturdybone"
+rarity = 4
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 43.7349
+main_stat = "攻击力"
+main_stat_value = "6%"
+passive = "陷阵者的自矜"
+passive_detail = "冲刺或替代冲刺的能力消耗的体力降低15%；此外，使用冲刺或替代冲刺的能力后，普通攻击造成的伤害提高，提高数值相当于攻击力的16%，该效果在生效18次或7秒后消失。"
+ascension_materials = ["摩拉", "贡祭炽心的惶恐", "意志破碎的残片", "卫从的木哨", "贡祭炽心的踌躇", "意志明晰的寄偶", "战士的铁哨", "贡祭炽心的决绝", "意志巡游的符像", "龙冠武士的金哨"]
+
+[[weapons]]
+name = "斫峰之刃"
+slug = "summitshaper"
+rarity = 5
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 45.9364
+main_stat = "攻击力"
+main_stat_value = "10.8%"
+passive = "金璋皇极"
+passive_detail = "护盾强效提升20%。攻击命中后的8秒内，攻击力提升4%。该效果至多可叠加5层，每0.3秒只能触发一次。此外，处于护盾庇护下时，该效果的攻击力提升效果提高100%。"
+ascension_materials = ["摩拉", "孤云寒林的光砂", "猎兵祭刀", "破损的面具", "孤云寒林的辉岩", "特工祭刀", "污秽的面具", "孤云寒林的圣骸", "督察长祭刀", "不祥的面具"]
+
+[[weapons]]
+name = "寝正月初晴"
+slug = "sunnymorningsleepin"
+rarity = 5
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 44.3358
+main_stat = "元素精通"
+main_stat_value = "58"
+passive = "一汤二鹰三鸣神"
+passive_detail = "触发扩散、星扩散反应后的6秒内，元素精通提升120点；元素战技命中敌人后的9秒内，元素精通提升96点；元素爆发命中敌人后的30秒内，元素精通提升32点。"
+ascension_materials = ["摩拉", "鸣神御灵的明惠", "聚燃的石块", "浮游干核", "鸣神御灵的欢喜", "聚燃的命种", "浮游幽核", "鸣神御灵的亲爱", "聚燃的游像眼", "浮游晶化核"]
+
+[[weapons]]
+name = "冲浪时光"
+slug = "surfsup"
+rarity = 5
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 44.3358
+main_stat = "暴击伤害"
+main_stat_value = "19.2%"
+passive = "水色回忆"
+passive_detail = "生命值上限提高20%。每15秒一次，施放元素战技后的14秒内，产生如下效果：获得4层「炽夏」，每层使普通攻击造成的伤害提升12%。持续期间内，每1.5秒一次：普通攻击命中敌人后，移除1层；每1.5秒一次：对敌人触发蒸发反应后，增加1层。「炽夏」效果至多叠加4层。"
+ascension_materials = ["摩拉", "贡祭炽心的惶恐", "意志破碎的残片", "稚嫩的尖齿", "贡祭炽心的踌躇", "意志明晰的寄偶", "老练的坚齿", "贡祭炽心的决绝", "意志巡游的符像", "横行霸者的利齿"]
+
+[[weapons]]
+name = "降临之剑"
+slug = "swordofdescension"
+rarity = 4
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 38.7413
+main_stat = "攻击力"
+main_stat_value = "7.7%"
+passive = "降世"
+passive_detail = "仅在以下平台生效：\n\"PlayStation®\"\n普通攻击与重击命中敌人后有50%概率在小范围内造成200%攻击力的伤害。该效果每10秒只能触发一次；此外，旅行者装备降临之剑时，攻击力提升66点。"
+ascension_materials = ["摩拉", "凛风奔狼的始龀", "地脉的旧枝", "寻宝鸦印", "凛风奔狼的裂齿", "地脉的枯叶", "藏银鸦印", "凛风奔狼的断牙", "地脉的新芽", "攫金鸦印"]
+
+[[weapons]]
+name = "水仙十字之剑"
+slug = "swordofnarzissenkreuz"
+rarity = 4
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 42.401
+main_stat = "攻击力"
+main_stat_value = "9%"
+passive = "勇者之剑"
+passive_detail = "装备者不具备「始基力」时：普通攻击、重击、下落攻击命中时，会释放芒性或荒性的能量冲击，造成160%攻击力的伤害。该效果每12秒至多触发一次，能量冲击的类型由水仙十字之剑当前的属性决定。"
+ascension_materials = ["摩拉", "悠古弦音的残章", "老旧的役人怀表", "异海凝珠", "悠古弦音的断章", "役人的制式怀表", "异海之块", "悠古弦音的乐章", "役人的时时刻刻", "异色结晶石"]
+
+[[weapons]]
+name = "香韵奏者"
+slug = "symphonistofscents"
+rarity = 5
+weapon_type = "长柄武器"
+weapon_type_code = "WEAPON_POLE"
+base_atk = 45.9364
+main_stat = "暴击伤害"
+main_stat_value = "14.4%"
+passive = "百味交响"
+passive_detail = "攻击力提升12%；当装备此武器的角色处于队伍后台时，攻击力额外提升12%。进行治疗后，装备者与受到治疗的角色会获得「甘美回奏」的效果，攻击力提升32%，持续3秒。装备者处于队伍后台时，依然能触发上述效果。"
+ascension_materials = ["摩拉", "纯圣露滴的滤渣", "浊水的一滴", "异海凝珠", "纯圣露滴的凝华", "浊水的一掬", "异海之块", "纯圣露滴的醴泉", "初生的浊水幻灵", "异色结晶石"]
+
+[[weapons]]
+name = "聊聊棒"
+slug = "talkingstick"
+rarity = 4
+weapon_type = "双手剑"
+weapon_type_code = "WEAPON_CLAYMORE"
+base_atk = 43.7349
+main_stat = "暴击率"
+main_stat_value = "4%"
+passive = "「伶牙俐齿」"
+passive_detail = "承受火元素附着后的15秒内，攻击力提升16%，每12秒至多触发一次；承受水元素、冰元素、雷元素或草元素附着后的15秒内，所有元素伤害加成提升12%，每12秒至多触发一次。"
+ascension_materials = ["摩拉", "绿洲花园的追忆", "残毁的横脊", "史莱姆凝液", "绿洲花园的恩惠", "密固的横脊", "史莱姆清", "绿洲花园的哀思", "锲纹的横脊", "史莱姆原浆"]
+
+[[weapons]]
+name = "且住亭御咄"
+slug = "tamayurateinoohanashi"
+rarity = 4
+weapon_type = "长柄武器"
+weapon_type_code = "WEAPON_POLE"
+base_atk = 43.7349
+main_stat = "元素充能效率"
+main_stat_value = "6.7%"
+passive = "好事者奔行灯"
+passive_detail = "施放元素战技时，提高20%攻击力和10%移动速度，持续10秒。"
+ascension_materials = ["摩拉", "今昔剧画之恶尉", "折光的胚芽", "破旧的刀镡", "今昔剧画之虎啮", "惑光的阔叶", "影打刀镡", "今昔剧画之一角", "迷光的蜷叶之心", "名刀镡"]
+
+[[weapons]]
+name = "暗巷闪光"
+slug = "thealleyflash"
+rarity = 4
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 45.0687
+main_stat = "元素精通"
+main_stat_value = "12"
+passive = "街巷游侠"
+passive_detail = "角色造成的伤害提升12%。受到伤害后，该伤害提升效果会失效5秒。"
+ascension_materials = ["摩拉", "高塔孤王的破瓦", "沉重号角", "导能绘卷", "高塔孤王的残垣", "黑铜号角", "封魔绘卷", "高塔孤王的断片", "黑晶号角", "禁咒绘卷"]
+
+[[weapons]]
+name = "钟剑"
+slug = "thebell"
+rarity = 4
+weapon_type = "双手剑"
+weapon_type_code = "WEAPON_CLAYMORE"
+base_atk = 42.401
+main_stat = "生命值"
+main_stat_value = "9%"
+passive = "叛逆的守护者"
+passive_detail = "受到伤害时，生成一个伤害吸收量等同于生命值上限20%的护盾，持续10秒或直到护盾失效,每45秒只能触发一次。角色处于护盾庇护下时，造成的伤害提升12%。"
+ascension_materials = ["摩拉", "高塔孤王的破瓦", "沉重号角", "骗骗花蜜", "高塔孤王的残垣", "黑铜号角", "微光花蜜", "高塔孤王的断片", "黑晶号角", "原素花蜜"]
+
+[[weapons]]
+name = "黑剑"
+slug = "theblacksword"
+rarity = 4
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 42.401
+main_stat = "暴击率"
+main_stat_value = "6%"
+passive = "「正义」"
+passive_detail = "普通攻击与重击的造成的伤害提升20%；此外，普通攻击与重击暴击时，回复等同于攻击力60%的生命值。该效果每5秒至多发动一次。"
+ascension_materials = ["摩拉", "凛风奔狼的始龀", "地脉的旧枝", "史莱姆凝液", "凛风奔狼的裂齿", "地脉的枯叶", "史莱姆清", "凛风奔狼的断牙", "地脉的新芽", "史莱姆原浆"]
+
+[[weapons]]
+name = "「渔获」"
+slug = "thecatch"
+rarity = 4
+weapon_type = "长柄武器"
+weapon_type_code = "WEAPON_POLE"
+base_atk = 42.401
+main_stat = "元素充能效率"
+main_stat_value = "10%"
+passive = "船歌"
+passive_detail = "元素爆发造成的伤害提升16%，元素爆发的暴击率提升6%。"
+ascension_materials = ["摩拉", "今昔剧画之恶尉", "混沌机关", "浮游干核", "今昔剧画之虎啮", "混沌枢纽", "浮游幽核", "今昔剧画之一角", "混沌真眼", "浮游晶化核"]
+
+[[weapons]]
+name = "黎明破晓之史"
+slug = "thedaybreakchronicles"
+rarity = 5
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 47.537
+main_stat = "暴击伤害"
+main_stat_value = "9.6%"
+passive = "悠远的流颂之歌"
+passive_detail = "装备者获得「渐起的晓风」：脱离战斗状态3秒后，普通攻击、元素战技和元素爆发造成的伤害提升60%。在战斗状态下，上述伤害提升效果每秒降低10%，直到降低至0%；装备者的普通攻击、元素战技或元素爆发命中敌人时，对应类别的伤害提升效果提升10%，直到提升至60%，上述每种类别的攻击每0.1秒至多触发一次该效果。装备者处于队伍后台时，依然能触发上述效果。\n此外，队伍拥有「魔导·秘仪」效果时，装备者的普通攻击、元素战技或元素爆发命中敌人时，改为使所有类别的伤害提升效果提升20%。"
+ascension_materials = ["摩拉", "狮牙斗士的枷锁", "沉重号角", "寻宝鸦印", "狮牙斗士的铁链", "黑铜号角", "藏银鸦印", "狮牙斗士的镣铐", "黑晶号角", "攫金鸦印"]
+
+[[weapons]]
+name = "船坞长剑"
+slug = "thedockhandsassistant"
+rarity = 4
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 42.401
+main_stat = "生命值"
+main_stat_value = "9%"
+passive = "船工号子"
+passive_detail = "受到治疗或进行治疗时，将赋予一枚坚忍标记，持续30秒，至多拥有三枚坚忍标记。施放元素战技或元素爆发时，将消耗所有的坚忍标记，产生持续10秒的「奋起」效果：每枚消耗的坚忍标记提高40点元素精通，并在效果产生2秒后，每枚消耗的坚忍标记为装备者恢复2点元素能量。每15秒至多触发一次奋起效果；角色处于队伍后台时也能获得坚忍标记。"
+ascension_materials = ["摩拉", "纯圣露滴的滤渣", "老旧的役人怀表", "异海凝珠", "纯圣露滴的凝华", "役人的制式怀表", "异海之块", "纯圣露滴的醴泉", "役人的时时刻刻", "异色结晶石"]
+
+[[weapons]]
+name = "最初的大魔术"
+slug = "thefirstgreatmagic"
+rarity = 5
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 45.9364
+main_stat = "暴击伤害"
+main_stat_value = "14.4%"
+passive = "伟大者帕西法尔"
+passive_detail = "重击造成的伤害提升16%；队伍中每存在一位与装备者元素类型相同的角色（包括装备者自身），将获得1层「手法」效果；每存在一位元素类型不同的角色，将获得1层「演技」效果。处于1/2/3层及以上「手法」效果下时，攻击力提升16%/32%/48%；处于1/2/3层及以上「演技」效果下时，移动速度提升4%/7%/10%。"
+ascension_materials = ["摩拉", "悠古弦音的残章", "浊水的一滴", "异海凝珠", "悠古弦音的断章", "浊水的一掬", "异海之块", "悠古弦音的乐章", "初生的浊水幻灵", "异色结晶石"]
+
+[[weapons]]
+name = "笛剑"
+slug = "theflute"
+rarity = 4
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 42.401
+main_stat = "攻击力"
+main_stat_value = "9%"
+passive = "和弦"
+passive_detail = "普通攻击或重击命中时，会获得一个和音。积攒了5个和音后，释放音律的力量，对周围的敌人造成100%攻击力的伤害。和音最多存在30秒，每0.5秒至多获得1个和音。"
+ascension_materials = ["摩拉", "凛风奔狼的始龀", "地脉的旧枝", "史莱姆凝液", "凛风奔狼的裂齿", "地脉的枯叶", "史莱姆清", "凛风奔狼的断牙", "地脉的新芽", "史莱姆原浆"]
+
+[[weapons]]
+name = "绝弦"
+slug = "thestringless"
+rarity = 4
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 42.401
+main_stat = "元素精通"
+main_stat_value = "36"
+passive = "无矢之歌"
+passive_detail = "元素战技与元素爆发的伤害提高24%。"
+ascension_materials = ["摩拉", "高塔孤王的破瓦", "沉重号角", "牢固的箭簇", "高塔孤王的残垣", "黑铜号角", "锐利的箭簇", "高塔孤王的断片", "黑晶号角", "历战的箭簇"]
+
+[[weapons]]
+name = "无工之剑"
+slug = "theunforged"
+rarity = 5
+weapon_type = "双手剑"
+weapon_type_code = "WEAPON_CLAYMORE"
+base_atk = 45.9364
+main_stat = "攻击力"
+main_stat_value = "10.8%"
+passive = "金璋皇极"
+passive_detail = "护盾强效提升20%。攻击命中后的8秒内，攻击力提升4%。该效果至多可叠加5层，每0.3秒只能触发一次。此外，处于护盾庇护下时，该效果的攻击力提升效果提高100%。"
+ascension_materials = ["摩拉", "雾海云间的铅丹", "雾虚花粉", "寻宝鸦印", "雾海云间的汞丹", "雾虚草囊", "藏银鸦印", "雾海云间的金丹", "雾虚灯芯", "攫金鸦印"]
+
+[[weapons]]
+name = "苍翠猎弓"
+slug = "theviridescenthunt"
+rarity = 4
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 42.401
+main_stat = "暴击率"
+main_stat_value = "6%"
+passive = "苍翠之风"
+passive_detail = "普通攻击与重击命中时，有50%几率生成一个风之眼，持续吸引周围敌人，并对其中的敌人每0.5秒造成40%攻击的伤害。该效果持续4秒，每14秒至多触发一次。"
+ascension_materials = ["摩拉", "高塔孤王的破瓦", "沉重号角", "牢固的箭簇", "高塔孤王的残垣", "黑铜号角", "锐利的箭簇", "高塔孤王的断片", "黑晶号角", "历战的箭簇"]
+
+[[weapons]]
+name = "流浪乐章"
+slug = "thewidsith"
+rarity = 4
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 42.401
+main_stat = "暴击伤害"
+main_stat_value = "12%"
+passive = "登场乐"
+passive_detail = "角色登场时，随机获得一个主题曲，持续10秒。每30秒只能触发一次。宣叙调：攻击力提升60%；咏叹调：全元素伤害提升48%;间奏曲：元素精通提升240。"
+ascension_materials = ["摩拉", "凛风奔狼的始龀", "地脉的旧枝", "破损的面具", "凛风奔狼的裂齿", "地脉的枯叶", "污秽的面具", "凛风奔狼的断牙", "地脉的新芽", "不祥的面具"]
+
+[[weapons]]
+name = "讨龙英杰谭"
+slug = "thrillingtalesofdragonslayers"
+rarity = 3
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 38.7413
+main_stat = "生命值"
+main_stat_value = "7.7%"
+passive = "传承"
+passive_detail = "主动切换角色时，新登场的角色攻击力提升24%，持续10秒。该效果每20秒只能触发一次。"
+ascension_materials = ["摩拉", "凛风奔狼的始龀", "地脉的旧枝", "导能绘卷", "凛风奔狼的裂齿", "地脉的枯叶", "封魔绘卷", "凛风奔狼的断牙", "地脉的新芽", "禁咒绘卷"]
+
+[[weapons]]
+name = "飞雷之弦振"
+slug = "thunderingpulse"
+rarity = 5
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 45.9364
+main_stat = "暴击伤害"
+main_stat_value = "14.4%"
+passive = "飞雷御执"
+passive_detail = "攻击力提高20%，并能获得「飞雷之巴印」的威势。飞雷之巴印：持有1/2/3层飞雷之巴印时，普通攻击造成的伤害提高12/24/40%。在下列情况下，角色将各获得1层飞雷之巴印：普通攻击造成伤害时，持续5秒；施放元素战技时，持续10秒；此外，角色元素能量低于100%时，将获得1层飞雷之巴印，此飞雷之巴印会在角色的元素能量充满时消失。每层飞雷之巴印的持续时间独立计算。"
+ascension_materials = ["摩拉", "鸣神御灵的明惠", "黯淡棱镜", "牢固的箭簇", "鸣神御灵的欢喜", "水晶棱镜", "锐利的箭簇", "鸣神御灵的亲爱", "偏光棱镜", "历战的箭簇"]
+
+[[weapons]]
+name = "浪影阔剑"
+slug = "tidalshadow"
+rarity = 4
+weapon_type = "双手剑"
+weapon_type_code = "WEAPON_CLAYMORE"
+base_atk = 42.401
+main_stat = "攻击力"
+main_stat_value = "9%"
+passive = "巡航的白浪"
+passive_detail = "受到治疗后，攻击力提升24%，持续8秒。角色处于队伍后台也能触发。"
+ascension_materials = ["摩拉", "无垢之海的苦盏", "隙间之核", "啮合齿轮", "无垢之海的酒盏", "外世突触", "机关正齿轮", "无垢之海的银杯", "异界生命核", "奇械机芯齿轮"]
+
+[[weapons]]
+name = "万世流涌大典"
+slug = "tomeoftheeternalflow"
+rarity = 5
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 44.3358
+main_stat = "暴击伤害"
+main_stat_value = "19.2%"
+passive = "万世的浪涛"
+passive_detail = "生命值提升16%。当前生命值提升或降低时，重击造成的伤害提升14%。该效果持续4秒，至多叠加3次，每0.3秒至多触发一次；叠加至3层或3层的持续时间刷新时，恢复8点元素能量，每12秒至多通过这种方式恢复一次元素能量。"
+ascension_materials = ["摩拉", "纯圣露滴的滤渣", "隙间之核", "啮合齿轮", "纯圣露滴的凝华", "外世突触", "机关正齿轮", "纯圣露滴的醴泉", "异界生命核", "奇械机芯齿轮"]
+
+[[weapons]]
+name = "东花坊时雨"
+slug = "toukaboushigure"
+rarity = 4
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 42.401
+main_stat = "元素精通"
+main_stat_value = "36"
+passive = "怪谭·时雨心地一本足"
+passive_detail = "攻击命中敌人后，会为命中的一名敌人施加「纸伞作祟」状态，持续10秒。该效果每15秒至多触发一次；持续期间该敌人被击败时，将清除该效果的冷却时间。装备者对处于「纸伞作祟」状态下的敌人造成的伤害提升16%。"
+ascension_materials = ["摩拉", "鸣神御灵的明惠", "破缺棱晶", "破旧的刀镡", "鸣神御灵的欢喜", "混浊棱晶", "影打刀镡", "鸣神御灵的亲爱", "辉光棱晶", "名刀镡"]
+
+[[weapons]]
+name = "旅行剑"
+slug = "travelershandysword"
+rarity = 3
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 39.8751
+main_stat = "防御力"
+main_stat_value = "6.4%"
+passive = "旅程"
+passive_detail = "获得元素晶球或元素微粒时，恢复1%生命值。"
+ascension_materials = ["摩拉", "狮牙斗士的枷锁", "混沌装置", "导能绘卷", "狮牙斗士的铁链", "混沌回路", "封魔绘卷", "狮牙斗士的镣铐", "混沌炉心", "禁咒绘卷"]
+
+[[weapons]]
+name = "图莱杜拉的回忆"
+slug = "tulaytullahsremembrance"
+rarity = 5
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 47.537
+main_stat = "暴击伤害"
+main_stat_value = "9.6%"
+passive = "堙没的蓝宝石泪滴"
+passive_detail = "普通攻击速度提升10%；施放元素战技后的14秒内：普通攻击造成的伤害每1秒提升4.8%；普通攻击命中敌人后，普通攻击造成的伤害提升9.6%，该效果每0.3秒至多触发1次。持续期间内，普通攻击造成的伤害至多通过上述效果提升至48%。角色退场时将移除效果，再次施放元素战技时会先移除原有的效果。"
+ascension_materials = ["摩拉", "烈日威权的残响", "失活菌核", "蕈兽孢子", "烈日威权的余光", "休眠菌核", "荧光孢粉", "烈日威权的梦想", "茁壮菌核", "孢囊晶尘"]
+
+[[weapons]]
+name = "甲级宝珏"
+slug = "twinnephrite"
+rarity = 3
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 39.8751
+main_stat = "暴击率"
+main_stat_value = "3.4%"
+passive = "奔袭战术"
+passive_detail = "击败敌人后的15秒内，移动速度和攻击力提升12%。"
+ascension_materials = ["摩拉", "雾海云间的铅丹", "雾虚花粉", "新兵的徽记", "雾海云间的汞丹", "雾虚草囊", "士官的徽记", "雾海云间的金丹", "雾虚灯芯", "尉官的徽记"]
+
+[[weapons]]
+name = "「究极霸王超级魔剑」"
+slug = "ultimateoverlordsmegamagicsword"
+rarity = 4
+weapon_type = "双手剑"
+weapon_type_code = "WEAPON_CLAYMORE"
+base_atk = 43.7349
+main_stat = "元素充能效率"
+main_stat_value = "6.7%"
+passive = "加油！"
+passive_detail = "攻击力提升12%。不仅如此！海沫村中曾蒙你帮助的美露莘们的声援心意充满了力量，依照她们的数目，攻击力至多进一步提升12%。"
+ascension_materials = ["摩拉", "无垢之海的苦盏", "老旧的役人怀表", "啮合齿轮", "无垢之海的酒盏", "役人的制式怀表", "机关正齿轮", "无垢之海的银杯", "役人的时时刻刻", "奇械机芯齿轮"]
+
+[[weapons]]
+name = "有乐御簾切"
+slug = "urakumisugiri"
+rarity = 5
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 44.3358
+main_stat = "暴击伤害"
+main_stat_value = "19.2%"
+passive = "锦之花与龛中剑"
+passive_detail = "普通攻击造成的伤害提升16%，元素战技造成的伤害提升24%；队伍中附近的角色在场上造成岩元素伤害后，上述效果进一步提升100%，持续15秒。此外，装备者的防御力提升20%。"
+ascension_materials = ["摩拉", "远海夷地的瑚枝", "混沌机关", "破旧的刀镡", "远海夷地的玉枝", "混沌枢纽", "影打刀镡", "远海夷地的琼枝", "混沌真眼", "名刀镡"]
+
+[[weapons]]
+name = "裁断"
+slug = "verdict"
+rarity = 5
+weapon_type = "双手剑"
+weapon_type_code = "WEAPON_CLAYMORE"
+base_atk = 47.537
+main_stat = "暴击率"
+main_stat_value = "4.8%"
+passive = "诸多朝与暮的誓约"
+passive_detail = "攻击力提升20%；队伍中的角色获取结晶反应产生的晶片或触发月结晶反应时，会为装备者赋予1枚「约印」，使元素战技造成的伤害提升18%，约印持续15秒，至多同时持有2枚。所有约印将在装备者的元素战技造成伤害后的0.2秒后移除。每1秒至多通过月结晶反应获取1枚「约印」。"
+ascension_materials = ["摩拉", "悠古弦音的残章", "隙间之核", "啮合齿轮", "悠古弦音的断章", "外世突触", "机关正齿轮", "悠古弦音的乐章", "异界生命核", "奇械机芯齿轮"]
+
+[[weapons]]
+name = "溢彩心念"
+slug = "vividnotions"
+rarity = 5
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 47.537
+main_stat = "暴击伤害"
+main_stat_value = "9.6%"
+passive = "落虹之愿"
+passive_detail = "攻击力提升28%；进行下落攻击时，获得「初霞之彩」效果：下落攻击造成的暴击伤害提升28%；施放元素战技或元素爆发时，获得「苍暮之辉」效果：下落攻击造成的暴击伤害提升40%；上述两种效果各自持续15秒，并将在坠地冲击命中后的0.1秒后解除。"
+ascension_materials = ["摩拉", "谵妄圣主的朽败", "冷裂壳块", "稚嫩的尖齿", "谵妄圣主的余哀", "蕴热的背壳", "老练的坚齿", "谵妄圣主的容光", "明燃的棱状壳", "横行霸者的利齿"]
+
+[[weapons]]
+name = "贯虹之槊"
+slug = "vortexvanquisher"
+rarity = 5
+weapon_type = "长柄武器"
+weapon_type_code = "WEAPON_POLE"
+base_atk = 45.9364
+main_stat = "攻击力"
+main_stat_value = "10.8%"
+passive = "金璋皇极"
+passive_detail = "护盾强效提升20%。攻击命中后的8秒内，攻击力提升4%。该效果至多可叠加5层，每0.3秒只能触发一次。此外，处于护盾庇护下时，该效果的攻击力提升效果提高100%。"
+ascension_materials = ["摩拉", "漆黑陨铁的一粒", "脆弱的骨片", "寻宝鸦印", "漆黑陨铁的一片", "结实的骨片", "藏银鸦印", "漆黑陨铁的一角", "石化的骨片", "攫金鸦印"]
+
+[[weapons]]
+name = "流浪的晚星"
+slug = "wanderingevenstar"
+rarity = 4
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 42.401
+main_stat = "元素精通"
+main_stat_value = "36"
+passive = "林野晚星"
+passive_detail = "每10秒，产生如下效果：基于装备者的元素精通的24%，提升该角色的攻击力，并基于该提升的30%为队伍中附近的其他角色提升攻击力，持续12秒，多件同名武器产生的此效果可以叠加。角色处于队伍后台时也能触发效果。"
+ascension_materials = ["摩拉", "绿洲花园的追忆", "失活菌核", "蕈兽孢子", "绿洲花园的恩惠", "休眠菌核", "荧光孢粉", "绿洲花园的哀思", "茁壮菌核", "孢囊晶尘"]
+
+[[weapons]]
+name = "训练大剑"
+slug = "wastergreatsword"
+rarity = 1
+weapon_type = "双手剑"
+weapon_type_code = "WEAPON_CLAYMORE"
+base_atk = 23.245
+main_stat = ""
+main_stat_value = ""
+passive = ""
+passive_detail = ""
+ascension_materials = ["摩拉", "凛风奔狼的始龀", "地脉的旧枝", "史莱姆凝液", "凛风奔狼的裂齿", "地脉的枯叶", "史莱姆清", "凛风奔狼的断牙"]
+
+[[weapons]]
+name = "断浪长鳍"
+slug = "wavebreakersfin"
+rarity = 4
+weapon_type = "长柄武器"
+weapon_type_code = "WEAPON_POLE"
+base_atk = 45.0687
+main_stat = "攻击力"
+main_stat_value = "3%"
+passive = "驭浪的海祇民"
+passive_detail = "队伍中所有角色的元素能量上限的总和，每1点能使装备此武器的角色的元素爆发造成的伤害提高0.12%，通过这种方式，元素爆发造成的伤害至多提高40%。"
+ascension_materials = ["摩拉", "今昔剧画之恶尉", "隐兽指爪", "破旧的刀镡", "今昔剧画之虎啮", "隐兽利爪", "影打刀镡", "今昔剧画之一角", "隐兽鬼爪", "名刀镡"]
+
+[[weapons]]
+name = "乘浪的回旋"
+slug = "waveridingwhirl"
+rarity = 4
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 41.0671
+main_stat = "元素充能效率"
+main_stat_value = "13.3%"
+passive = "长牙飞去来"
+passive_detail = "游泳消耗的体力降低15%。此外，施放元素战技后的10秒内，生命值上限提升20%，队伍中每存在一位水元素类型的角色，生命值上限将进一步提升12%，至多通过这种方式提升24%，该效果每15秒至多触发一次。"
+ascension_materials = ["摩拉", "贡祭炽心的惶恐", "意志破碎的残片", "稚嫩的尖齿", "贡祭炽心的踌躇", "意志明晰的寄偶", "老练的坚齿", "贡祭炽心的决绝", "意志巡游的符像", "横行霸者的利齿"]
+
+[[weapons]]
+name = "白影剑"
+slug = "whiteblind"
+rarity = 4
+weapon_type = "双手剑"
+weapon_type_code = "WEAPON_CLAYMORE"
+base_atk = 42.401
+main_stat = "防御力"
+main_stat_value = "11.3%"
+passive = "注能之锋"
+passive_detail = "普通攻击和重击命中后，攻击力和防御力提高6%。该效果持续6秒，最多叠加4层，每0.5秒只能触发一次。"
+ascension_materials = ["摩拉", "孤云寒林的光砂", "猎兵祭刀", "寻宝鸦印", "孤云寒林的辉岩", "特工祭刀", "藏银鸦印", "孤云寒林的圣骸", "督察长祭刀", "攫金鸦印"]
+
+[[weapons]]
+name = "白铁大剑"
+slug = "whiteirongreatsword"
+rarity = 3
+weapon_type = "双手剑"
+weapon_type_code = "WEAPON_CLAYMORE"
+base_atk = 38.7413
+main_stat = "防御力"
+main_stat_value = "9.6%"
+passive = "收割"
+passive_detail = "击败敌人时，恢复8%生命值。"
+ascension_materials = ["摩拉", "狮牙斗士的枷锁", "混沌装置", "史莱姆凝液", "狮牙斗士的铁链", "混沌回路", "史莱姆清", "狮牙斗士的镣铐", "混沌炉心", "史莱姆原浆"]
+
+[[weapons]]
+name = "白湖冬羽"
+slug = "whitelakefrostfeather"
+rarity = 5
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 47.537
+main_stat = "暴击率"
+main_stat_value = "4.8%"
+passive = "雪鹄的终幕舞"
+passive_detail = "装备者的元素战技命中敌人时，获得「湖色的哀告」：攻击力提升8%，持续8秒，至多叠加3层，每0.1秒至多触发一次，每层持续时间独立计算；持有3层时，装备者造成的星烁反应伤害的暴击伤害提升50%，且触发星烁反应或造成星烁反应伤害时，还会使装备者恢复4点元素能量。上述恢复元素能量的效果每3.5秒至多触发一次。装备者处于队伍后台时，依然能触发上述效果。"
+ascension_materials = ["摩拉", "藏窖灵浆的斟酌", "灵生空根", "嵌合种", "藏窖灵浆的酩酊", "灵生分蘖节", "并生嵌合胞", "藏窖灵浆的酣畅", "灵生盘枝心", "源生嵌合体"]
+
+[[weapons]]
+name = "白缨枪"
+slug = "whitetassel"
+rarity = 3
+weapon_type = "长柄武器"
+weapon_type_code = "WEAPON_POLE"
+base_atk = 38.7413
+main_stat = "暴击率"
+main_stat_value = "5.1%"
+passive = "锐利"
+passive_detail = "普通攻击造成的伤害提升24%。"
+ascension_materials = ["摩拉", "孤云寒林的光砂", "猎兵祭刀", "新兵的徽记", "孤云寒林的辉岩", "特工祭刀", "士官的徽记", "孤云寒林的圣骸", "督察长祭刀", "尉官的徽记"]
+
+[[weapons]]
+name = "风花之颂"
+slug = "windblumeode"
+rarity = 4
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 42.401
+main_stat = "元素精通"
+main_stat_value = "36"
+passive = "风花之愿"
+passive_detail = "施放元素战技时，获得风之花的悠古愿望加持，攻击力提升16%，持续6秒。"
+ascension_materials = ["摩拉", "狮牙斗士的枷锁", "地脉的旧枝", "骗骗花蜜", "狮牙斗士的铁链", "地脉的枯叶", "微光花蜜", "狮牙斗士的镣铐", "地脉的新芽", "原素花蜜"]
+
+[[weapons]]
+name = "暗巷的酒与诗"
+slug = "wineandsong"
+rarity = 4
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 43.7349
+main_stat = "元素充能效率"
+main_stat_value = "6.7%"
+passive = "变化万端"
+passive_detail = "普通攻击命中敌人后，冲刺或替代冲刺的能力消耗的体力降低14%，持续5秒。此外，使用冲刺或替代冲刺的能力后，攻击力提升20%，持续5秒。"
+ascension_materials = ["摩拉", "凛风奔狼的始龀", "地脉的旧枝", "寻宝鸦印", "凛风奔狼的裂齿", "地脉的枯叶", "藏银鸦印", "凛风奔狼的断牙", "地脉的新芽", "攫金鸦印"]
+
+[[weapons]]
+name = "凝雪沉心"
+slug = "wintersheavyheart"
+rarity = 4
+weapon_type = "法器"
+weapon_type_code = "WEAPON_CATALYST"
+base_atk = 42.401
+main_stat = "暴击伤害"
+main_stat_value = "12%"
+passive = "寒霜的遗秘"
+passive_detail = "装备者获得「银染的血契」：队伍中每存在一位冰元素类型的角色，装备者的元素精通提升24点；队伍中每存在一位雷元素类型的角色，装备者的攻击力提升4.8%。至多4位冰元素类型或雷元素类型的角色可以提供上述效果。\n辉映·星烁：「银染的血契」效果改为：队伍中每存在一位冰元素类型或雷元素类型的角色，装备者的元素精通提升20点，造成的星烁反应伤害提升6%。"
+ascension_materials = ["摩拉", "凛雪帝皇的复生", "灵生空根", "幻造萤屑", "凛雪帝皇的庆仪", "灵生分蘖节", "幻造裂晶", "凛雪帝皇的悲恤", "灵生盘枝心", "幻造晶鳞石"]
+
+[[weapons]]
+name = "狼牙"
+slug = "wolffang"
+rarity = 4
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 42.401
+main_stat = "暴击率"
+main_stat_value = "6%"
+passive = "苍狼北风"
+passive_detail = "元素战技与元素爆发造成的伤害提升16%。元素战技命中敌人时，元素战技的暴击率提升2%；元素爆发命中敌人时，元素爆发的暴击率提升2%。上述两种效果各自持续10秒，至多叠加4次，每0.1秒至多触发一次。"
+ascension_materials = ["摩拉", "高塔孤王的破瓦", "混沌装置", "破损的面具", "高塔孤王的残垣", "混沌回路", "污秽的面具", "高塔孤王的断片", "混沌炉心", "不祥的面具"]
+
+[[weapons]]
+name = "狼的末路"
+slug = "wolfsgravestone"
+rarity = 5
+weapon_type = "双手剑"
+weapon_type_code = "WEAPON_CLAYMORE"
+base_atk = 45.9364
+main_stat = "攻击力"
+main_stat_value = "10.8%"
+passive = "如狼般狩猎者"
+passive_detail = "攻击力提高20%；攻击命中生命值低于30%的敌人时，队伍中所有成员的攻击力提高40%，持续12秒。该效果30秒只能触发一次。"
+ascension_materials = ["摩拉", "狮牙斗士的枷锁", "混沌装置", "导能绘卷", "狮牙斗士的铁链", "混沌回路", "封魔绘卷", "狮牙斗士的镣铐", "混沌炉心", "禁咒绘卷"]
+
+[[weapons]]
+name = "西福斯的月光"
+slug = "xiphosmoonlight"
+rarity = 4
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 42.401
+main_stat = "元素精通"
+main_stat_value = "36"
+passive = "镇灵的低语"
+passive_detail = "每10秒，产生如下效果：装备者的每点元素精通，都会为该角色提升0.036%元素充能效率，并基于该提升的30%为队伍中附近的其他角色提升元素充能效率，持续12秒，多件同名武器产生的此效果可以叠加。角色处于队伍后台时也能触发效果。"
+ascension_materials = ["摩拉", "谧林涓露的铜符", "破缺棱晶", "褪色红绸", "谧林涓露的铁符", "混浊棱晶", "镶边红绸", "谧林涓露的银符", "辉光棱晶", "织金红绸"]

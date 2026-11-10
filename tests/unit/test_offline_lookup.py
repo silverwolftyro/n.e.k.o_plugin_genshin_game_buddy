@@ -108,7 +108,15 @@ async def test_lookup__offline__material_is_found(build_plugin: Any) -> None:
 
 @pytest.mark.integration
 async def test_lookup__offline__natural_language_query_also_hits(build_plugin: Any) -> None:
-    """自然语言问句里也能命中（不是只认"恰好等于名字"的查询）。"""
+    """自然语言问句里也能命中（不是只认"恰好等于名字"的查询）。
+
+    ★ 2026-11-11（数据扩全量）：这条断言的方向变了。
+      原断言是 ``"天空之刃" not in keys``，理由是"genshin-db 最小集里不存在，
+      不该凭空捏造"。**那个前提只在最小集成立**——上游 genshin-db 一直有
+      「天空之刃」（slug ``skywardblade``），只是最小集当初没收录它。
+      数据扩到上游全量后它自然出现了，所以现在断言它**在** keys 里；
+      "不凭空捏造"这条底线改由"表里没有的名字不出现"来守住（见下一条用例）。
+    """
     plugin = await _genshin(build_plugin)
 
     result = await plugin.lookup_game_term(query="风鹰剑和天空之刃哪个好？")
@@ -116,8 +124,22 @@ async def test_lookup__offline__natural_language_query_also_hits(build_plugin: A
     assert output["found"] is True
     keys = [entry["key"] for entry in output["entries"]]
     assert "风鹰剑" in keys
-    # "天空之刃"在 genshin-db 最小集里不存在（表里是"天空之翼"）——不该凭空捏造
-    assert "天空之刃" not in keys
+    assert "天空之刃" in keys
+
+
+@pytest.mark.integration
+async def test_lookup__offline__still_does_not_fabricate_entries(build_plugin: Any) -> None:
+    """底线不变：表里没有的名字**不出现**（不编造）。
+
+    ★ 2026-11-11：这条从上一条里独立出来——上一条改的是"上游有但最小集没收"的
+      条目，这一条守的是"上游根本没有"的条目，两者不能混。
+    """
+    plugin = await _genshin(build_plugin)
+
+    result = await plugin.lookup_game_term(query="风鹰剑并不存在的武器哪个好？")
+    output = result["output"]
+    keys = [entry["key"] for entry in output["entries"]]
+    assert "并不存在的武器" not in keys
 
 
 # =============================================================================

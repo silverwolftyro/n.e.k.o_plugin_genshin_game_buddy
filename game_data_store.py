@@ -19,6 +19,10 @@
 覆盖层（用户侧改写）机制目前只作用于 ``term_store`` 的四个术语维度与
 ``scenes.toml``；本模块读取的是包内只读数据文件，不支持覆盖层。
 
+★ 2026-11-11：数据从最小集扩到**上游全量**（武器 254 / 圣遗物 63 / 材料 916）。
+查询接口未变；只有 ``MaterialEntry.summary()`` 的标签渲染修了一处
+（上游 29 条材料没有 ``typeText``，旧的 ``.rstrip("】")`` 会渲染出半个括号）。
+
 用法::
 
     from game_data_store import load_game_data
@@ -125,8 +129,13 @@ class MaterialEntry:
     description: str = ""
 
     def summary(self) -> str:
-        """一行摘要，给 LLM 直接用。"""
-        parts = [f"【{self.name}】{self.category_text}".rstrip("】")]
+        """一行摘要，给 LLM 直接用。
+
+        ★ 2026-11-11：标签不再 ``.rstrip("】")``。上游有 29 条材料**没有**
+          ``typeText``，``rstrip`` 会把闭合括号一并去掉、渲染成 ``【药材研析仪``。
+          现在空类别时保留成对括号 ``【药材研析仪】``。
+        """
+        parts = [f"【{self.name}】{self.category_text}"]
         if self.sources:
             parts.append("获取途径：" + "、".join(self.sources))
         elif self.description:
