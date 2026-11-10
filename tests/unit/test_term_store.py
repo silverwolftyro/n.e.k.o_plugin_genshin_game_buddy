@@ -20,6 +20,17 @@ from plugin.plugins.genshin_game_buddy.term_store import (
 
 REAL_GAMES = ("genshin", "wuthering_waves")
 
+#: ``terms/<game>/`` 下**允许存在、但不是术语维度**的文件（按 stem 判定）。
+#:
+#: - ``scenes`` —— 场景定义，走独立的场景加载器（``scene_store``），不是术语维度；
+#: - ``weapons`` / ``artifacts`` / ``materials`` —— 原神攻略**离线数据**，
+#:   由 ``tools/fetch_genshin_db.py`` 在开发期从 genshin-db 落地，运行时只读，
+#:   ``term_store`` 不加载它们（维度白名单仍然只有四个）。
+#:
+#: 这份名单是**显式**的：既保证"拼错名的野文件"仍然会被这条用例逮到，
+#: 又允许 terms 目录承载第二类（非术语）数据文件。
+NON_DIMENSION_FILES = frozenset({"scenes", "weapons", "artifacts", "materials"})
+
 NOTE_MARKER = "NOTES-MARKER-7f31c9"
 
 
@@ -115,8 +126,8 @@ def test_terms__real_tree__no_unknown_dimension_files() -> None:
         if not game_dir.is_dir():
             continue
         for path in game_dir.glob("*.toml"):
-            if path.stem == "scenes":
-                continue  # scenes.toml is scene definition, not a term dimension
+            if path.stem in NON_DIMENSION_FILES:
+                continue  # 非术语维度文件：见 NON_DIMENSION_FILES 的说明
             assert path.stem in DIMENSIONS, f"unexpected dimension file: {path}"
 
 

@@ -1,0 +1,47 @@
+schema_version = 1
+generated_at = "2026-11-10T10:15:19+08:00"
+source = "genshin-db (theBowja/genshin-db)"
+source_repo = "https://github.com/theBowja/genshin-db"
+source_commit = "8e5badd60b5d894284ccc927a56c9683529d2592"
+source_path = "src/data/ChineseSimplified/artifacts/*.json"
+source_license = "MIT（上游仓库 LICENSE；本插件只取名称/数值/效果描述等事实性数据）"
+
+[[artifacts]]
+name = "绝缘之旗印"
+slug = "emblemofseveredfate"
+rarity = [4, 5]
+effect_2pc = "元素充能效率提高20%。"
+effect_4pc = "基于元素充能效率的25%，提高元素爆发造成的伤害。至多通过这种方式获得75%提升。"
+pieces = ["明威之镡", "切落之羽", "雷云之笼", "绯花之壶", "华饰之兜"]
+
+[[artifacts]]
+name = "沉沦之心"
+slug = "heartofdepth"
+rarity = [4, 5]
+effect_2pc = "获得15%水元素伤害加成。"
+effect_4pc = "施放元素战技后的15秒内，普通攻击与重击造成的伤害提高30%。"
+pieces = ["饰金胸花", "追忆之风", "坚铜罗盘", "沉波之盏", "酒渍船帽"]
+
+[[artifacts]]
+name = "风起之日"
+slug = "adaycarvedfromrisingwinds"
+rarity = [4, 5]
+effect_2pc = "攻击力提高18%。"
+effect_4pc = "普通攻击、重击、元素战技或元素爆发命中敌人后，将获得持续6秒的「风与牧歌的眷怜」：攻击力提高25%。若装备者已经完成了「魔女的课业」，则「风与牧歌的眷怜」将会升级为「风与牧歌的决意」，额外使通过考验的装备者的暴击率提升20%。装备者处于队伍后台时，也能触发上述效果。"
+pieces = ["风花的箴铭", "晨光的明誓", "春律的片刻", "未言的宴话", "哀慕的恋歌"]
+
+[[artifacts]]
+name = "昔日宗室之仪"
+slug = "noblesseoblige"
+rarity = [4, 5]
+effect_2pc = "元素爆发造成的伤害提升20%。"
+effect_4pc = "施放元素爆发后，队伍中所有角色攻击力提升20%，持续12秒。该效果不可叠加。"
+pieces = ["宗室之花", "宗室之翎", "宗室时计", "宗室银瓮", "宗室面具"]
+
+[[artifacts]]
+name = "角斗士的终幕礼"
+slug = "gladiatorsfinale"
+rarity = [4, 5]
+effect_2pc = "攻击力提高18%。"
+effect_4pc = "装备该圣遗物套装的角色为单手剑、双手剑、长柄武器角色时，角色普通攻击造成的伤害提高35%。"
+pieces = ["角斗士的留恋", "角斗士的归宿", "角斗士的希冀", "角斗士的酣醉", "角斗士的凯旋"]

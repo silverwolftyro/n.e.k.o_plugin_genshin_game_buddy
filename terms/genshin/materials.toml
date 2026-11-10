@@ -1,0 +1,187 @@
+schema_version = 1
+generated_at = "2026-11-10T10:15:19+08:00"
+source = "genshin-db (theBowja/genshin-db)"
+source_repo = "https://github.com/theBowja/genshin-db"
+source_commit = "8e5badd60b5d894284ccc927a56c9683529d2592"
+source_path = "src/data/ChineseSimplified/materials/*.json"
+source_license = "MIT（上游仓库 LICENSE；本插件只取名称/数值/效果描述等事实性数据）"
+
+[[materials]]
+name = "原石"
+slug = "primogem"
+rarity = 5
+category = "ADSORBATE"
+category_text = "稀有货币"
+sources = []
+description = "超出世界的原初晶石。黑暗的宇宙中，由无主的梦想与希望凝结而成的辉光。"
+
+[[materials]]
+name = "摩拉"
+slug = "mora"
+rarity = 3
+category = "ADSORBATE"
+category_text = "通用货币"
+sources = ["冒险与探索奖励", "洞天百宝兑换", "激活藏金之花奖励"]
+description = "通行大陆的钱。世界通用的共同语言，谁人都能理解的贵金属。"
+
+[[materials]]
+name = "好感经验"
+slug = "companionshipexp"
+rarity = 3
+category = "ITEM_VIRTUAL"
+category_text = "好感成长"
+sources = []
+description = "好感经验，用于提升好感等级"
+
+[[materials]]
+name = "纪行经验"
+slug = "bep"
+rarity = 3
+category = "CONSUME"
+category_text = "纪行经验"
+sources = []
+description = "纪行即是将长旅中所经历的一切都记录下来。这些就是将被谱写成诗的素材。"
+
+[[materials]]
+name = "大英雄的经验"
+slug = "heroswit"
+rarity = 4
+category = "EXP_FRUIT"
+category_text = "角色经验素材"
+sources = ["解决事件报酬", "洞天百宝兑换", "激活启示之花奖励"]
+description = "角色经验素材，含有20000点经验值。\n如果向往着天空岛而在大陆开始巡礼，这些经验可称得上弥足珍贵。"
+
+[[materials]]
+name = "冒险家的经验"
+slug = "adventurersexperience"
+rarity = 3
+category = "EXP_FRUIT"
+category_text = "角色经验素材"
+sources = ["冒险与探索奖励", "激活启示之花奖励"]
+description = "角色经验素材，含有5000点经验值。\n如果踏上了前人未至的秘境，这些经验还是很重要的。"
+
+[[materials]]
+name = "精锻用魔矿"
+slug = "mysticenhancementore"
+rarity = 3
+category = "WEAPON_EXP_STONE"
+category_text = "武器强化素材"
+sources = ["锻造获得", "解决事件报酬"]
+description = "武器经验素材，含有10000点经验值。\n传说，精炼的矿锭中凝结了大地上战斗的记忆。而受益于这些记忆的兵器，自然也是有灵魂的了。"
+
+[[materials]]
+name = "兽肉"
+slug = "rawmeat"
+rarity = 0
+category = "EXCHANGE"
+category_text = "食材"
+sources = ["动物掉落"]
+description = "兽类的新鲜肉块。经过适当处理可以制成让人元气满满的美食。"
+
+[[materials]]
+name = "禽肉"
+slug = "fowl"
+rarity = 0
+category = "EXCHANGE"
+category_text = "食材"
+sources = ["动物掉落"]
+description = "禽类的新鲜肉块。经过适当处理可以制成让人精神一振的佳肴。"
+
+[[materials]]
+name = "鱼肉"
+slug = "fish"
+rarity = 0
+category = "EXCHANGE"
+category_text = "食材"
+sources = ["捕捉鱼类采集"]
+description = "鱼类的新鲜肉块。经过适当处理可以制成让人回味无穷的菜式。"
+
+[[materials]]
+name = "散失的风神瞳"
+slug = "anemoculus"
+rarity = 0
+category = "ELEM_CRYSTAL"
+category_text = "冒险道具"
+sources = []
+description = "浓烈的风元素能量积聚成的物质。献给风的神像，能弥补它在漫长岁月中散失的力量。"
+
+[[materials]]
+name = "散失的岩神瞳"
+slug = "geoculus"
+rarity = 0
+category = "ELEM_CRYSTAL"
+category_text = "冒险道具"
+sources = []
+description = "浓烈的岩元素能量积聚成的物质。献给岩的神像，能弥补它在漫长岁月中散失的力量。"
+
+[[materials]]
+name = "风之印"
+slug = "anemosigil"
+rarity = 3
+category = "CONSUME"
+category_text = "七国徽印"
+sources = ["蒙德地区探索奖励"]
+description = "受到蒙德大地的千风认可，获授的印记。\n用来在蒙德城内特定的地方兑换特殊道具。"
+
+[[materials]]
+name = "雷之印"
+slug = "electrosigil"
+rarity = 3
+category = "CONSUME"
+category_text = "七国徽印"
+sources = ["稻妻地区探索奖励"]
+description = "受到稻妻群岛的鸣雷认可，获授的印记。\n可以缴纳给鸣神大社的神樱，提高「神樱眷顾」的等级。"
+
+[[materials]]
+name = "远海夷地的琼枝"
+slug = "jadebranchofadistantsea"
+rarity = 4
+category = "AVATAR_MATERIAL"
+category_text = "武器突破素材"
+sources = ["占位-可合成数量:{0}"]
+description = "赋予武器突破之力的材料。\n失去了一切、逃向暗之外海的魔神在海渊中，见到了什么都没有的弃民。于是它决定留下来，成为他们的「远吕羽氏尊」、「海祇大御神」。\n传说大蛇神曾经折下身上所有的珊瑚枝，让蜷缩在黑暗中的孩子们拥有照亮周遭的光明。又有一说它用折下的珊瑚枝架起了登高的阶梯，让它的孩子们再次回到了地面上，见到阳光。"
+
+[[materials]]
+name = "远海夷地的瑚枝"
+slug = "coralbranchofadistantsea"
+rarity = 2
+category = "AVATAR_MATERIAL"
+category_text = "武器突破素材"
+sources = ["礼包商城兑换"]
+description = "赋予武器突破之力的材料。\n稻妻列岛中距离鸣神岛最遥远的「海祇」，在海祇岛的古语中的意思是「统管诸海的大神」。传说大蛇在常夜的渊下国土中初次现身时，身上覆满了四色的珊瑚枝，散发着煌煌的荧光。"
+
+[[materials]]
+name = "鸣草"
+slug = "nakuweed"
+rarity = 0
+category = "EXCHANGE"
+category_text = "稻妻区域特产"
+sources = ["推荐：踏鞴砂采集", "尘歌壶种植", "前往采集"]
+description = "即使在无风的日子里，亦会随雷鸣之声隐隐振动的植物。看起来像是花瓣的结构其实是叶片的延伸，保护着脆弱的花朵。"
+
+[[materials]]
+name = "常燃火种"
+slug = "everflameseed"
+rarity = 4
+category = "AVATAR_MATERIAL"
+category_text = "角色培养素材"
+sources = ["30级以上爆炎树掉落"]
+description = "驱动爆炎树持续燃烧的种子。仿佛要点燃世间的一切草木般放射着火元素的热量。\n大地深处湍流不息的能量中运载着无穷的愿望。挟着烈火凭依在植物上，使它恒常地燃烧，并且渴望用爆裂的火炎洗净一切的，又是什么样的愿望呢。"
+
+[[materials]]
+name = "凝云鳞甲"
+slug = "cloudseamscale"
+rarity = 4
+category = "AVATAR_MATERIAL"
+category_text = "角色培养素材"
+sources = ["30级以上隐山猊兽掉落"]
+description = "隐山猊兽的甲鳞，质地冰冷而坚硬。纵然剥离脱落，其上依然萦绕着纯净的仙力，普通的武器难以损之分毫。\n普通的野兽有时也会被逸散的仙力影响，变得比往常更为强大，但猊兽的不同之处在于，萦绕其身的仙力并非源于环境，而是源于它们自身——这也是其首领的地位往往被认为与仙人等同的原因。"
+
+[[materials]]
+name = "雷光棱镜"
+slug = "lightningprism"
+rarity = 4
+category = "AVATAR_MATERIAL"
+category_text = "角色培养素材"
+sources = ["30级以上无相之雷掉落"]
+description = "无相之雷用于汇聚元素，修复损伤的元素物质。其中蕴含着至纯的雷之力。\n棱镜能将构成光的色彩区分，而雷光棱镜将奔流的能量编织成纯粹的雷光。即使无相之雷已经被击败，雷元素也持续在这只棱镜中汇聚。"

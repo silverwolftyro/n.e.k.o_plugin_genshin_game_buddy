@@ -1,0 +1,137 @@
+schema_version = 1
+generated_at = "2026-11-10T10:15:19+08:00"
+source = "genshin-db (theBowja/genshin-db)"
+source_repo = "https://github.com/theBowja/genshin-db"
+source_commit = "8e5badd60b5d894284ccc927a56c9683529d2592"
+source_path = "src/data/ChineseSimplified/weapons/*.json"
+source_license = "MIT（上游仓库 LICENSE；本插件只取名称/数值/效果描述等事实性数据）"
+
+[[weapons]]
+name = "风鹰剑"
+slug = "aquilafavonia"
+rarity = 5
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 47.537
+main_stat = "物理伤害加成"
+main_stat_value = "9%"
+passive = "西风之鹰的抗争"
+passive_detail = "攻击力提高20%；受到伤害时触发：高扬抗争旗号的西风鹰之魂苏醒，恢复等同于攻击力的100%的生命值，并对周围的敌人造成200%攻击力的伤害。该效果每15秒只能触发一次。"
+ascension_materials = ["摩拉", "高塔孤王的破瓦", "沉重号角", "牢固的箭簇", "高塔孤王的残垣", "黑铜号角", "锐利的箭簇", "高塔孤王的断片", "黑晶号角", "历战的箭簇"]
+
+[[weapons]]
+name = "护摩之杖"
+slug = "staffofhoma"
+rarity = 5
+weapon_type = "长柄武器"
+weapon_type_code = "WEAPON_POLE"
+base_atk = 45.9364
+main_stat = "暴击伤害"
+main_stat_value = "14.4%"
+passive = "无羁的朱赤之蝶"
+passive_detail = "生命值提升20%。此外，基于装备该武器的角色生命值上限的0.8%，获得攻击力加成。当装备该武器的角色生命值低于50%时，进一步获得1%基于生命值上限的攻击力提升。"
+ascension_materials = ["摩拉", "漆黑陨铁的一粒", "地脉的旧枝", "史莱姆凝液", "漆黑陨铁的一片", "地脉的枯叶", "史莱姆清", "漆黑陨铁的一角", "地脉的新芽", "史莱姆原浆"]
+
+[[weapons]]
+name = "雾切之回光"
+slug = "mistsplitterreforged"
+rarity = 5
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 47.537
+main_stat = "暴击伤害"
+main_stat_value = "9.6%"
+passive = "雾切御腰物"
+passive_detail = "获得12%所有元素伤害加成，并能获得「雾切之巴印」的威势。雾切之巴印：持有1/2/3层雾切之巴印时，获得8/16/28%自己的元素类型的元素伤害加成。在下列情况下，角色将各获得1层雾切之巴印：普通攻击造成元素伤害时，持续5秒；施放元素爆发时，持续10秒；此外，角色元素能量低于100%时，将获得1层雾切之巴印，此雾切之巴印会在角色的元素能量充满时消失。每层雾切之巴印的持续时间独立计算。"
+ascension_materials = ["摩拉", "远海夷地的瑚枝", "混沌机关", "破旧的刀镡", "远海夷地的玉枝", "混沌枢纽", "影打刀镡", "远海夷地的琼枝", "混沌真眼", "名刀镡"]
+
+[[weapons]]
+name = "天空之翼"
+slug = "skywardharp"
+rarity = 5
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 47.537
+main_stat = "暴击率"
+main_stat_value = "4.8%"
+passive = "回响长天的诗歌"
+passive_detail = "暴击伤害提高20%；攻击命中时有60%概率造成125%攻击力的小范围物理伤害，该效果每4秒只能触发一次。"
+ascension_materials = ["摩拉", "凛风奔狼的始龀", "地脉的旧枝", "牢固的箭簇", "凛风奔狼的裂齿", "地脉的枯叶", "锐利的箭簇", "凛风奔狼的断牙", "地脉的新芽", "历战的箭簇"]
+
+[[weapons]]
+name = "阿莫斯之弓"
+slug = "amosbow"
+rarity = 5
+weapon_type = "弓"
+weapon_type_code = "WEAPON_BOW"
+base_atk = 45.9364
+main_stat = "攻击力"
+main_stat_value = "10.8%"
+passive = "矢志不忘"
+passive_detail = "普通攻击与重击造成的伤害提升12%；普通攻击与重击的箭矢发射后每经过0.1秒，伤害还会提升8%，至多提升5次。"
+ascension_materials = ["摩拉", "狮牙斗士的枷锁", "混沌装置", "史莱姆凝液", "狮牙斗士的铁链", "混沌回路", "史莱姆清", "狮牙斗士的镣铐", "混沌炉心", "史莱姆原浆"]
+
+[[weapons]]
+name = "天目影打刀"
+slug = "amenomakageuchi"
+rarity = 4
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 41.0671
+main_stat = "攻击力"
+main_stat_value = "12%"
+passive = "岩藏之胤"
+passive_detail = "施放元素战技后，获得1个胤种，该效果每5秒至多触发一次。胤种持续30秒，至多同时存在3个。施放元素爆发后，会清除持有的所有胤种，并在2秒之后，基于消耗的胤种数量，每个为该角色恢复6点元素能量。"
+ascension_materials = ["摩拉", "远海夷地的瑚枝", "混沌机关", "破旧的刀镡", "远海夷地的玉枝", "混沌枢纽", "影打刀镡", "远海夷地的琼枝", "混沌真眼", "名刀镡"]
+
+[[weapons]]
+name = "薙草之稻光"
+slug = "engulfinglightning"
+rarity = 5
+weapon_type = "长柄武器"
+weapon_type_code = "WEAPON_POLE"
+base_atk = 45.9364
+main_stat = "元素充能效率"
+main_stat_value = "12%"
+passive = "非时之梦·常世灶食"
+passive_detail = "攻击力获得提升，提升程度相当于元素充能效率超出100%部分的28%，至多通过这种方式提升80%。施放元素爆发后的12秒内，元素充能效率提升30%。"
+ascension_materials = ["摩拉", "今昔剧画之恶尉", "混沌机关", "破旧的刀镡", "今昔剧画之虎啮", "混沌枢纽", "影打刀镡", "今昔剧画之一角", "混沌真眼", "名刀镡"]
+
+[[weapons]]
+name = "息灾"
+slug = "calamityqueller"
+rarity = 5
+weapon_type = "长柄武器"
+weapon_type_code = "WEAPON_POLE"
+base_atk = 49.1377
+main_stat = "攻击力"
+main_stat_value = "3.6%"
+passive = "灭却之戒法"
+passive_detail = "获得12%所有元素伤害加成；施放元素战技后，获得持续20秒的「圆顿」，攻击力每1秒提升3.2%，该攻击力提升效果至多叠加6次。当装备此武器的角色处于队伍后台时，「圆顿」的攻击力提升效果翻倍。"
+ascension_materials = ["摩拉", "雾海云间的铅丹", "雾虚花粉", "骗骗花蜜", "雾海云间的汞丹", "雾虚草囊", "微光花蜜", "雾海云间的金丹", "雾虚灯芯", "原素花蜜"]
+
+[[weapons]]
+name = "和璞鸢"
+slug = "primordialjadewingedspear"
+rarity = 5
+weapon_type = "长柄武器"
+weapon_type_code = "WEAPON_POLE"
+base_atk = 47.537
+main_stat = "暴击率"
+main_stat_value = "4.8%"
+passive = "昭理的鸢之枪"
+passive_detail = "命中敌人时自身攻击力提高3.2%，持续6秒，最高可以叠加7层。该效果每0.3秒最多触发一次。满层状态时伤害提升12%。"
+ascension_materials = ["摩拉", "孤云寒林的光砂", "猎兵祭刀", "新兵的徽记", "孤云寒林的辉岩", "特工祭刀", "士官的徽记", "孤云寒林的圣骸", "督察长祭刀", "尉官的徽记"]
+
+[[weapons]]
+name = "磐岩结绿"
+slug = "primordialjadecutter"
+rarity = 5
+weapon_type = "单手剑"
+weapon_type_code = "WEAPON_SWORD_ONE_HAND"
+base_atk = 44.3358
+main_stat = "暴击率"
+main_stat_value = "9.6%"
+passive = "护国的无垢之心"
+passive_detail = "生命值提升20%。此外，基于装备该武器的角色生命值上限的1.2%，获得攻击力加成。"
+ascension_materials = ["摩拉", "雾海云间的铅丹", "雾虚花粉", "寻宝鸦印", "雾海云间的汞丹", "雾虚草囊", "藏银鸦印", "雾海云间的金丹", "雾虚灯芯", "攫金鸦印"]
