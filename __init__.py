@@ -59,6 +59,7 @@ from .activation import ActivationState
 from .context_pack import (
     build_context_block,
     build_lookup_block,
+    render_scene_avoid,
     render_term_card,
 )
 from .game_registry import (
@@ -3551,12 +3552,26 @@ class GenshinGameBuddyPlugin(NekoPluginBase):
                         should_push = True
                 if should_push:
                     scene = self._scene_store.get(primary)
-                    if scene is not None and scene.prompt:
+                    if scene is not None and (scene.prompt or scene.avoid):
+                        # ★ 2026-11-10：场景级 avoid 与场景正文**同批**注入。
+                        #   此前 avoid 只在 ``_push_context`` 里渲染，而默认配置
+                        #   ``reinject_every_n_messages = 0`` → 语境块永不重推 →
+                        #   avoid 写了没人读，防剧透约束形同虚设（端到端验证实证：
+                        #   场景命中后的全部 push 里"本场景避免"一次都没出现）。
+                        #   同一次 push 一起送 —— 不新增 push 调用点（红线：恰好 4 处）。
+                        avoid_line = render_scene_avoid(
+                            scene.avoid, label=self._t("context.scene_avoid")
+                        )
+                        scene_text = f"【当前场景：{primary}】"
+                        if scene.prompt:
+                            scene_text += f"\n{scene.prompt}"
+                        if avoid_line:
+                            scene_text += f"\n{avoid_line}"
                         self.push_message(
                             source="genshin_game_buddy",
                             visibility=[],
                             ai_behavior="read",
-                            parts=[{"type": "text", "text": f"【当前场景：{primary}】\n{scene.prompt}"}],
+                            parts=[{"type": "text", "text": scene_text}],
                             priority=0,
                             metadata={
                                 "scene": primary,
@@ -3564,8 +3579,8 @@ class GenshinGameBuddyPlugin(NekoPluginBase):
                             },
                         )
                         self.logger.info(
-                            "genshin_game_buddy: ocr_perceive scene-prompt-push scene={} chars={}",
-                            primary, len(scene.prompt),
+                            "genshin_game_buddy: ocr_perceive scene-prompt-push scene={} chars={} avoid={}",
+                            primary, len(scene.prompt), len(scene.avoid),
                         )
                         self._last_scene_pushed_at = time.monotonic()
                         # ★ 2026-11-10：场景攻略正文已进模型上下文 →
