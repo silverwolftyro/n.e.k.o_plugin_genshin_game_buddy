@@ -111,6 +111,13 @@ exclude = [
     ".gitignore",
     # 改名清单：发布前一次性文档
     "RENAME_BEFORE_RELEASE.md",
+    # ★ 开发期联网脚本，不随包分发（2026-11-10）。
+    #   tools/fetch_genshin_db.py 只在开发期从 genshin-db 拉数据，
+    #   运行时用不到（数据已落成本地 TOML），
+    #   更不该把联网工具塞进用户机器。
+    #   文件级排除（不是 exclude_dirs）——
+    #   同目录的 tools/diag_yui_bridge.py 照旧随包。
+    "tools/fetch_genshin_db.py",
 ]
 exclude_files = [
     # 开发期启动脚本
