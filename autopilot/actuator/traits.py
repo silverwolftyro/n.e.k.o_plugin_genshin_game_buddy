@@ -180,7 +180,17 @@ TRAITS: dict[str, ActionTraits] = {
         strict_arrival=True,      # 技能要等到 E 转好，必须精确
         allowed_scenes=(SCENE_COMBAT, SCENE_WORLD),
         min_gap_ms=150,
+        # ★ max_duration_ms 是按「点一下」标的。长按（显式 hold_ms）
+        #   会**自动**把上限撑到 hold+gap+500 —— 见
+        #   executor._effective_max_duration_ms。
+        #   不撑的话钟离长按 E 1.5 秒会刚好卡在 2000ms 的边上，
+        #   慢一点就 TIMEOUT：明明按满了却报失败。
         max_duration_ms=2000,
+        # ★ 支持长按：连招里写 `hold_ms = 1500` 就是「按住 E 1.5 秒」。
+        #   钟离的护盾必须长按才出得来，点按只会放柱子。
+        #   显式写的 hold_ms **不抖**（humanizer 的 ±15% 会把它抖到
+        #   1275ms，差一点就放不出护盾，而日志里一条错都没有）。
+        #   详见 ComboStep.hold_ms 与 executor 的 USE_SKILL 分支。
     ),
     "USE_BURST": ActionTraits(
         strict_arrival=True,      # 大招要等充能满 + 角色在场

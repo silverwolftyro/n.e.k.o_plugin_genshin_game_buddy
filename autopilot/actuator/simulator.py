@@ -21,12 +21,13 @@
 from __future__ import annotations
 
 import ctypes
+import inspect
 import logging
 import time
 from ctypes import wintypes
 from dataclasses import dataclass, field
 from enum import IntEnum
-from typing import Protocol
+from typing import Callable, Iterable, Protocol
 
 logger = logging.getLogger(__name__)
 
@@ -365,6 +366,21 @@ _MOUSE_FLAG_VK: dict[int, int] = {
     MOUSEEVENTF_RIGHTDOWN: VK.RBUTTON, MOUSEEVENTF_RIGHTUP: VK.RBUTTON,
     MOUSEEVENTF_MIDDLEDOWN: VK.MBUTTON, MOUSEEVENTF_MIDDLEUP: VK.MBUTTON,
 }
+
+#: 注入回声抑制窗口（秒）。
+#:
+#: ★ 只用来覆盖「监听线程下一次轮询」这一小段：
+#:   ``physical_input.POLL_INTERVAL_S`` 是 20 ms，边沿检测保证
+#:   「按住不放只报一次」，所以窗口过期后**不会补发**让权。
+#:   120 ms 是给轮询抖动和 hold_ms 留的余量，取整十倍便于读。
+#:
+#: ⚠️ 副作用：用户恰好在引擎按键后 120 ms 内按了**同一个**键时，
+#:   那一次让权会被吞掉。方向是安全的（引擎多按了一下，不是不让权）。
+ECHO_SUPPRESS_S: float = 0.12
+
+#: 长按期间查中断闸的间隔（秒）。20ms —— 与物理输入监听同频，
+#: 所以「用户按下 E 抢权」到「引擎松手」的最坏延迟就是这个量级。
+HOLD_ABORT_POLL_S: float = 0.02
 _MOUSE_BUTTON_MASK: int = (MOUSEEVENTF_LEFTDOWN | MOUSEEVENTF_LEFTUP
                            | MOUSEEVENTF_RIGHTDOWN | MOUSEEVENTF_RIGHTUP
                            | MOUSEEVENTF_MIDDLEDOWN | MOUSEEVENTF_MIDDLEUP)
@@ -479,9 +495,26 @@ class InputSimulator:
     key_mode: str = KEY_MODE_VK
 
     _log: list[SentEvent] = field(default_factory=list, repr=False)
+    #: VK 码 -> 「引擎最后一次注入它的时刻 + ECHO_SUPPRESS_S」。
+    #: 只给 :meth:`is_own_echo` 用；条目数上限 = VK 表大小（~90），
+    #: 过期项在查询时顺手淘汰，不需要额外的清扫任务。
+    _echo_until: dict[int, float] = field(default_factory=dict, repr=False)
 
     def __post_init__(self) -> None:
         self._log = []
+        self._echo_until = {}
+        # ★ 引擎自己注入 down、还没抬起来的键（VK 码）。
+        #   用途只有一个：区分「这个键是**引擎**按着的」和
+        #   「这个键是**用户**按着的」——
+        #   ``GetAsyncKeyState`` 两者都看得见，分不出来（见
+        #   :meth:`_protected_physical_vks`）。
+        self._engine_down: set[int] = set()
+        # ★ 「用户此刻正按着的键」提供者。由
+        #   :mod:`autopilot.core.loop` 接上
+        #   ``PhysicalInputWatcher.held_physical_keys``。
+        #   没有它（单测 / 仿真 / 非 Windows）时按「没人按着」处理 ——
+        #   行为与旧版完全一致，不引入新的风险。
+        self.physical_hold_provider: Callable[[], Iterable[int]] | None = None
         # ★ 响亮失败：模式写错要在构造期就炸，不能等到第一次注入
         if self.key_mode not in KEY_MODES:
             raise InvalidStateError(
@@ -529,11 +562,45 @@ class InputSimulator:
     def key_up(self, vk: int | KeyId) -> None:
         self._send_key(vk, up=True)
 
-    def key_press(self, vk: int | KeyId, hold_ms: int = 30) -> None:
-        """按下 → 保持 → 抬起。hold_ms 让游戏能收到按下沿。"""
+    def key_press(self, vk: int | KeyId, hold_ms: int = 30,
+                  abort_check: Callable[[], None] | None = None) -> None:
+        """按下 → 保持 → 抬起。hold_ms 让游戏能收到按下沿。
+
+        :param abort_check: 长按期间的**中断闸**。每
+            :data:`HOLD_ABORT_POLL_S` 调一次；它抛异常就**立刻松手**
+            并把异常抛出去（键一定抬起 —— finally 保证）。
+            ★ 这是长按能安全存在的前提：钟离长按 E 要按 1.5 秒，
+              这 1.5 秒里执行层是**阻塞**的 —— 没有这道闸，
+              用户在这 1.5 秒内按下的任何键都会被引擎的按住状态顶掉，
+              而急停（F12）也要等 1.5 秒才生效。
+              有了它，两者的响应延迟都压到 20ms 以内。
+        """
         self._send_key(vk, up=False)
-        time.sleep(max(0, hold_ms) / 1000.0)
-        self._send_key(vk, up=True)
+        try:
+            if abort_check is None:
+                time.sleep(max(0, hold_ms) / 1000.0)
+            else:
+                self._sleep_abortable(hold_ms, abort_check)
+        finally:
+            # ★ 无论怎么退出（正常走完 / 中断抛异常），键**一定抬起**。
+            #   不抬起的话游戏那边会一直认为这个键按着。
+            self._send_key(vk, up=True)
+
+    def _sleep_abortable(self, hold_ms: int, abort_check: Callable[[], None]) -> None:
+        """按住 ``hold_ms``，但随时可以被 ``abort_check`` 打断。
+
+        打断的方式是**抛异常** —— 调用方（执行层）用不同的异常类型
+        区分「急停」「用户抢占」「超时」，这里不关心是哪一种，
+        只负责保证键被松开。
+        """
+        end = time.monotonic() + max(0, hold_ms) / 1000.0
+        while True:
+            remaining = end - time.monotonic()
+            if remaining <= 0:
+                return
+            time.sleep(min(remaining, HOLD_ABORT_POLL_S))
+            # ★ 先查再睡下一段：中断响应延迟 <= HOLD_ABORT_POLL_S。
+            abort_check()
 
     def key_combo(self, modifiers: list[int | KeyId], key: int | KeyId) -> None:
         """**原子**提交组合键：mod1↓ mod2↓ key↓ key↑ mod2↑ mod1↑。
@@ -641,13 +708,25 @@ class InputSimulator:
 
     # -- 兜底 ------------------------------------------------------------
 
-    def release_all(self) -> list[int]:
-        """**无条件**释放所有按下的键与鼠标键。返回被释放的键码。
+    def release_all(self, *, exclude_physical: bool = False) -> list[int]:
+        """释放所有按下的键与鼠标键。返回被释放的键码。
 
         为什么必须做：任何异常/中断都可能留下"卡住的按键"——
         W 被按住不放 = 角色一直往前跑。BetterGI 在 `TaskRunner.End()`、
         `AutoFightTask.finally`、`AutoBossTask.finally` 都调这个
         `[实测]`，这是异常安全的关键。
+
+        :param exclude_physical: ``True`` 时**跳过用户此刻正按着的键**。
+
+            ★ 这是「物理抢占误松用户按键」这个致命 Bug 的修法（2026-10-19）。
+              旧实现遍历 ``VK`` 逐个问 ``is_key_down``，**分不出**这个键
+              是引擎按的还是**用户**按的（``GetAsyncKeyState`` 两者都看得见），
+              于是「用户按住 E 长按技能」时，一次让权就把 E 弹起来 ——
+              游戏收到合成的 KeyUp，用户的长按**当场断掉**，
+              表现为「长按出不来 / 按 A/W 走不动」。
+
+              开着这个开关时，用户正按着的键**绝对不**发 KeyUp；
+              引擎自己按着的键**照旧全松**（异常安全底线不变）。
 
         本方法**自身不抛异常**：它出现在 finally 里，再抛会盖掉真正的错误。
         但**绝不静默**：失败一律 `logger.error(..., exc_info=True)` 带完整
@@ -655,6 +734,11 @@ class InputSimulator:
         构造期就能发现的问题拖到了排障末尾。
         """
         released: list[int] = []
+        skipped: list[int] = []
+        # ★ 先算「受保护的键」。放在 try 外面：算不出来时宁可**不保护**
+        #   （退化成旧行为），也不要因为一次异常把让权整条路径炸掉。
+        protected = self._protected_physical_vks() if exclude_physical \
+            else frozenset()
         try:
             backend = self.require_backend()
         except InvalidStateError as exc:
@@ -664,7 +748,13 @@ class InputSimulator:
 
         try:
             for vk in list(VK):
-                if not backend.is_key_down(int(vk)):
+                code = int(vk)
+                # ★ 用户正按着的键：不碰（2026-10-19）。
+                #   合成 KeyUp 会把用户的长按/走位**当场掐断**。
+                if code in protected:
+                    skipped.append(code)
+                    continue
+                if not backend.is_key_down(code):
                     continue
                 # ★ 鼠标键必须发**鼠标抬起**，不能发键盘抬起（§37）。
                 #   原实现对所有 VK 一律 ``_mk_key(up=True)`` —— 对
@@ -673,8 +763,8 @@ class InputSimulator:
                 #   明明有 1，游戏的左键却还按着；而 NORMAL_ATTACK 正是
                 #   靠 release_all 兜底的（长按语义），于是角色一直平A。
                 #   MOUSE_BUTTON_VKS 早就定义了却没人用。
-                if int(vk) in MOUSE_BUTTON_VKS:
-                    _down_flag, up_flag = _mouse_button_flags(int(vk))
+                if code in MOUSE_BUTTON_VKS:
+                    _down_flag, up_flag = _mouse_button_flags(code)
                     self._send([_mk_mouse(flags=up_flag)],
                                desc=f"release_all {vk.name}", check=False)
                 else:
@@ -682,9 +772,9 @@ class InputSimulator:
                     #   和按下时用**同一个模式**。SCANCODE 模式按下的键
                     #   用 VK 模式抬起，系统层不一定认（wVk 与 wScan 是
                     #   两条不同路径），键会**卡在游戏里**。
-                    self._send(_mk_keys(int(vk), up=True, mode=self.key_mode),
+                    self._send(_mk_keys(code, up=True, mode=self.key_mode),
                                desc=f"release_all {vk.name}", check=False)
-                released.append(int(vk))
+                released.append(code)
         except Exception:  # noqa: BLE001 - finally 里绝不外抛，但必须留痕
             logger.exception(
                 "release_all 中途失败（已释放 %d 个键，其余可能仍卡住，需手动松开）",
@@ -692,9 +782,55 @@ class InputSimulator:
             )
             return released
 
+        if skipped:
+            # ★ 必须留痕：被跳过的键**没有**被松开。用户以为引擎松手了
+            #   其实没有 —— 这种「静默不松」不记日志就永远查不出来。
+            logger.info("release_all 跳过 %d 个用户正按着的键: %s",
+                        len(skipped), ", ".join(_vk_name(v) for v in skipped))
         if released:
             logger.info("release_all 释放了: %s", ", ".join(_vk_name(v) for v in released))
         return released
+
+    # -- 物理按键保护（2026-10-19）--------------------------------------
+
+    def set_physical_hold_provider(
+        self, provider: Callable[[], Iterable[int]] | None
+    ) -> None:
+        """接上「用户此刻正按着的键」的来源。
+
+        :param provider: 无参可调用对象，返回当前**被用户按着**的
+            VK 码集合（可迭代即可）。生产环境接的是
+            ``PhysicalInputWatcher.held_physical_keys``。
+
+        ★ 接上之后 :meth:`release_all` 才能在**让权**时跳过用户的键。
+          没接（单测 / 仿真 / 非 Windows）时按「没人按着」处理 ——
+          行为与旧版一致。
+        """
+        self.physical_hold_provider = provider
+
+    def _protected_physical_vks(self) -> frozenset[int]:
+        """算出「**不能松**」的键：用户正按着、且**不是**引擎自己按的。
+
+        ★ 为什么要减掉引擎自己按的键
+          ``GetAsyncKeyState`` 对**注入**的按键同样返回「按下」（实测）。
+          所以监听器看到的「按着的键」里**混着引擎自己按的键**。
+          不减掉的话：引擎长按 E（钟离护盾 1.5 秒）时，
+          E 会出现在「用户按着的键」里 → release_all 不松它 →
+          **引擎的 E 永远卡在游戏里**（角色一直按着 E）。
+
+          减掉之后：引擎自己按的键**永远**会被松开（异常安全底线保住），
+          用户按的键**永远**不会被碰（人的优先级最高）。
+        """
+        provider = self.physical_hold_provider
+        if provider is None:
+            return frozenset()
+        try:
+            held = {int(v) for v in provider()}
+        except Exception:  # noqa: BLE001 - 判别失败宁可放过，不拦用户
+            logger.debug("读「用户按着的键」失败，本次不保护任何键",
+                         exc_info=True)
+            return frozenset()
+        return frozenset(held - self._engine_down)
 
     def is_key_down(self, vk: int | KeyId) -> bool:
         return self.backend.is_key_down(_vk_of(vk))
@@ -728,9 +864,132 @@ class InputSimulator:
 
     def _record(self, inputs: list[INPUT]) -> None:
         """把注入事件写进环形历史，并按 ``history_size`` 截断。"""
-        self._log.extend(decode_events(inputs))
+        events = decode_events(inputs)
+        self._log.extend(events)
         if self.history_size > 0 and len(self._log) > self.history_size:
             del self._log[: len(self._log) - self.history_size]
+        # ★ 回声登记（2026-10-18）。**必须在**每一次注入上做，包括失败的那次
+        #   —— backend.send 抛异常之前已经可能已经把键按下去了。
+        self._note_echo(events)
+        # ★ 记账「引擎自己按着哪些键」（2026-10-19）。
+        #   这是「松键时跳过用户的键、但引擎的键一定要松」的前提 ——
+        #   没有它就分不清「这个键是用户按的」还是「引擎自己按的」。
+        self._note_engine_down(events)
+
+    def _note_engine_down(self, events: list[SentEvent]) -> None:
+        """更新「引擎自己按着哪些键」。
+
+        ★ 无论成功失败都记：backend.send 抛异常时键**可能已经按下去了**，
+          这时更要知道它按着哪个键（否则它就永远卡在游戏里）。
+        """
+        for ev in events:
+            if not ev.vk:
+                continue
+            if ev.down:
+                self._engine_down.add(int(ev.vk))
+            else:
+                self._engine_down.discard(int(ev.vk))
+
+    def _note_echo(self, events: list[SentEvent]) -> None:
+        """登记「这个键刚刚是我按的」。
+
+        ★ 为什么需要它
+        --------------
+        ``autopilot/actuator/physical_input.py`` 用 ``GetAsyncKeyState``
+        轮询来发现「用户在按键」，好让引擎让权。但**注入进去的按键
+        同样会反映在 ``GetAsyncKeyState`` 上** —— 实测（ctypes + SendInput
+        F24 键，down 后 30 ms 读高位 = 1）确认，不是推断。
+
+        于是不加这道过滤时，引擎按 E -> 监听器在 20 ms 内看到 E 被按下
+        -> 判定「用户在按 E」-> ``release_all()`` 把 E 释放掉 + 冻结 3 秒
+        + 执行层抛 ``_UserTakeover``。**引擎会把自己刚发出的按键掐掉。**
+
+        ⚠️ 这不是理论问题，是 2026-10-18 在本机复现出来的：
+          ``key_press(hold_ms=30)``（USE_SKILL 走的就是它）100% 触发回调。
+
+        ★ 为什么不换成「区分注入与硬件」的 Win32 API
+          能做（低级键盘钩子的 ``LLKHF_INJECTED``、注册 raw input 时带
+          ``RIDEV_NOINJECTED``），但那是把一个真机验证过的安全特性
+          整体重写。注册表侧的做法（知道**自己**什么时候按了什么）
+          只加十几行，出错面小得多 —— 判错的后果最多是「让权晚 120 ms」。
+        """
+        until = time.monotonic() + ECHO_SUPPRESS_S
+        for ev in events:
+            if ev.vk:
+                self._echo_until[ev.vk] = until
+
+    def is_own_echo(self, key: int | KeyId | str,
+                    *, now: float | None = None) -> bool:
+        """这个键是不是**引擎自己刚注入的**（而不是人按的）。
+
+        :param key: VK 码、:class:`KeyId`，或 VK 名（``"E"`` / ``"LBUTTON"``）
+        :param now: 注入 monotonic 时刻，默认取当前时间（测试可注入）
+        :returns: ``True`` = 抑制窗口内，应**当作没听见**
+
+        ★ 窗口长度只影响「用户恰好在引擎按键后 120 ms 内也按了同一个键」
+          这一个边角：那种情况下引擎会晚 120 ms 才让权。边沿检测保证
+          不会重复触发，所以窗口过期后也不会补发一次让权 ——
+          代价是那一次让权可能被吃掉，**不会**变成持续不让权。
+
+        认不出来的键名返回 ``False``（不抑制）—— 宁可放过，
+        也不要因为一个拼写问题把用户的按键吞掉。
+        """
+        vk = _vk_of(key) if not isinstance(key, str) else _vk_by_name(key)
+        if vk is None:
+            return False
+        until = self._echo_until.get(vk)
+        if until is None:
+            return False
+        t = time.monotonic() if now is None else now
+        if t > until:
+            self._echo_until.pop(vk, None)     # 顺手淘汰
+            return False
+        return True
+
+
+# --------------------------------------------------------------------------
+# 松键调用（跨层共用）
+# --------------------------------------------------------------------------
+
+def _accepts_kwarg(fn: Callable, name: str) -> bool:
+    """这个可调用对象接不接某个关键字参数。"""
+    try:
+        sig = inspect.signature(fn)
+    except (TypeError, ValueError):        # 内建 / C 扩展签名拿不到
+        return False
+    for p in sig.parameters.values():
+        if p.kind is inspect.Parameter.VAR_KEYWORD:
+            return True
+        if p.name == name:
+            return True
+    return False
+
+
+def release_all_compat(sim: object, *, exclude_physical: bool = False) -> list[int]:
+    """调用 ``sim.release_all()``，**兼容**不认新参数的旧替身。
+
+    :param sim: 任何带 ``release_all`` 的对象（生产上是 :class:`InputSimulator`）
+    :param exclude_physical: ``True`` 时**跳过用户此刻正按着的键**（让权路径）
+    :returns: 被释放的键码列表（拿不到就返回空表）
+
+    ★ 为什么要有这个包装
+      ``release_all`` 的调用点散在 ``core/loop.py`` 与 ``actuator/executor.py``
+      两层，而测试替身（``tests/unit/test_core_loop.py`` 里的 ``_Sim``）
+      只实现了老签名 ``release_all(self)``。直接写
+      ``release(exclude_physical=True)`` 会抛 ``TypeError`` ——
+      而这几行代码**正好在让权的关键路径上**，抛异常等于让权失败。
+
+      宁可退化成旧行为（整体松键），也不能在让权路径上炸。
+    """
+    release = getattr(sim, "release_all", None)
+    if release is None:
+        return []
+    if not exclude_physical:
+        return list(release() or [])
+    if _accepts_kwarg(release, "exclude_physical"):
+        return list(release(exclude_physical=True) or [])
+    logger.warning("release_all 不支持 exclude_physical，按旧行为整体松键")
+    return list(release() or [])
 
 
 # --------------------------------------------------------------------------
@@ -742,6 +1001,28 @@ def _vk_of(vk: int | KeyId) -> int:
     if isinstance(vk, KeyId):
         return vk.to_vk()
     return int(vk)
+
+
+def _vk_by_name(name: str) -> int | None:
+    """VK 名 -> VK 码。**认不出来返回 None**，不抛。
+
+    供 :meth:`InputSimulator.is_own_echo` 用：那边拿到的是
+    ``PhysicalInputWatcher`` 回调传过来的字符串，认不出来时必须
+    「不抑制」而不是崩掉或乱猜一个键。
+    """
+    if not name:
+        return None
+    up = name.strip().upper()
+    try:
+        return int(VK[up])
+    except KeyError:
+        pass
+    if up.startswith("VK_"):                     # "VK_E" 这种写法也认
+        try:
+            return int(VK[up[3:]])
+        except KeyError:
+            return None
+    return None
 
 
 # --------------------------------------------------------------------------
@@ -1141,6 +1422,7 @@ def probe_backend(backend: object | None) -> BackendReport:
 
 
 __all__ = [
+    "ECHO_SUPPRESS_S",
     "EXTENDED_KEYS",
     "IS_WINDOWS",
     "INPUT",
@@ -1161,5 +1443,6 @@ __all__ = [
     "decode_events",
     "probe_backend",
     "process_integrity",
+    "release_all_compat",
     "require_windows",
 ]

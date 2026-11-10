@@ -57,10 +57,20 @@ from typing import Any
 from ..contracts.events import Event, EventCategory, Severity
 from ..contracts.intent_packet import IntentPacket
 from ..contracts.state_packet import StatePacket
+# 物理输入让权（2026-10-17）：独立后台线程轮询 GetAsyncKeyState，
+# 检测到用户按键就松键 + 让权。2026-10-19 起让权改为**动态**：
+# 用户还按着就一直让权，松手后 1 秒内也让权（见 TakeoverState）。
+from ..actuator.physical_input import (TAKEOVER_IDLE_S, TakeoverState,
+                                       PhysicalInputWatcher)
+# 松键（2026-10-19）：让权时**必须**跳过用户正按着的键 ——
+# 旧代码无条件 release_all()，把用户刚按下的 E/W 一起弹起来，
+# 用户的长按/走位被引擎当场掐断。release_all_compat 兼容旧替身。
+from ..actuator.simulator import _vk_by_name, release_all_compat
 # 敌人判据**只用这一份**。2026-10-15 之前，本文件曾用 `kind` + `.y`
 # 自己抄了一份，而 WorldEntity 根本没有 `.y` 字段，`getattr` 兜底成 1.0
 # 让条件恒假 —— `health_bar` 永远计不进 ENEMY_DETECTED，规则却照常开火。
 # 详见 policy/context.py::is_enemy_evidence 的长注释。
+from ..policy.combo_manager import COMBO_INTENT_PRIORITY as _COMBO_PRIORITY
 from ..policy.context import count_enemy_entities
 from .runtime import (
     IllegalTransition,
@@ -130,6 +140,40 @@ class CoreLoop:
         self._max_consecutive_crashes = max(1, max_consecutive_crashes)
         self._stop_timeout_s = stop_timeout_s
 
+        # ── 物理输入让权（2026-10-17）─────────────────────────────
+        #: 监听物理按键的后台线程。**独立线程** —— 主循环 5Hz，
+        #:   一个 tick 要做感知+决策，塞进按键轮询只会拖慢它。
+        self._input_watcher: PhysicalInputWatcher | None = None
+        #: 让权状态。**动态**的 —— 用户还按着就一直让权，松手后
+        #: 再宽限 :attr:`_takeover_idle_s` 秒。
+        #: ★ 用 monotonic 而不是 time.time()：系统时间被改（对时、
+        #:   夏令时）会让窗口算错。
+        self._takeover: TakeoverState = TakeoverState(idle_s=TAKEOVER_IDLE_S)
+        #: 让权的**空闲宽限**（秒）：用户最后一次动作之后还让多久。
+        self._takeover_idle_s: float = TAKEOVER_IDLE_S
+        #: 上一次「让权提示」的时刻（monotonic）。用来节流终端提示 ——
+        #: 用户连点鼠标时逐条刷屏会盖掉真正的故障信息。
+        self._last_takeover_notice_mono: float = 0.0
+
+        # ★ 把「用户此刻正按着的键」接到模拟器上（2026-10-19）。
+        #   有了它，让权时的 release_all 才会**跳过用户正按着的键** ——
+        #   旧代码无条件把用户刚按下的 E/W 一起弹起来，用户的长按/走位
+        #   被引擎**当场掐断**。
+        #   ★ 这里接的是**方法**而不是快照：模拟器每次要用时才问，
+        #     拿到的是「此刻」的状态，不是启动时的旧值。
+        self._wire_physical_hold_provider()
+
+        # ★ 默认「不接管」（2026-10-18 补）
+        #   直接构造 CoreLoop 而不走 run_loop 的人（测试、插件内嵌）
+        #   **不会**调 set_run_mode()。默认值必须朝着安全的方向：
+        #   「没声明过的一律当作不动用户的键」。反过来默认 LIVE
+        #   会让任何漏调用的调用方直接接管键鼠。
+        #
+        # ⚠️ 常量在 set_run_mode() 里**惰性** import，不在模块级 ——
+        #   ui.schema 是协议层、core 是运行层，core 依赖 ui 等于把
+        #   层次反过来（ui/schema.py 自己也写了同一条规矩）。
+        self._run_mode: str = "DRY_RUN"
+
         self._consecutive_capture_failures = 0
         self._last_scene: str | None = None
         #: 收尾时用过哪些资源的记录，供诊断
@@ -195,6 +239,28 @@ class CoreLoop:
         with self._state_lock:
             return self._state
 
+    @property
+    def last_scene(self) -> str | None:
+        """最近一次 tick 判出的场景 ID。``None`` = 还没跑出第一个 tick。
+
+        ★ 为什么需要它（而不是只靠 ``SCENE_CHANGED`` 事件）
+          ------------------------------------------------------
+          事件只在**变化**时发，且**第一次赋值被刻意吞掉**（见 ``_tick``
+          里那个 ``if self._last_scene is not None`` —— 不然开场就会
+          多一句「场景切换 None -> WORLD」）。于是只订阅事件的消费者
+          （``run_loop`` 的 UI 线程）在整个 run 都停在初始的 UNKNOWN：
+
+              快照 scene="UNKNOWN"
+              快照 raw_stats.by_scene={"WORLD": 355}    ← 自相矛盾
+
+          真机 2026-10-14 整场都是这么显示的。事件流有它的用处
+          （「什么时候变的」），但读「**现在**是什么」只能问这里。
+
+        只读、无副作用；UI 线程每 200ms 读一次，
+        ``_last_scene`` 是普通字符串属性赋值，读取本身是原子的。
+        """
+        return self._last_scene
+
     def _transition(self, dst: RuntimeState) -> None:
         with self._state_lock:
             check_transition(self._state, dst)
@@ -215,6 +281,7 @@ class CoreLoop:
         self._consecutive_capture_failures = 0
         self.ctx.bus.start()
         self._start_panic_watcher()
+        self._start_input_watcher()
         self._thread = threading.Thread(
             target=self._run, name="autopilot-core", daemon=True)
         self._thread.start()
@@ -389,6 +456,10 @@ class CoreLoop:
         finally:
             # ★ 不管怎么退出都要松键
             self._release_all("工作线程退出")
+            # ★ 监听线程也要停 —— 它是 daemon，但显式停掉更干净，
+            #   免得引擎重启时旧线程还在监听（两个线程同时回调，
+            #   让权窗口会被旧线程续期）。
+            self._stop_input_watcher()
             logger.debug("工作线程退出，最终状态 %s", self.state.value)
 
     def _tick_guarded(self) -> None:
@@ -512,7 +583,49 @@ class CoreLoop:
         self._emit_business_events(state)
         self._check_stuck(state.state_version)
 
+        # ══════════════════════════════════════════════════════════════
+        # ★★ DRY_RUN 决策闸门（2026-10-19）
+        # ────────────────────────────────────────────────────────────
+        #   ``--dry-run`` 以前**只换了执行层的注入后端**（DryRunBackend），
+        #   决策层照跑、连招照走、组合照发 —— 于是引擎明明一个键都没发，
+        #   却像真的在打：203 条 INTENT_EXECUTED、10 条 INTENT_REJECTED、
+        #   YUI 照着念战斗播报。用户在物理按键时看到的是「引擎在我打字的时候
+        #   还在喊『我不打了』」。
+        #
+        #   闸门放在**业务事件之后、决策之前**，两个原因：
+        #     · 业务事件（ENEMY_DETECTED / COMBAT_ENTERED / POSITION_CHANGED）
+        #       描述的是「世界现在怎样」，卡片要显示、用户要看着 —— 必须继续发；
+        #     · 决策层往后一步都不走，于是 INTENT_EXECUTED / INTENT_REJECTED /
+        #       COMBO_STARTED / REFLEX_FIRED **一条都不会产生**，不是靠下游
+        #       过滤，是压根没跑。
+        #
+        #   ⚠️ 统计口径用 ``record_paused_perception`` 而不是 ``record_idle``：
+        #     干跑是「**永远**只感知不决策」，与 PAUSED 同类；用 record_idle
+        #     会让 idle_streak 每 tick 无限增长，卡片上看着像引擎卡住了。
+        if not self.is_live():
+            self.ctx.executor.release_held()
+            self.ctx.stats.record_paused_perception()
+            logger.debug(
+                "tick#%d [DRY_RUN] sv=%d scene=%s —— 只感知，不决策",
+                self.ctx.stats.ticks, state.state_version, state.scene.id)
+            self._notify_tick(state, None)
+            return
+
         # ── ② 决策 ──────────────────────────────────────────────
+        # ★ 用户物理输入让权（2026-10-17）
+        #   位置很讲究：在**感知之后、决策之前**。
+        #     · 感知照跑 —— 停了眼睛，恢复时看到的是陈旧画面
+        #     · 决策不做 —— 用户在操作的这段时间里引擎**一个键都不发**
+        #   和 PAUSED 分支的区别：PAUSED 是用户按的暂停按钮，
+        #   让权是**用户按了游戏里的键** —— 引擎不该抢，但也不该
+        #   把整个循环停掉（停了就没法自动恢复）。
+        if self._user_takeover_active():
+            self.ctx.stats.record_paused_perception()
+            logger.debug(
+                "tick#%d [让权] 用户在操作，引擎不动作", self.ctx.stats.ticks)
+            self._notify_tick(state, None)
+            return
+
         # ★ 传的是**世界状态**（含历史），不是裸 StatePacket ——
         #   决策层要用 count() / last_exec() 判断"待了多久""上次何时执行"。
         try:
@@ -720,6 +833,10 @@ class CoreLoop:
             res = self.ctx.executor.execute(intent, state)
         except Exception as exc:  # noqa: BLE001 - executor 理论上不外抛
             self.ctx.stats.record_intent(intent.action.value, "FAILED")
+            # ★ 异常也必须回报 —— 否则连招上挂着「等执行完成」的那一步
+            #   会一直等到兜底超时才放行，白等 2 秒。
+            self._notify_combo_done(intent, ok=False,
+                                    error=f"{type(exc).__name__}: {exc}")
             self._note_crash(
                 f"执行器异常（{intent.action.value}）："
                 f"{type(exc).__name__}: {exc}",
@@ -728,6 +845,20 @@ class CoreLoop:
 
         outcome = res.outcome.value
         self.ctx.stats.record_intent(intent.action.value, outcome)
+        # ★ 执行完成回报（``wait = "ready"`` 的信号源）。
+        #   ``IntentExecutor.execute`` 是**同步**的，返回即「按键按完、
+        #   hold_ms 按够、gap_ms 等完」—— 这是唯一一个不靠估算的
+        #   「这一步真的做完了」信号。
+        #   没有人等它时它是空操作（返回 False），所以对规则意图
+        #   和没有 wait 的步骤调用它毫无成本。
+        #
+        # ★★ ``reason`` 一定要一起传（2026-10-19）
+        #   只传 outcome（"REJECTED"）的话，连招**分不出**为什么被拒：
+        #   「被限流（MIN_GAP）」和「配置错了（KEYMAP）」长得一模一样。
+        #   而这两种该做的处理完全相反 —— 前者该**重试**，后者该**中止**。
+        self._notify_combo_done(intent, ok=bool(res.ok),
+                                error="" if res.ok else outcome,
+                                reason="" if res.ok else res.reason)
 
         if res.event is not None:
             self.ctx.bus.publish(res.event)
@@ -739,6 +870,10 @@ class CoreLoop:
             # 非 OK 是**需要知道**的事，但不算故障（REJECTED 很常见）
             logger.info("✗ %s -> %s: %s", intent.action.value, outcome,
                         res.reason)
+            # ★ 记拒绝原因分类（2026-10-18）
+            #   「为什么被拒」是用户排障的第一问。intents_rejected 只给
+            #   总数不说原因 —— Console 的权限红牌就靠这个计数器。
+            self.ctx.stats.record_rejection(res.reason)
             self._emit(
                 Event(
                     severity=Severity.WARN if outcome == "REJECTED"
@@ -746,8 +881,15 @@ class CoreLoop:
                     category=EventCategory.EXECUTION,
                     code=f"INTENT_{outcome}",
                     message=f"{intent.action.value} {outcome}: {res.reason}",
+                    # ★★ reason 进 context（2026-10-17）
+                    #   拒绝原因是**结构化数据**，不是给人看的自由文本。
+                    #   只塞在 message 里，读侧就得去解析字符串才能分清
+                    #   「被限流」（MIN_GAP）和「被安全拦下」（场景不对/急停）——
+                    #   而 YUI 播报层正需要这个区分（见 event_to_yui.py）。
+                    #   message 保持原样，兼容在跑的旧读侧。
                     context={"steps": res.steps,
-                             "elapsed_ms": res.elapsed_ms},
+                             "elapsed_ms": res.elapsed_ms,
+                             "reason": res.reason},
                     state_version=state.state_version,
                 ),
                 dedupe_key=f"INTENT_{outcome}:{intent.action.value}",
@@ -804,6 +946,13 @@ class CoreLoop:
         """
         if self.state not in (RuntimeState.RUNNING, RuntimeState.PAUSED):
             return
+        # ★ 立刻中断连招（2026-10-18）。
+        #   放在状态守卫**之后**：循环已经在停机的话没有「正在进行的连招」
+        #   要清（abort 返回 False，幂等）。
+        #   为什么还要显式清：连招状态挂在 policy 上，进程还会继续跑到
+        #   reset。如果用户急停后没 reset 就又 start()，一条走了一半的
+        #   连招会在新一场战斗里接着往下打 —— 听起来像是「AI 记得刚才」。
+        self._abort_combo("F12 急停")
         logger.warning("F12 急停触发")
         self._panic_event.set()
         self._stop_event.set()
@@ -828,6 +977,55 @@ class CoreLoop:
     # ==================================================================
     # 辅助
     # ==================================================================
+
+    def _abort_combo(self, reason: str) -> bool:
+        """通知策略层中断正在进行的连招。
+
+        **刻意用 getattr 而不是直接调 ``self.ctx.policy.abort_combo``**：
+        ``RuntimeContext.policy`` 是可注入容器（测试塞假策略、
+        ``DISABLED`` 模式塞 ``DisabledSource``），那些实现没有这个方法。
+        没有 getattr 的话，每换一个 PolicySource 实现都要回来改这里，
+        可替换性就漏了。**但也不能静默** —— 缺方法只说明「没接连招」，
+        不是出错，所以只打 debug。
+
+        :returns: 是否真的中断了一条连招（没连招 / 没在跑时 False）
+        """
+        fn = getattr(self.ctx.policy, "abort_combo", None)
+        if fn is None:
+            logger.debug("当前策略源没有连招（abort_combo 缺失），忽略")
+            return False
+        try:
+            hit = bool(fn(reason))
+        except Exception:  # noqa: BLE001 - 中断失败不该打断让权 / 急停
+            logger.exception("中断连招失败：%s", reason)
+            return False
+        if hit:
+            logger.info("连招已被中断：%s", reason)
+        return hit
+
+    def _notify_combo_done(self, intent, *, ok: bool, error: str,
+                           reason: str = "") -> bool:
+        """回报「上一个连招动作真的做完了」。
+
+        与 :meth:`_abort_combo` 同一个理由用 ``getattr``：策略源是可注入
+        的容器，``DisabledSource`` 和测试假策略都没有连招。缺方法只说明
+        「没接连招」，不是出错。
+
+        :param intent: 刚执行完的那个意图。用来确认它**确实来自连招** ——
+            规则意图也会走到这里，回报给连招会放行一个它没在等的门。
+        :returns: 连招确实在等这个回报。
+        """
+        if getattr(intent, "priority", None) != _COMBO_PRIORITY:
+            return False
+        fn = getattr(self.ctx.policy, "notify_combo_done", None)
+        if fn is None:
+            logger.debug("当前策略源没有连招（notify_combo_done 缺失），忽略")
+            return False
+        try:
+            return bool(fn(ok=ok, error=error, reason=reason))
+        except Exception:  # noqa: BLE001 - 回报失败不该打断这一 tick
+            logger.exception("回报连招执行完成失败")
+            return False
 
     def _can_act(self, where: str) -> bool:
         """每一步之间都要问：还能动吗？
@@ -890,6 +1088,313 @@ class CoreLoop:
             return
         if released:
             logger.info("已释放 %d 个按键（%s）", len(released), why)
+
+    # ==================================================================
+    # 物理输入让权（2026-10-17）
+    # ==================================================================
+
+    def _wire_physical_hold_provider(self) -> None:
+        """把「用户此刻正按着的键」接到模拟器上。
+
+        ★ 为什么要接（2026-10-19）
+          ``release_all()`` 遍历所有按下的键无条件发 KeyUp，
+          而 ``GetAsyncKeyState`` **分不出**「引擎按的」和「用户按的」。
+          于是用户按住 E 长按技能时，一次让权就把 E 弹起来 ——
+          合成 KeyUp 到了游戏里，用户的长按**当场断掉**，
+          表现是「长按出不来」「按 A/W 走不动」。
+
+          模拟器拿到「用户按着哪些键」之后，就能：
+          * 让权时**跳过**这些键（人的优先级最高）；
+          * 但**引擎自己按着的键照旧全松**（异常安全底线不变）。
+
+        ★ 失败不致命：接不上就退化成旧行为（整体松键），
+          引擎照样能跑 —— 少一次保护不该换来一次崩溃。
+        """
+        sim = getattr(getattr(self.ctx, "executor", None), "sim", None)
+        setter = getattr(sim, "set_physical_hold_provider", None)
+        if setter is None:
+            return
+        try:
+            setter(self._user_held_vks)
+        except Exception:  # noqa: BLE001 - 接不上就退化成旧行为
+            logger.debug("接「用户按着的键」失败", exc_info=True)
+
+    def _user_held_vks(self) -> frozenset[int]:
+        """用户**此刻正按着**的键（VK 码）。
+
+        两个来源取并集：
+
+        ① :meth:`PhysicalInputWatcher.held_physical_keys`
+           —— 监听器轮询到的**原始**按键状态。
+        ② :attr:`TakeoverState.held`
+           —— 让权状态里**回声过滤后**确认是用户按的键。
+
+        ★ 为什么要 ②
+          没有真实监听器的环境（单测、离线仿真、非 Windows）里 ① 是空的，
+          但「用户按了 E」这件事**确实发生过**（仿真里是直接调
+          ``_on_physical_input("E")`` 模拟的）。② 记的就是它 ——
+          于是仿真里也能验证「让权不碰用户的键」。
+
+        ★ 两个来源都**分不出**「用户按的」和「引擎注入的」
+          （``GetAsyncKeyState`` 两边都看得见）。调用方
+          （:class:`autopilot.actuator.simulator.InputSimulator`）
+          会把「引擎自己按着的键」减掉。
+        """
+        out: set[int] = set()
+        watcher = self._input_watcher
+        if watcher is not None:
+            try:
+                out |= {int(vk) for vk in watcher.held_physical_keys()}
+            except Exception:  # noqa: BLE001 - 读不到就少一个来源
+                logger.debug("读监听器的按着键失败", exc_info=True)
+        for name in self._takeover.held:
+            vk = _vk_by_name(name)
+            if vk is not None:
+                out.add(int(vk))
+        return frozenset(out)
+
+    def _start_input_watcher(self) -> None:
+        """起物理输入监听线程。
+
+        ★ 幂等，重复 start() 不会起第二个线程。
+        ★ 拿不到 user32（非 Windows）时**静默跳过** ——
+          监听是**增强**，不是必需功能，缺了不该让引擎起不来。
+        """
+        if self._input_watcher is not None and self._input_watcher.running:
+            return
+        try:
+            watcher = PhysicalInputWatcher(
+                self._on_physical_input,
+                on_release=self._on_physical_release,
+            )
+            watcher.start()
+        except Exception:  # noqa: BLE001
+            logger.warning("物理输入监听起不来（不影响引擎运行）",
+                           exc_info=True)
+            return
+        self._input_watcher = watcher
+        # ★ 监听器起来后重接一次「用户按着的键」——
+        #   来源 ①（监听器的原始状态）这时才可用。
+        self._wire_physical_hold_provider()
+
+    def _stop_input_watcher(self) -> None:
+        watcher = self._input_watcher
+        if watcher is None:
+            return
+        self._input_watcher = None
+        try:
+            watcher.stop()
+        except Exception:  # noqa: BLE001
+            logger.debug("停物理输入监听失败", exc_info=True)
+
+    def _on_physical_input(self, key_name: str) -> None:
+        """检测到用户物理按键 —— 立刻让权。
+
+        顺序是刻意的：
+
+        1. **先松键** —— 用户按的键和引擎按的键可能**是同一个**。
+           不先松，用户的 E 会被引擎按着的 E 顶掉。
+        2. **再进让权窗口** —— 光松一次不够：引擎下一帧（200ms 后）
+           又会按下去，用户还是按不动。必须让它**停手一段时间**。
+        3. **最后发事件** —— 让 YUI / Console 知道「刚才是你抢的」。
+
+        ★ 这里跑在**监听线程**里，所以不能做重活。
+          松键是一次 SendInput 批量，很快。
+
+        🔴 2026-10-18：先问一句「这是不是引擎自己刚按的」
+        ------------------------------------------------------------
+        ``GetAsyncKeyState`` **看得到 SendInput 注入的按键**（实测：
+        down 后 30 ms 读高位 = 1）。所以不加过滤时，引擎每按一次键，
+        监听器就在 20 ms 内判定「用户在按」-> ``release_all()`` 把
+        引擎**自己刚按下的键**释放掉 + 冻结 3 秒 + 执行层抛
+        ``_UserTakeover``。引擎会把自己的输出掐掉。
+
+        这不是推断：``sim.key_press(VK.HELP, hold_ms=30)``（USE_SKILL
+        走的就是这条路径）在本机 100% 触发了监听器回调。
+        ``InputSimulator.is_own_echo`` 负责判别，窗口
+        ``simulator.ECHO_SUPPRESS_S`` = 120 ms。
+
+        """
+        # ★ 先过滤自己的回声。放在最前面是有意的：后面每一步都会
+        #   松键 / 冻结 / 抛异常，一步都不该对「自己」做。
+        sim = getattr(self.ctx.executor, "sim", None)
+        own_echo = getattr(sim, "is_own_echo", None)
+        if own_echo is not None:
+            try:
+                if own_echo(key_name):
+                    logger.debug("忽略引擎自己的注入回声：%s", key_name)
+                    return
+            except Exception:  # noqa: BLE001 - 判别失败宁可放过，不拦用户
+                logger.debug("回声判别异常，按「用户在按」处理", exc_info=True)
+
+        # ★ 立刻中断连招（2026-10-18）。
+        #   排在回声过滤**之后**、切人记账**之前**：走到这里已经确定是
+        #   真人按键了，而「用户在操作」和「连招还在按」不能共存。
+        #
+        #   ⚠️ 这条是**必须**的而不是锦上添花：让权窗口内主循环**不再决策**
+        #     （见 ``_tick`` 里 ``_user_takeover_active()`` 那个 early return），
+        #     所以连招不会在这 3 秒里推进 —— 但它**也没被清掉**。
+        #     用户让权结束时连招会从中断处继续，接着往下打他的队友。
+        #     「用户抢了一把之后机器人接着自己的连招打」= 抢不动。
+        #   放在这里而不是让权窗口里轮询，是因为**用户的第一次按键**
+        #   就是最该让权的那一次 —— 晚一帧都是他在跟机器人抢。
+        self._abort_combo(f"用户按了 {key_name}")
+
+        # ★ 先记账「用户按了数字键 = 切人了」（2026-10-18）。
+        #   必须排在回声过滤**之后**：引擎自己按的 1-4 已经在上面 return 了，
+        #   走到这里的数字键才是真人按的。
+        #   为什么需要：``PlayerInfo.active_member`` 恒 None 时
+        #   ``onfield()`` 恒 UNKNOWN，按名字判的连招规则一条都触发不了。
+        #   视觉判据不可用（见 perception/detectors/character_detector.py
+        #   模块文档第 4 条），而**键盘是唯一无需标定就 100% 准的切人信号**。
+        tracker = getattr(self.ctx, "active_slots", None)
+        if tracker is not None:
+            try:
+                if tracker.note_physical_key(key_name):
+                    logger.info("用户在切人：按了 %s（槽位 %s）",
+                                key_name, tracker.current())
+            except Exception:  # noqa: BLE001 - 记账失败不该打断让权
+                logger.debug("切人记账异常", exc_info=True)
+
+        self._takeover.note_press(key_name)
+        # ★ 这次按下**还没松**（边沿检测只在「刚按下」时触发）——
+        #   告诉让权状态「这个键正被按着」，它会一直让权到收到松开为止。
+        self._takeover.note_hold(key_name)
+        released = 0
+        sim = getattr(self.ctx.executor, "sim", None)
+        try:
+            # ★ exclude_physical=True：**跳过用户正按着的键**（2026-10-19）。
+            #   旧代码在这里无条件 release_all()，把用户**刚按下**的 E/W
+            #   也一起弹起来 —— 游戏收到合成的 KeyUp，用户的长按/走位
+            #   **当场被掐断**（「长按出不来」「走不动」）。
+            #   引擎自己按着的键**照旧全松**（异常安全底线不变）。
+            released = len(release_all_compat(sim, exclude_physical=True))
+        except Exception:  # noqa: BLE001
+            logger.exception("让权时 release_all 失败")
+        # 安全闸也要知道 —— 它是发按键前的最后一道，
+        # 知道「用户在操作」就不会在让权窗口里再放行任何意图。
+        guard = getattr(self.ctx.executor, "guard", None)
+        note = getattr(guard, "note_user_input", None)
+        if note is not None:
+            try:
+                note(key_name, self._takeover_idle_s, still_held=True)
+            except Exception:  # noqa: BLE001
+                logger.exception("让权通知安全闸失败")
+        logger.info("用户按下 %s：已松 %d 个键，让权（空闲宽限 %.1fs）",
+                    key_name, released, self._takeover_idle_s)
+        # ★★ 终端提示（2026-10-19）
+        #   真机反馈：「用户频繁按鼠标触发让权，导致觉得引擎不敢动」。
+        #   根因是**信息不对称**：引擎让了权，但用户只看到「它不动了」，
+        #   于是以为引擎坏了/不敢动。
+        #
+        #   ★ 为什么必须写清楚「松开所有按键，等待 N 秒」
+        #     新版让权是**动态**的：用户**还按着**键时引擎一直让权。
+        #     只说「已让权」的话，用户会以为按一下就行 —— 于是他一直
+        #     按着鼠标，引擎就一直不动，误会更深。
+        #
+        #   ★ 为什么要节流
+        #     用户连点鼠标时每次都是一次抢占，逐条刷屏会盖掉真正的
+        #     故障信息。3 秒内只提示一次：第一次**一定**会出现，
+        #     之后同样的提示短时间内不重复。
+        now_mono = time.monotonic()
+        if now_mono - self._last_takeover_notice_mono >= 3.0:
+            self._last_takeover_notice_mono = now_mono
+            # ★ 措辞（2026-10-19 定稿）
+            #   「松开按键 1 秒后恢复」比「请松开所有按键，等待 1 秒」更准：
+            #   动态让权下**用户还按着**时引擎一直让权，必须让用户知道
+            #   「松手 + 等 1 秒」就能拿回控制权，而不是「引擎坏了不动了」。
+            logger.warning(
+                "[提示] 你按下了 %s，引擎已让权。松开按键 %.0f 秒后恢复。",
+                key_name, self._takeover_idle_s)
+        self._emit(Event.user_interrupt(key_name, released,
+                                        self._takeover_idle_s))
+
+    def _on_physical_release(self, key_name: str) -> None:
+        """检测到用户**松手** —— 让权状态少一条「还按着」的理由。
+
+        ★ 没有这一条，引擎就不知道用户还在按着 W ——
+          而「还在按」正是动态让权的第一条规则：用户按住走位时，
+          引擎必须一直不抢，而不是等 1 秒后抢方向。
+
+        ★ 回声过滤同样要做：引擎自己的长按（例如钟离长按 E 1.5 秒）
+          也会产生一次「松开」边沿。不滤掉的话，引擎会把自己的
+          长按当成「用户松手了」，凭空多出 1 秒让权 —— 自己掐自己。
+          （长按的「松开」落在注入后 120ms 回声窗口内，因为
+          ``_note_echo`` 在**每一次**注入上都重新登记窗口。）
+
+        """
+        sim = getattr(self.ctx.executor, "sim", None)
+        own_echo = getattr(sim, "is_own_echo", None)
+        if own_echo is not None:
+            try:
+                if own_echo(key_name):
+                    logger.debug("忽略引擎自己的注入回声（松开）：%s", key_name)
+                    return
+            except Exception:  # noqa: BLE001 - 判别失败宁可放过，不拦用户
+                logger.debug("回声判别异常，按「用户在松手」处理", exc_info=True)
+        self._takeover.note_release(key_name)
+        guard = getattr(self.ctx.executor, "guard", None)
+        release_note = getattr(guard, "note_user_release", None)
+        if release_note is not None:
+            try:
+                release_note(key_name)
+            except Exception:  # noqa: BLE001
+                logger.exception("通知安全闸「用户松手」失败")
+
+    def _user_takeover_active(self) -> bool:
+        """现在是不是在让权。**动态**判据。"""
+        return self._takeover.active
+
+    @property
+    def user_takeover_active(self) -> bool:
+        """让权窗口是否生效（给快照/Console 用）。"""
+        return self._user_takeover_active()
+
+    # ------------------------------------------------------------------
+    # 接管状态（2026-10-18 补）
+    # ------------------------------------------------------------------
+    def run_mode(self) -> str:
+        """执行模式（``"LIVE"`` / ``"DRY_RUN"``）。"""
+        return self._run_mode
+
+    def is_live(self) -> bool:
+        """是不是真的会动用户的键。
+
+        ★ 为什么不用 ``self._run_mode == "LIVE"`` 直接比字符串
+          ``LIVE`` 是 ``ui.schema`` 的常量，而 ui 是协议层、core 是运行层，
+          模块级 import 会把层次反过来（见 :meth:`set_run_mode` 的注释）。
+          这里惰性 import 一次再比，层次不反转，也不用在模块级留一个
+          硬编码的裸字符串（裸字符串迟早和常量分叉）。
+
+        读侧遇到不认识的值一律当干跑 —— 宁可不动，也不动错。
+        """
+        from ..ui.schema import LIVE  # noqa: PLC0415
+
+        return self._run_mode == LIVE
+
+    def set_run_mode(self, live: bool) -> None:
+        """声明本进程的执行模式。**由 run_loop 在启动时调用一次**。
+
+        ⚠️ 为什么不从 ``sys.argv`` 反查
+          engine exe 经 Nuitka 编译，argv 会被 self-execution 护栏改写；
+          而且「我被怎么启动的」这件事在进程内已经不可靠 —— 只有
+          argparse 解析出来的 ``args`` 才是真值，由 run_loop 传进来。
+        """
+        from ..ui.schema import DRY_RUN, LIVE  # noqa: PLC0415
+
+        self._run_mode = LIVE if live else DRY_RUN
+        logger.info("执行模式：%s", self._run_mode)
+
+
+    def runtime_info(self) -> tuple[str, bool]:
+        """``(run_mode, user_takeover)`` —— 写快照用的一次性读取。
+
+        ★ 为什么一次返回两个而不是让调用方分两次读
+          两次读之间状态可能已经变了（让权窗口刚好到期），于是快照会
+          记下「不在让权中」而 UI 刚读到 True —— 那种不一致极难排查。
+          一次取值保证两个字段来自同一时刻。
+        """
+        return self._run_mode, self._user_takeover_active()
 
     def _auto_pause(self, reason: str) -> None:
         """关键失败自动暂停。**不静默继续**。"""

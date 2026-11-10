@@ -61,6 +61,16 @@ class PolicyConfig:
     idle_warn_after: int = 300
     #: 给实现起名（进日志/事件）。None = 用实现自报的名字。
     name: str | None = None
+    #: ★ 已构造好的连招状态机（``policy.combo_manager.ComboRunner``）。
+    #:
+    #:   **刻意是对象而不是路径**：连招执行器要拿到
+    #:   ``ActiveSlotTracker``（确认切完人没有）和 ``CharSlotIndex``
+    #:   （某人几号位）才能跑，而那两个对象是 ``tools/_stack.py`` 建的，
+    #:   策略工厂拿不到 —— 让工厂自己去 load 只会造出一个切不动人的连招。
+    #:
+    #:   None = 没配连招 = **纯反射模式**。这是默认值，也是向后兼容的
+    #:   唯一保证：不传就与接入连招之前逐字节一致。
+    combo_runner: Any = None
 
     def __post_init__(self) -> None:
         self.kind = IntentSourceKind.parse(self.kind)
@@ -98,6 +108,7 @@ class PolicyConfig:
                 rule_files=getattr(raw, "rule_files", None),
                 idle_warn_after=getattr(raw, "idle_warn_after", 300),
                 name=getattr(raw, "name", None),
+                combo_runner=getattr(raw, "combo_runner", None),
             )
         raise PolicyConfigError(
             f"无法把 {type(raw).__name__} 当作 PolicyConfig。"
@@ -165,6 +176,7 @@ def _build_local(cfg: PolicyConfig) -> PolicySource:
         rule_files=cfg.rule_files,
         idle_warn_after=cfg.idle_warn_after,
         name=cfg.name,
+        combo_runner=cfg.combo_runner,
     )
 
 

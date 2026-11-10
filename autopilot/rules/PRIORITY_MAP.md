@@ -1,5 +1,61 @@
 # 规则优先级地图
 
+> ⚠️ **下面的表格是 2026-10-11 的快照，已经过时**（当时的结论是
+> 「15 条全关着，引擎只会平A」）。**冲突记录（第 2 节）仍然有效**，
+> 冲突用例 `test_rule_expansion.py::test_rules__world_collision_is_known`
+> 会自动抓出新撞车。最新状态见顶部那一节。
+
+## ★ 2026-10-18 更新：连招不再占 priority（改成独立的 [[combo]] 层）
+
+连招最初是 `genshin_combat.toml` 里的 7 条 `combo_*` 规则（priority 62~68）：
+钟离开盾 → 切夜兰 → 夜兰开大 → 切纳西妲 → 纳西妲挂草 → 切神里绫华 → 一直普攻。
+
+**这 7 条已在同日删除**，搬进了 `autopilot/combos/combos.toml` 的一条 `[[combo]]`：
+
+```toml
+sequence = [
+    { char = "钟离",     action = "USE_SKILL",    when = "e_ready()", gap_ms = 700 },
+    { char = "夜兰",     action = "USE_BURST",    when = "q_ready()" },
+    { char = "纳西妲",   action = "USE_SKILL",    when = "e_ready()", gap_ms = 500 },
+    { char = "神里绫华", action = "NORMAL_ATTACK", repeat = 5 },
+]
+```
+
+三条理由：
+
+1. **那 7 条把一个玩家的队伍写进了代码。** 队伍是玩家自己配的（四人 24 种
+   排列），换一队整条失效，而失效方式是「一条都不触发」，屏幕和日志上
+   什么都看不出来。
+2. **不用再抢 priority 位置。** 连招不再参与升序遍历，它在 `poll()` 里被
+   单独拦截，**压过 80 / 85 那两条通用规则**。
+3. **切人不用手写。** 写 `char = "夜兰"` 引擎会先自动发 `SWITCH_CHARACTER`，
+   所以「②④⑥ 切过去」那三条规则不再需要。
+
+### 连招与规则的仲裁
+
+| 谁 | 什么时候赢 |
+|---|---|
+| priority **< 20** 的规则（5/8/12 恢复类、10 被围后退、15 开锁宝箱） | **打断连招**（吃药、闪避、感知不可信不许排在开盾后面） |
+| 连招 | 连招跑着的时候压过一切非应急规则，包括 80 / 85 |
+| 其余规则 | 连招空闲且 trigger 没命中时照常工作 |
+
+阈值 20 的来历见 `policy/combo_manager.py::DEFAULT_BREAK_BELOW_PRIORITY`。
+连招的完整机制与玩家写法见 **`docs/combat_architecture.md`**。
+
+⚠️ 62~68 这个带**现在空了**。可以拿去放新的普通规则，但**别把连招放回来** ——
+`test_combo_sequence.py::TestShippedConfig::test_no_legacy_combo_rules_are_left`
+会红。
+
+### 两条信号的死活也变了（2026-10-18）
+
+| 信号 | 之前 | 现在 |
+|---|---|---|
+| `q_ready()` | 恒 UNKNOWN（`DEAD_FUNCS`） | 配置门控（`[autopilot.burst_cd]`），进 `CONDITIONAL_FUNCS` |
+| `onfield()` | 恒 UNKNOWN（`DEAD_FUNCS`） | 靠**切人记账**（`actuator/active_slot.py`）出 `active_member`，名字仍需 `[autopilot.character_id]`。**仓库内已无消费者**（随 7 条 combo 规则一起没了），但它是给玩家用的公共 DSL 函数，接线仍由 `character_id` 配置段与 `PolicyContext.onfield` 两条守卫盯着 |
+| `e_ready()` | 恒 UNKNOWN | 上一轮已改成配置门控 |
+
+---
+
 > 2026-10-11 · 对应 `autopilot/rules/*.toml` 的**实际**状态，不是设计意图。
 > 生成方式：跑 `build_policy()` 加载全部规则后按 `(scenes, priority)` 分组。
 

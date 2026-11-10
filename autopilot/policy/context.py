@@ -436,7 +436,8 @@ class PolicyContext:
         **A. ``enemy_identify``（group=enemy）** —— 玩家主动锁定目标后才
         出现的青色标识。
 
-        **B. 敌人血条（group=combat / kind=health_bar）且 y < 0.5**。
+        **B. 敌人血条（group=combat / kind=health_bar）、y < 0.5 且
+        conf >= :data:`ENEMY_CONFIDENCE_MIN`（0.55）**。
 
         为什么必须有 B：三次真机 smoke 里 ``enemy_identify`` **一次都没检出**
         （health_bar 分别检出 6 / 5 / 10 次）。用户确认 ——
@@ -536,20 +537,18 @@ class PolicyContext:
           血条（``health_bar``）才是**成群出现**的那个。真机扫描里
           health_bar 检出 249 次 vs enemy_identify 344 次，但前者天然
           与敌人数成正比。
+
+        ★★ 2026-10-18：**这里曾经是第三份判据抄写**（2026-10-16 把
+          判据抽成 :func:`is_enemy_evidence` 时漏掉了它）。留着的话，
+          一次改动就要记得改三处，漏一处就变成「同一个问题两个答案」——
+          而规则里 ``has_nearby_enemy()`` 和 ``enemy_count()`` 可以
+          出现在同一个 ``when`` 里，那种不一致会以「条件明明一样，
+          一边真一边假」的形式冒出来，最难排查。
+          现在直接复用，**不存在漂移的可能**。
         """
         if self.world_entities is None:
             return self._unk("enemy_bar_count", "本帧无世界实体信息")
-        n = 0
-        for e in self.world_entities:
-            group = getattr(e, "group", getattr(e, "kind", ""))
-            if group == "combat":
-                bb = getattr(e, "bbox", None)
-                # 与 has_nearby_enemy 同口径：只看上半屏，且跳过读不到位置的
-                if not bb or len(bb) < 2:
-                    continue
-                if float(bb[1]) < ENEMY_HEALTH_BAR_Y_MAX:
-                    n += 1
-        return n
+        return sum(1 for e in self.world_entities if is_enemy_evidence(e))
 
     def has_locked_chest(self) -> bool | UnknownValue:
         """附近有没有**上锁**的宝箱。
@@ -682,6 +681,56 @@ FUNCTION_NAMES: frozenset[str] = frozenset(_FUNCTION_TABLE)
 #:    边界按 ``<`` 判定：y 恰为 0.5 时**不算**敌人（保守）。
 ENEMY_HEALTH_BAR_Y_MAX: float = 0.5
 
+#: 敌人血条的**最低置信度**（``WorldEntity.confidence``，YOLO 直接给的）。
+#:
+#: ✔ **这条替代了 2026-10-18 加的「高度下限」，而后者已被实测推翻。**
+#:   ------------------------------------------------------------------
+#: 起因：零敌人的画面上 ``has_nearby_enemy()`` 也会返回 True。已知 6 个
+#: 误报（``batch_20260929b`` 逐帧肉眼核验）全是 ``health_bar``：NPC 头顶
+#: 绿条、屏幕左上角的 UI 细条、派蒙菜单区的 UI 条。
+#:
+#: ❌ **高度下限（h >= 0.015）被推翻了 —— 别再走那条路**
+#:   当时手上只有 1 个真敌人样本（h = 0.02）和 6 个误报（h = 0.005~0.011），
+#:   阈值取在两组中间，看着合理。2026-10-18 补跑全盘 3593 帧真机素材
+#:   （``recognition/raw/frames/*``，逐帧跑 bgi_world）后拿到 249 条
+#:   **已肉眼确认的真敌人血条**，结论是两组分布**完全重叠**：
+#:
+#:   =================  ====  ==========  ==========
+#:   组                  条数  h 中位      h 最大
+#:   =================  ====  ==========  ==========
+#:   真战斗              249   0.0087      0.0175
+#:   已知误报            6     0.0063      0.0112
+#:   =================  ====  ==========  ==========
+#:
+#:   真敌人里 **87.1% 的 h ≤ 0.0112**（误报的最大值）—— 也就是说 h=0.015
+#:   那个阈值会**漏掉 95.2% 的真敌人**，只剩 12/249。宽度 w、纵向 y 同样分不开。
+#:
+#: ✔ **置信度分得开**（同一批数据）
+#:
+#:   =============  ==========  =============
+#:   阈值           真敌人保留    已知误报挡下
+#:   =============  ==========  =============
+#:   conf >= 0.50  94.4%        4/6
+#:   conf >= 0.55  **89.6%**    **6/6**
+#:   conf >= 0.60  85.5%        6/6
+#:   =============  ==========  =============
+#:
+#:   真敌人 conf 中位 0.82、误报中位 0.48。0.55 取在两者之间的空档带。
+#:
+#: ⚠️ 负样本仍然只有 6 条（其余 30 条未决样本的定性见
+#:   ``tests/unit/test_enemy_filtering.py`` 的 ``TestUndecidedSamples``）。
+#:   换句话说：这条阈值是「对已知 6 个误报有效」，不是「已充分验证」。
+#:   边界按 ``>=`` 判定：conf 恰为 0.55 算敌人 —— 这里被误杀的是**真敌人**，
+#:   宁可放过一条误报也不能少打一次。
+ENEMY_CONFIDENCE_MIN: float = 0.55
+
+#: 因置信度不足被挡掉的 ``health_bar`` 累计数。
+#:
+#: ★ 单元素 list 纯粹为了可写。和 :data:`BAD_BBOX_COUNTER` 分开计数 ——
+#:   「字段读不到」和「模型自己就不确定」是两种不同的错，混在一起就看不出
+#:   「战斗不开火」到底是哪一类造成的。
+LOW_CONF_COUNTER: list[int] = [0]
+
 
 #: 累计有多少个「像敌人但坐标不可判读」的实体（见 :func:`is_enemy_evidence`）。
 #: 单元素 list 纯粹为了可写；计数器本身不是状态契约的一部分。
@@ -707,10 +756,11 @@ def is_enemy_evidence(entity: object) -> bool:
       两处都改为调用它，之后不可能再漂。
 
     判据内容见 :meth:`PolicyContext.has_nearby_enemy` 的长注释
-    （A 敌人标识 / B 上半屏血条，以及 y<0.5 分界的实测依据）。
+    （A 敌人标识 / B 上半屏血条 + 置信度下限，以及 y<0.5 分界的实测依据）。
 
-    :returns: True = 算一个敌人。坐标不可判读时返回 False 并累加
-        :data:`BAD_BBOX_COUNTER` —— **跳过但不静默**。
+    :returns: True = 算一个敌人。字段读不到时返回 False 并累加
+        :data:`BAD_BBOX_COUNTER`；置信度不足时返回 False 并累加
+        :data:`LOW_CONF_COUNTER` —— **两者都是「跳过但不静默」**。
     """
     kind = getattr(entity, "kind", None)
     if kind is None:
@@ -721,10 +771,32 @@ def is_enemy_evidence(entity: object) -> bool:
     if group != "combat":
         return False
     bb = getattr(entity, "bbox", None)
-    if not bb or len(bb) < 2:
+    # ⚠️ 这里读 4 项里的前 2 项就够了，但**仍然要求 len >= 4**：
+    #   WorldEntity 的 bbox 永远是 4 元组，要求满长是为了让「这是个
+    #   残缺的实体」在任何判据分支之前就被同一个计数器接住，
+    #   而不是先过 y 再在别的分支炸掉。
+    if not bb or len(bb) < 4:
         BAD_BBOX_COUNTER[0] += 1
         return False
-    return float(bb[1]) < ENEMY_HEALTH_BAR_Y_MAX
+    if float(bb[1]) >= ENEMY_HEALTH_BAR_Y_MAX:
+        return False
+    # ★ 置信度下限（2026-10-18 取代高度下限，见 ENEMY_CONFIDENCE_MIN 的实测表）。
+    #   字段名是 ``confidence``（WorldEntity 的真实字段），
+    #   ``conf`` 只是历史上若干测试夹具用过的别名 —— 两个都认，
+    #   免得为了改判据去改一堆和本判定无关的夹具。
+    conf = getattr(entity, "confidence", None)
+    if conf is None:
+        conf = getattr(entity, "conf", None)
+    if conf is None:
+        # 读不到置信度 = 「不知道」。按不触发处理并计数 ——
+        # 猜一个默认值（比如 0.0）会把所有真敌人都杀掉，
+        # 猜 1.0 则等于没有过滤，两种都是静默失效。
+        BAD_BBOX_COUNTER[0] += 1
+        return False
+    if float(conf) < ENEMY_CONFIDENCE_MIN:
+        LOW_CONF_COUNTER[0] += 1
+        return False
+    return True
 
 
 def count_enemy_entities(entities) -> tuple[int, int]:
@@ -736,8 +808,10 @@ def count_enemy_entities(entities) -> tuple[int, int]:
 
 __all__ = [
     "BAD_BBOX_COUNTER",
+    "ENEMY_CONFIDENCE_MIN",
     "ENEMY_HEALTH_BAR_Y_MAX",
     "FUNCTION_NAMES",
+    "LOW_CONF_COUNTER",
     "UNKNOWN",
     "PolicyContext",
     "PolicySignals",

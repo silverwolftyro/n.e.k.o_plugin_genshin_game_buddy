@@ -15,7 +15,11 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 from ..contracts.events import Event, EventCategory, Severity
+from ..contracts.reasons import (PERMISSION_REASON_PREFIXES,
+                                 REASON_BREAKER, REASON_PANIC,
+                                 REASON_USER_TAKEOVER)
 from ..contracts.state_packet import StatePacket
+from .physical_input import TAKEOVER_IDLE_S, TakeoverState
 from .simulator import VK
 
 logger = logging.getLogger(__name__)
@@ -31,8 +35,43 @@ DEFAULT_MAX_ACTIONS = 5000
 #: ★ 这些前缀是本模块与 executor 之间的**契约**。reason 字符串带变量
 #: （如 ``BREAKER_OPEN(剩 1234ms)``），上层**不要拿整个字符串做相等比较** ——
 #: 用 `is_hard_stop()` 判前缀，格式改动才不会静默改变上层行为。
-REASON_PANIC = "PANIC_KEY_PRESSED"
-REASON_BREAKER = "BREAKER_OPEN"
+#:
+#: ★ 常量本体在 ``contracts/reasons.py``（2026-10-18）
+#:   「拒绝原因」是执行层产出、**多方**消费的东西（stats 要分类计数、
+#:   读侧要决定播什么话）。放在 actuator 里的话，core（上层）就得
+#:   import actuator（下层）—— 方向反了。
+#:   这里 import 过来是为了**保持原有 import 路径不变**。
+
+#: 「用户正在操作，引擎让权」的原因码前缀（2026-10-17）。
+#:
+#: ★ 这**不是**安全拦截，是**礼让**。
+#:   与 ``MIN_GAP`` 一样：动作本来合法，只是「现在不该做」。
+#:   读侧（event_to_yui）必须把它和「安全拦下」分开播报 ——
+#:   说「我没敢做」是骗人，引擎是**主动让**的。
+
+#: 「权限 / 焦点不足」的原因码（2026-10-17）。
+#:
+#: ★ 这一类的用户可读含义是「**权限不足**」，不是「动作非法」。
+#:   ``WINDOW_NOT_FOREGROUND`` 的真实成因有两个，**都**指向权限：
+#:     1. 主控台/引擎**不是管理员** -> Windows UIPI 拦下了注入
+#:     2. 游戏窗口不在前台 -> 焦点检查主动拒绝
+#:   用户看到「没敢做」会以为规则错了；看到「权限不足」才知道该
+#:   用管理员身份重跑。
+
+#: 属于「权限不足」这一类的原因码前缀。
+
+
+def is_permission_problem(reason: str) -> bool:
+    """这个拒绝原因是「权限/焦点不足」吗。
+
+    读侧用它决定播报「权限不足」还是「没敢做」。
+    """
+    return any(reason.startswith(p) for p in PERMISSION_REASON_PREFIXES)
+
+
+def is_user_takeover(reason: str) -> bool:
+    """这个拒绝原因是「用户接管，引擎主动让」吗。"""
+    return reason.startswith(REASON_USER_TAKEOVER)
 
 
 def is_hard_stop(reason: str) -> bool:
@@ -113,6 +152,67 @@ class SafetyGuard:
         self._last_action_ms: dict[str, int] = {}
         self._panic_pressed = False
         self._fg_cache: tuple[str, float] = ("", 0.0)
+        #: 让权状态。**动态**的 —— 跟着用户的实际操作走，不是固定倒计时。
+        #: 判据只有这一处（:class:`~autopilot.actuator.physical_input.TakeoverState`），
+        #: 主循环那边用的是**同一个类**，不各写一套。
+        self.takeover = TakeoverState(idle_s=TAKEOVER_IDLE_S)
+        #: 让权是哪个键触发的（给事件/日志用）。
+        self._user_takeover_key: str = ""
+
+    # -- 用户让权（2026-10-17，2026-10-19 改动态）-----------------------
+    def note_user_input(
+        self,
+        key_name: str,
+        seconds: float | None = None,
+        *,
+        still_held: bool = False,
+    ) -> None:
+        """记一次物理输入：进入「让权」。
+
+        让权期间 :meth:`check` 一律拒绝执行 —— 物理输入的优先级
+        **高于**一切虚拟意图。
+
+        :param key_name: 触发让权的键名（给日志/事件用）。
+        :param seconds: **空闲宽限**（秒）。``None`` = 用默认值
+            :data:`~autopilot.actuator.physical_input.TAKEOVER_IDLE_S`。
+            ⚠️ 语义变了：旧版这里给的是「让权总时长」，现在给的是
+            「用户最后一次动作之后还让多久」——
+            旧版是死等 3 秒，点一下走位也要干等 3 秒，割裂感极强。
+        :param still_held: 这个键**现在还被按着**吗。
+            True = 一直让权，直到收到 :meth:`note_user_release`。
+            ⚠️ 必须是**真人**按的键 —— 引擎自己的注入回声要先过滤掉，
+            否则引擎会把自己的长按当成「用户在按」，然后自己掐自己。
+        """
+        if seconds is not None:
+            self.takeover.idle_s = max(0.0, float(seconds))
+        self.takeover.note_press(key_name)
+        if still_held:
+            self.takeover.note_hold(key_name)
+        self._user_takeover_key = key_name
+        logger.info("用户按了 %s，引擎让权（空闲宽限 %.1fs）",
+                    key_name, self.takeover.idle_s)
+
+    def note_user_release(self, key_name: str) -> None:
+        """用户**松手**了。
+
+        少了这一条，引擎就不知道「用户还在按着 W」——
+        而「还在按」正是动态让权的第一条规则（按着就一直让权）。
+        """
+        self.takeover.note_release(key_name)
+
+    @property
+    def user_takeover_active(self) -> bool:
+        """现在是不是在让权。**动态**判据。"""
+        return self.takeover.active
+
+    @property
+    def user_takeover_key(self) -> str:
+        return self._user_takeover_key
+
+    def clear_user_takeover(self) -> None:
+        """手动清掉让权（用户主动恢复时用）。"""
+        self.takeover.clear()
+        self._user_takeover_key = ""
 
     # -- 状态 ------------------------------------------------------------
 
@@ -177,6 +277,12 @@ class SafetyGuard:
         # ① 急停（最致命，任何时候都优先）
         if self.panic_active:
             return False, REASON_PANIC
+
+        # ①.5 用户物理输入让权（2026-10-17）
+        #   ★ 排在急停之后、其余检查之前
+        #     用户的优先级只低于「整个执行层停机」，高于一切策略判断。
+        if self.user_takeover_active:
+            return False, f"{REASON_USER_TAKEOVER}:{self._user_takeover_key}"
 
         # ② 熔断器
         ok, reason = self._check_breaker(now_ms)

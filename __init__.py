@@ -37,7 +37,7 @@ import threading
 import time
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict
 
 from plugin.sdk.plugin import (
     Err,
@@ -91,6 +91,24 @@ from .term_store import CORE_LAYER_DIMENSIONS, TermEntry, TermLibrary, TermLoadE
 #   Win32 代码不用被塞回 screen_capture。详见 window_probe 的模块 docstring。
 from .window_probe import find_window_by_title as _find_window_by_title
 from .window_probe import log_window_census as _log_window_census
+
+# ★ BetterGI 桥接（2026-11-07 单插件合并）────────────────────────────────
+#   原独立插件 ``bettergi_companion`` 的 webhook_server / bettergi_control /
+#   event_mapper / config.toml 已**物理并入**本插件的 ``bettergi/`` 子包。
+#   本插件只保留「接线」：startup 起服务器、shutdown 收摊子、
+#   ``@llm_tool command_bettergi`` 把 YUI 的指令递进桥接。
+#
+# ★ 为什么是相对导入（``level > 0``）
+#   红线 ``test_redline__no_undeclared_third_party_imports`` 只检查
+#   ``node.level == 0`` 的绝对导入 —— 相对导入不在扫描范围内。
+#   子包内部因此可以自由使用它的依赖，而不必改白名单。
+from .bettergi.bridge import CONTROL_TOOL_DESCRIPTION, BettergiBridge
+from .bettergi.control import COMMAND_TOOL_PARAMETERS
+
+# ★ 生命周期守卫（2026-11-07）——游戏进程/前台检测 → 感知栈休眠。
+#   同样是相对导入；``lifecycle_guard`` 内部用 psutil（可选）
+#   或 Win32 toolhelp 枚举进程，不写进 ``pyproject.toml`` 依赖。
+from .lifecycle_guard import LifecycleGuard
 
 #: 与 autopilot/ 子包一致的日志约定（那边 20+ 个模块都是这么写的）
 logger = logging.getLogger(__name__)
@@ -335,7 +353,7 @@ def _resolve_run_dir(default: Path) -> tuple[Path, str]:
     # 所以装到别人机器上时它不存在，不会误伤。
     candidates.append((
         "开发机源码树",
-        Path(r"D:\NEKO\N.E.K.O-main\N.E.K.O-main\plugin\plugins"
+        Path(r"D:\workspace\N.E.K.O\NEKO-genshin\N.E.K.O-main\N.E.K.O-main\plugin\plugins"
              r"\genshin_game_buddy\autopilot\_runtime"),
     ))
     candidates.append(("安装副本 DEFAULT_RUN_DIR", default))
@@ -430,6 +448,15 @@ class GenshinGameBuddyPlugin(NekoPluginBase):
         self._scene_store: dict[str, SceneEntry] = {}
         # 归属检测的 (library, scenes) 按游戏缓存；config 重建时清空（2.0.14）。
         self._detect_cache: dict[str, tuple[Any, dict[str, SceneEntry]]] = {}
+        # 2026-11-07：BetterGI 双向桥接（startup 里建，shutdown 里收）。
+        # 「空壳 + 纯对象」——构造它不做 IO（R8：auto_start=false 不阻止 import）。
+        self._bettergi: BettergiBridge | None = None
+        # 2026-11-07：游戏生命周期守卫（前台检测 → 感知栈休眠）。
+        self._guard: LifecycleGuard | None = None
+        # 守卫状态迁移的回调（唤醒时立刻放行一拍 OCR，不等下一个 tick）。
+        self._guard_wake_pending: bool = False
+        # 挂起日志的节流时间戳（挂起是持续状态，每 2s 一行会刷爆日志）。
+        self._guard_suspend_log_at: float = 0.0
 
     # ==================================================================
     # i18n：全部用户可见文案的唯一出口
@@ -462,6 +489,17 @@ class GenshinGameBuddyPlugin(NekoPluginBase):
 
         options = PluginOptions.from_section(as_section(cfg, "genshin_game_buddy"))
         registry = GameRegistry.from_config(cfg)
+
+        # ★ YUI 话痨度预设（2026-10-29 落地 P0）——三级优先的第一级。
+        #   宿主改配置会推 CONFIG_UPDATE -> config_change 生命周期 ->
+        #   这里重新读一次生效配置 -> 写进桥接层。**不需要重启插件**。
+        #   预设名本身是合法值才写；"chatty"（清单默认值）会被桥接层解释成
+        #   「我没管它」-> 交回给 Console 滑块。
+        try:
+            autopilot_bridge.set_host_verbosity_preset(options.yui_verbosity_preset)
+        except Exception:  # noqa: BLE001 - 档位不该拖垮配置重载
+            autopilot_bridge.set_host_verbosity_preset(None)
+
         with self._state_lock:
             self._options = options
             self._registry = registry
@@ -505,7 +543,9 @@ class GenshinGameBuddyPlugin(NekoPluginBase):
         # count 卡在 1 或 2；下次启动闸依然挡）。
         with self._ocr_in_flight_lock:
             self._ocr_in_flight_count = 0
-        await self._reload_config()
+        # ★ 2026-11-07：留住原始配置字典 —— 下面启动 BetterGI 桥接时要读
+        #   ``[genshin_game_buddy.bettergi]`` 段（webhook / control 覆盖项）。
+        _raw_cfg = await self._reload_config()
         # 拍板 2.0.69：让用户立刻知道"该改哪个文件"——启动日志打印实际生效的 config 路径
         # （self.config 的 dump 来源）。真机 2.0.68 暴露：用户改安装副本 plugin.toml 无效，
         # 因为宿主读的是 user config 副本。
@@ -518,6 +558,63 @@ class GenshinGameBuddyPlugin(NekoPluginBase):
             "(apply_settings writes back to this file; user edits take effect on next startup)",
             cfg_path,
         )
+
+        # ══════════════════════════════════════════════════════════════
+        # ★ BetterGI 桥接（2026-11-07 单插件合并）
+        # ────────────────────────────────────────────────────────────
+        #   原独立插件 bettergi_companion 的职责现在由本插件内的
+        #   ``bettergi/`` 子包承担：
+        #     · 正向：BetterGI Webhook 事件 → 台词 → YUI 说话
+        #     · 反向：YUI 的 @llm_tool 指令 → 队列 → BetterGI 干活
+        #
+        #   ★ 桥接起不来**不能拖垮插件**
+        #     端口被占用（17890 已经被别的程序占了）是最常见的情况 ——
+        #     降级成 "degraded" 继续跑，感知栈照常工作。
+        try:
+            _bridge_section = as_section(
+                as_section(_raw_cfg, "genshin_game_buddy"), "bettergi"
+            )
+            self._bettergi = BettergiBridge(
+                push_fn=self.push_message,
+                logger=self.logger,
+            )
+            _bridge_status = self._bettergi.start(dict(_bridge_section))
+            self.logger.info(
+                "genshin_game_buddy: bettergi bridge status={}", _bridge_status
+            )
+        except Exception as exc:  # noqa: BLE001 - 桥接失败不该让插件起不来
+            self.logger.warning("bettergi 桥接启动失败（忽略）：%s", exc)
+            self._bettergi = None
+
+        # ══════════════════════════════════════════════════════════════
+        # ★ 生命周期守卫（2026-11-07）
+        # ────────────────────────────────────────────────────────────
+        #   游戏进程不在 / 不在前台 → 感知栈（YOLO 推理 + OCR 轮询）挂起，
+        #   零延迟生效（不用等感知状态机那 6 次 miss 反推）。
+        #   Webhook 监听是独立线程，不受影响 —— 低功耗但不掉线。
+        try:
+            if not self._options.lifecycle_guard_enabled:
+                self.logger.info(
+                    "genshin_game_buddy: 生命周期守卫已关闭"
+                    "（lifecycle_guard_enabled=false）；感知栈不会自动休眠"
+                )
+                self._guard = None
+            else:
+                self._guard = LifecycleGuard(
+                    logger_=self.logger,
+                    active_game_fn=self._current_game_id,
+                    poll_interval_s=float(
+                        self._options.lifecycle_guard_poll_seconds
+                    ),
+                    allow_background=bool(
+                        self._options.lifecycle_guard_allow_background
+                    ),
+                    on_state_change=self._on_guard_state_change,
+                )
+                self._guard.start()
+        except Exception as exc:  # noqa: BLE001 - 守卫失败不该让插件起不来
+            self.logger.warning("生命周期守卫启动失败（忽略）：%s", exc)
+            self._guard = None
 
         # ══════════════════════════════════════════════════════════════
         # ★ 事件流 -> YUI 适配器（2026-10-08）
@@ -546,15 +643,32 @@ class GenshinGameBuddyPlugin(NekoPluginBase):
             #   早退过一次，54 个集成测试直接红成 AttributeError。
             try:
                 from .autopilot.ui import protocol as _e2y_protocol
+                from .autopilot_bridge import read_engine_run_mode, read_yui_verbosity
                 from .event_to_yui import EventToYui
                 _run_dir, _run_dir_why = _resolve_run_dir(
                     _e2y_protocol.DEFAULT_RUN_DIR)
+                # ★ 播报档位先读一次：Console 可能早于插件启动，
+                #   那时用户已经拖过滑块了，不读就得等下一个 poll。
                 self._event_to_yui = EventToYui(
                     push_fn=self.push_message,
                     runtime_dir=_run_dir,
                     poll_seconds=2.0,
                     throttle_seconds=5.0,
                     logger_=self.logger,
+                    verbosity=read_yui_verbosity(),
+                    # ★ 每轮 poll 问一次档位（mtime 短路，几乎免费）。
+                    #   用「供应函数」而不是让 event_to_yui 自己去读桥接文件
+                    #   —— 那会让这个模块依赖 autopilot_bridge，
+                    #   而它本来是可以被单独驱动的。
+                    #   于是用户在 Console 拖滑块最多 2 秒生效，不用重启插件。
+                    verbosity_fn=read_yui_verbosity,
+                    # ★ 干跑时把战斗 chatter 整类咽掉（2026-10-19）。
+                    #   **必须传 _run_dir 而不是默认目录** —— 上面刚解析出
+                    #   实际盯的目录，日志里已经因为分家踩过一次坑；
+                    #   这里再传错，播报器会去读另一个目录的快照，
+                    #   于是「明明是干跑，YUI 照样喊有怪」且日志无异常。
+                    run_mode_fn=(
+                        lambda d=_run_dir: read_engine_run_mode(d)),
                 )
                 if self._event_to_yui.start():
                     # ★ 把「实际盯哪个目录 + 为什么选它 + 进程 cwd」打进日志。
@@ -660,6 +774,19 @@ class GenshinGameBuddyPlugin(NekoPluginBase):
     @lifecycle(id="config_change")
     async def config_change(self, **_: Any) -> Any:
         await self._reload_config()
+        # ★ 2026-11-07：守卫的运行期参数跟着配置走（面板改完立即生效，
+        #   不用重启插件 —— 这正是「允许后台运行」开关该有的手感）。
+        _guard = getattr(self, "_guard", None)
+        if _guard is not None:
+            try:
+                _guard.set_allow_background(
+                    bool(self._options.lifecycle_guard_allow_background)
+                )
+                _guard.set_poll_interval(
+                    float(self._options.lifecycle_guard_poll_seconds)
+                )
+            except Exception as exc:  # noqa: BLE001
+                self.logger.warning("生命周期守卫参数更新失败（忽略）：%s", exc)
         self._load_scenes_for_current()
         with self._state_lock:
             self._activation.clear_all()
@@ -712,6 +839,24 @@ class GenshinGameBuddyPlugin(NekoPluginBase):
                 metrics_snapshot["timeouts"],
                 rss, threads, handles,
             )
+        # ★ 2026-11-07：先收生命周期守卫，再收 BetterGI 桥接。
+        #   守卫先停 → 不会再有新的「挂起/唤醒」状态迁移打进来；
+        #   桥接后停 → 端口 17890 释放，BetterGI 的下一次长轮询会失败
+        #   （插件已卸载，这正是期望行为）。
+        _guard = getattr(self, "_guard", None)
+        if _guard is not None:
+            try:
+                _guard.stop()
+            except Exception as exc:  # noqa: BLE001
+                self.logger.warning("生命周期守卫停止异常（忽略）：%s", exc)
+            self._guard = None
+        _bettergi = getattr(self, "_bettergi", None)
+        if _bettergi is not None:
+            try:
+                _bettergi.stop()
+            except Exception as exc:  # noqa: BLE001
+                self.logger.warning("bettergi 桥接停止异常（忽略）：%s", exc)
+            self._bettergi = None
         self._manager.unload()
         self._ocr.close()
         # 拍板 2.0.65：多线程 OCR 关 executor。
@@ -724,6 +869,58 @@ class GenshinGameBuddyPlugin(NekoPluginBase):
             self._activation.clear_all()
         self.logger.info("genshin_game_buddy: shutdown")
         return Ok({"status": "stopped"})
+
+    # ==================================================================
+    # ★ BetterGI 反向控制（2026-11-07 单插件合并）
+    # ==================================================================
+    #
+    # ★ 为什么用 ``@llm_tool`` 而不是 ``@plugin_entry``
+    #   宿主里有**两条**给 LLM 暴露能力的路：
+    #     · ``@plugin_entry`` → 只给 **analyzer LLM**（决定「该起哪个插件」）
+    #     · ``@llm_tool``     → 给 **对话 LLM**（YUI 本人）
+    #   本需求是「用户对 YUI 说话 → YUI 决定去指挥 BetterGI」，
+    #   所以必须用 ``@llm_tool``。
+    #
+    # ★ 注册路径确认（任务 B 的验收点）
+    #   ``plugin/sdk/plugin/base.py:629-662`` → ``LLM_TOOL_REGISTER`` IPC
+    #   → ``user_plugin_server`` → ``main_server``
+    #   → ``LLMSessionManager.tool_registry``
+    #   ⇒ 与原先在独立插件 ``bettergi_companion`` 里注册时**完全同一条链路**，
+    #     合并进本插件后不需要任何额外接线 —— 装饰器扫的是**插件类的方法**，
+    #     跟它在哪个插件里无关。
+    #
+    # ★ passive 不挡调用
+    #   ``passive`` 只在 analyzer 调度路径上被过滤（它管的是「插件要不要参与
+    #   dispatch」），``@llm_tool`` 的注册与调用链路全程不看它。
+    @llm_tool(
+        name="command_bettergi",
+        description=CONTROL_TOOL_DESCRIPTION,
+        parameters=COMMAND_TOOL_PARAMETERS,
+        timeout=60.0,
+    )
+    async def command_bettergi(self, action: str, args: Any = None, **_: Any) -> Dict[str, Any]:
+        """把「开自动战斗」这类意图变成一条给 BetterGI 的指令，**并等回执**。
+
+        ★ 为什么要等回执
+          用户要的是「YUI 告诉我到底成没成」。如果工具一返回「已发送」，
+          用户永远不知道指令是不是石沉大海 —— BetterGI 没装脚本、没开
+          「JS HTTP 权限」、或者端口被拦，表现都一样：什么都不会发生。
+          所以这里**阻塞等 BetterGI 的回执**，把成功 / 失败 / 超时
+          **如实**返回给 LLM，让 YUI 用嘴说清楚。
+
+        ★ 返回约定
+          成功 → ``{"output": "...", "is_error": False}``
+          失败 → ``{"output": "...", "is_error": True, "error": "..."}``
+        """
+        bridge = getattr(self, "_bettergi", None)
+        if bridge is None:
+            msg = (
+                "BetterGI 桥接没有启动（插件还没起来，或 17890 端口绑定失败）。"
+                "请稍后再试，或者检查一下 17890 端口有没有被别的程序占用。"
+            )
+            self.logger.warning("genshin_game_buddy: %s", msg)
+            return {"output": msg, "is_error": True, "error": msg}
+        return await bridge.dispatch_command(action, args)
 
     # ==================================================================
     # 拍板 2.0.70：内置 stress mode 工具方法
@@ -2677,6 +2874,91 @@ class GenshinGameBuddyPlugin(NekoPluginBase):
     # 2.1a：周期感知 timer
     # ==================================================================
 
+    # ------------------------------------------------------------------
+    # ★ 2026-11-07：生命周期守卫（任务 C）—— 感知栈的挂起闸门
+    # ------------------------------------------------------------------
+
+    def _perception_suspended(self) -> bool:
+        """感知栈（YOLO 推理 / OCR 轮询）现在该不该挂起。
+
+        判定全部交给 :class:`lifecycle_guard.LifecycleGuard`：
+
+        * 游戏进程**不在** → 挂起
+        * 游戏进程在但**不在前台** → 挂起（除非开了「允许后台运行」）
+        * 游戏在前台 / 守卫没起来 / 探测失败 → **不挂起**（fail-open）
+
+        ★ fail-open 是刻意的
+          守卫失灵时宁可多烧一点 CPU，也不能让插件整个哑掉。
+        """
+        guard = getattr(self, "_guard", None)
+        if guard is None:
+            return False
+        try:
+            return bool(guard.suspended)
+        except Exception:  # noqa: BLE001 - 守卫异常不能拖垮感知栈
+            return False
+
+    def _guard_state(self) -> str:
+        """守卫最近一次探测到的状态（拿不到返回空串）。"""
+        guard = getattr(self, "_guard", None)
+        if guard is None:
+            return ""
+        try:
+            return str(guard.state)
+        except Exception:  # noqa: BLE001
+            return ""
+
+    def _log_guard_skip(self) -> None:
+        """挂起时打一行 INFO。
+
+        ★ 为什么节流
+          拍板 2.0.68 要求「任何 early-return 都打 INFO」，但挂起是
+          **持续状态**（可能挂几分钟），每 2s 一行会把日志刷爆。
+          ⇒ 首次必打，之后每 60s 补一行，状态一变（唤醒）立即再打。
+        """
+        now = time.monotonic()
+        last = getattr(self, "_guard_suspend_log_at", 0.0)
+        if last and (now - last) < 60.0:
+            return
+        self._guard_suspend_log_at = now
+        self.logger.info(
+            "genshin_game_buddy: perception suspended by lifecycle guard "
+            "(state={}); capture/OCR skipped, webhook listener still alive",
+            self._guard_state(),
+        )
+
+    def _current_game_id(self) -> str:
+        """当前会话的游戏 id（没有会话返回空串）。
+
+        给生命周期守卫用：只有当前游戏在守卫表里（原神），守卫才对它生效 ——
+        否则玩鸣潮时会被「原神没开」误伤。
+        """
+        try:
+            current = self._manager.current
+        except Exception:  # noqa: BLE001
+            return ""
+        if current is None:
+            return ""
+        return str(getattr(current, "game_id", "") or "")
+
+    def _on_guard_state_change(self, previous: str, current: str) -> None:
+        """守卫状态迁移回调 —— 唤醒时立刻放行下一拍感知。
+
+        ★ 为什么不只是「等下一个 tick」
+          感知 tick 是 2s 一拍，唤醒后若还要等 interval 到点，
+          最多白等 2s。直接把 ``_last_real_ocr_monotonic`` 归零，
+          下一拍就满足「interval 已到」，**立即**恢复感知。
+        """
+        if previous in ("ABSENT", "BACKGROUND") and current == "FOREGROUND":
+            with self._state_lock:
+                self._last_real_ocr_monotonic = 0.0
+            self.logger.info(
+                "genshin_game_buddy: lifecycle guard resumed "
+                "(%s -> %s); perception resumes on next tick",
+                previous,
+                current,
+            )
+
     @timer_interval(id="ocr_perceive", seconds=3)
     async def ocr_perceive(self) -> None:
         """拍板 2.0.65：tick 装饰器固定 3s；实际 OCR 间隔由 self._options 控制。
@@ -2701,6 +2983,30 @@ class GenshinGameBuddyPlugin(NekoPluginBase):
         抓屏/OCR 结果缓存给"术语激活"轮次复用（避免每 2s 都做完整链路）。
         """
         try:
+            # ══════════════════════════════════════════════════════════
+            # ★ 2026-11-07：生命周期守卫闸门（任务 C 的核心）
+            # ──────────────────────────────────────────────────────────
+            #   游戏进程不在 / 不在前台时，**整轮感知栈跳过**：
+            #   不抓屏、不跑模型推演、不做 OCR。
+            #
+            #   ★ 为什么放在这里（最前面）
+            #     这是感知链路里**第一个**能下决心的地方。放在后面
+            #     （比如只跳过 OCR 本体）的话，change-driven 的轻量帧
+            #     dHash 抓屏已经先跑掉了 —— 一样在烧 CPU。
+            #
+            #   ★ 为什么零延迟
+            #     守卫是**进程级**判断（看一眼操作系统就知道游戏在不在），
+            #     而感知状态机是**从 OCR 结果反推**的：判「你不在游戏里」
+            #     得先做一次 OCR，于是 3 次 miss（AWAY）+ 3 次 miss
+            #     （OUT_OF_GAME）才停 —— 2s 档位下就是 12 秒空转。
+            #
+            #   ★ Webhook 监听不受影响
+            #     它在独立线程上（bettergi/webhook_server.py），
+            #     不经过这里 —— 游戏刚退出时 BetterGI 的最后一条事件
+            #     照样收得到，用户还能听到收尾台词。
+            if self._perception_suspended():
+                self._log_guard_skip()
+                return
             # 拍板 2.0.71：tick 间隔用 scene_interval（默认 2s）；保留 ocr_perceive_interval_seconds
             # 字段以兼容旧面板/配置文件，但语义已被 ocr_scene_interval_seconds / ocr_term_interval_seconds 取代。
             interval = self._options.ocr_scene_interval_seconds
@@ -2889,6 +3195,23 @@ class GenshinGameBuddyPlugin(NekoPluginBase):
         import hashlib
         t0 = time.monotonic()
         self.logger.info("genshin_game_buddy: stage=body_enter")
+        # ★ 2026-11-07：生命周期守卫 —— **第二道闸**（纵深防御）。
+        #   第一道闸在 ``ocr_perceive`` 里（提交任务之前）；这一道在
+        #   worker 线程**真正开跑时**再确认一次。
+        #   ★ 为什么两道都要
+        #     两道闸之间隔了一次线程调度 —— 守卫可能正好在这中间判定
+        #     「游戏退出了」。那时候已经排好的任务如果还往下跑，
+        #     就是一次完整的抓屏 + OCR，纯白烧 CPU。
+        #   ★ 这里 return 不影响 worker 闸
+        #     ``_ocr_in_flight_count`` 由 submit 出去的 Future 的
+        #     ``_on_done`` 回调释放，body 提前返回照样会触发。
+        if self._perception_suspended():
+            self.logger.info(
+                "genshin_game_buddy: _ocr_perceive_body skip "
+                "reason=lifecycle_guard_suspended state={}",
+                self._guard_state(),
+            )
+            return
         # 拍板 2.0.71：SceneTracker 心跳——每 30s 打一次 snapshot（不论 body 走完整链路还是 early-return）
         # 解决"2 分钟日志只有 body_enter/exit，没有 scene_tracker"问题：状态机一直在跑，只是没切换就不打日志
         # 拍板 2.0.73：心跳附加 ocr_in_flight / ocr_workers / executor_alive——便于排查 worker 卡死。
@@ -3278,9 +3601,9 @@ class GenshinGameBuddyPlugin(NekoPluginBase):
             term_lines=activated_lines,
             empty_note=self._t("context.no_terms"),
             hint=self._t("context.hint"),
+            note=self._t("context.no_speculation"),
             max_chars=self._options.max_context_chars,
         )
-
         # push_message v2：只用 parts + visibility + ai_behavior。
         # visibility=[] → 用户看不到原始语境块；ai_behavior="read" → 进模型上下文
         # 但**不**立即触发回复 turn（respond 会造成自我触发）。

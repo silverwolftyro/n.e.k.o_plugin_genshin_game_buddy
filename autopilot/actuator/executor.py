@@ -40,11 +40,42 @@ from .simulator import (
     KeyId,
     VK,
     Win32Backend,
+    _vk_by_name,
+    release_all_compat,
 )
 from .traits import ActionTraits, traits_of
 from .validator import IntentValidator, ValidationResult
 
 logger = logging.getLogger(__name__)
+
+
+def _key_label(key_id: int) -> str:
+    """按键的可读名。``KeyId`` 与 ``VK`` **两种类型都能过**。
+
+    ★★ 为什么不能直接写 ``key_id.name``（2026-10-19 实机崩在这）
+      ``.name`` 是**枚举成员**才有的属性。而键位值有两种来源：
+
+        · 内置 ``DEFAULT_KEYMAP``  -> ``VK`` 成员（IntEnum，**有** .name）
+        · ``load_keymap()`` 读文件 -> ``KeyId``（int 子类，**没有** .name）
+
+      之前只有前者被走到过 —— ``run_loop`` 从不把 ``keymap_path``
+      传给 ``build_stack``，执行器一直用内置默认表。2026-10-19 那个
+      修复让 keymap 真的被读进来，于是第一次拿到 ``KeyId``，
+      ``executor.py`` 里那一排 ``key_id.name`` 立刻炸成：
+
+          AttributeError: 'KeyId' object has no attribute 'name'
+
+      症状是 USE_SKILL / USE_BURST **连着报 5 次**（每次意图一条
+      日志），触发熔断器把整条连掐断 —— 引擎从此空转。
+
+    这里用 ``KeyId(int(x)).display_name`` 统一：**两种类型都对**，
+    因为 ``display_name`` 内部走 ``_vk_name()`` 查表，查不到就退化成
+    ``VK_0xXX``，永不抛。
+    """
+    try:
+        return KeyId(int(key_id)).display_name
+    except (TypeError, ValueError):
+        return repr(key_id)
 
 #: MOVE_TO 转向分段之间的间隔（秒）。
 #:
@@ -222,6 +253,8 @@ class IntentExecutor:
         humanizer: Humanizer | None = None,
         keymap: dict[str, KeyId] | None = None,
         char_slots: dict[str, int] | None = None,
+        active_slot_tracker: Any = None,
+        slot_index: Any = None,
         dry_run: bool = False,
     ) -> None:
         # ★ 注意 `InputSimulator()` / `InputSimulator(backend=DryRunBackend())`
@@ -239,7 +272,20 @@ class IntentExecutor:
         self.guard = guard or SafetyGuard()
         self.humanizer = humanizer or Humanizer(HumanizerConfig())
         #: 动作名 -> KeyId（可配置，keymap_editor 写入 config/keymap.toml）
-        self.keymap: dict[str, KeyId] = dict(keymap or DEFAULT_KEYMAP)
+        #:
+        #: ★ 统一成 KeyId（2026-10-19）
+        #:   值原本有**两种类型**：内置 ``DEFAULT_KEYMAP`` 给的是 ``VK``
+        #:   成员，而 ``load_keymap()`` 读文件给的是 ``KeyId``。
+        #:   同一个 dict 里混着两种类型，下游只能靠「这个值恰好是哪个」
+        #:   来判断 —— 于是 ``key_id.name`` 这种写法在读文件那条路上
+        #:   必然 AttributeError（``.name`` 是枚举才有的）。
+        #:   既然类型注解写的是 ``dict[str, KeyId]``，这里就让它**真的是**。
+        #:   注意 ``keymap.py`` 在模块层 import 本模块（取 DEFAULT_KEYMAP），
+        #:   所以这里**不能**反过来 import 它的 ``_as_keyid`` —— 会成环。
+        self.keymap: dict[str, KeyId] = {
+            a: (k if isinstance(k, KeyId) else KeyId(int(k)))
+            for a, k in (keymap or DEFAULT_KEYMAP).items()
+        }
         #: 角色 id -> 位置编号 1..4（``SWITCH_CHARACTER`` 靠它把 char_id
         #: 翻译成「按哪个数字键」）。
         #:
@@ -260,6 +306,28 @@ class IntentExecutor:
         #: 配置来源见 :func:`actuator.keymap.load_char_slots`。
         self._char_slots: dict[str, int] = {
             str(k): int(v) for k, v in (char_slots or {}).items()}
+        #: 在场槽位记账器（``actuator.active_slot.ActiveSlotTracker``）。
+        #: ``None`` = 不记（默认），``SWITCH_CHARACTER`` 照常按。
+        #:
+        #: ★ 为什么要它：``PlayerInfo.active_member`` 恒为 None 时
+        #:   ``onfield()`` 恒 UNKNOWN，于是「按名字判」的所有连招规则
+        #:   一条都触发不了。视觉判据不可用（见
+        #:   ``perception/detectors/character_detector.py`` 模块文档第 4 条），
+        #:   而**引擎自己按的哪个数字键它当然知道** —— 这是唯一
+        #:   无需看画面、无需样本标定、且 100% 准确的切人来源。
+        #:
+        #: ⚠️ 只覆盖「引擎切的」这一半；用户自己按数字键的那一半在
+        #:   ``core/loop.py::_on_physical_input`` 里喂同一个对象。
+        #:   两半都缺时 ``active_member`` 才是 None。
+        self._active_slots = active_slot_tracker
+        #: 编队名册索引（``actuator.active_slot.CharSlotIndex``）。
+        #: 感知层写它，执行层读它 —— 「免配置切人」的两端。
+        #: ``None`` = 只认静态 :attr:`_char_slots`。
+        #:
+        #: ★ 与 :attr:`_char_slots` 的优先级是**静态 > 动态**：
+        #:   用户手填的是**故意**的，可能与 OCR 不一致（OCR 有误识可能），
+        #:   这时必须听用户的。
+        self._slot_index = slot_index
         # ★ 执行前再确认一次 backend 可用（构造期已查，这里防的是
         #   手工改写 sim.backend 之后绕过检查的情况）
         self.sim.require_backend()
@@ -278,6 +346,25 @@ class IntentExecutor:
         self._nav = _NavWindow()
 
     # -- 对外 ------------------------------------------------------------
+
+    def _user_took_over(self) -> bool:
+        """用户现在是不是在接管（他正按着键）。
+
+        ★ 为什么要单独问一次（2026-10-19）
+          让权时执行层会因为 ``_UserTakeover`` 抛异常 -> outcome=REJECTED
+          -> finally 里松键。而「让权时松键」这条路径**必须**区别对待：
+          用户正按着的键**不能**被松（合成 KeyUp 会把用户的长按/走位
+          **当场掐断**），而引擎自己按着的键**必须**被松
+          （异常安全底线：不能留下卡住的键）。
+
+          判据用安全闸的 ``user_takeover_active`` —— 它和
+          :class:`autopilot.actuator.safety.TakeoverState` 是同一份状态，
+          引擎与主循环看到的是同一个真相。
+        """
+        try:
+            return bool(getattr(self.guard, "user_takeover_active", False))
+        except Exception:  # noqa: BLE001 - 判别失败就按「没让权」处理
+            return False
 
     @property
     def history(self) -> list[ExecutionResult]:
@@ -369,7 +456,14 @@ class IntentExecutor:
                 f"运行 python -m autopilot.tools.keymap_editor 编辑，"
                 f"或检查 config/keymap.toml"
             )
-        if kid is KeyId.NONE:
+        # ⚠️ 必须按**值**比，不能用 ``is``。
+        #   ``KeyId.NONE`` 是类体里的普通 int（0），而
+        #   ``KeyId.from_name("NONE")`` 造出来的是 ``KeyId(0)`` ——
+        #   两者 ``==`` 但 ``is`` 为 False。写成 ``is`` 的话，
+        #   「显式设为 NONE」这个判断对**文件加载**的键位**永远不成立**
+        #   （实测：from_name('NONE') is KeyId.NONE -> False），
+        #   动作会一路掉到 to_vk() 才炸，报错信息差一大截。
+        if int(kid) == KeyId.NONE:
             raise KeyIdError(f"动作 {action} 的按键被显式设为 NONE（不执行）")
         return kid
 
@@ -432,10 +526,18 @@ class IntentExecutor:
             #      再 release_all」—— 连刚按下的 SHIFT 一起松开，
             #      闪避等于没按。顺序反了比不修更糟。
             action_name = intent.action.value
+            #: ★ 本次执行的**有效**时长上限。显式长按要算进去（见
+            #:   :meth:`_effective_max_duration_ms`）。
+            max_dur_ms = self._effective_max_duration_ms(intent, t)
             prev_action = self._last_action
             pre_released = 0
             if self._held and action_name != prev_action:
-                pre_released = len(self.sim.release_all())
+                # ★ exclude_physical：用户正按着的键不碰（2026-10-19）。
+                #   「意图切换时的先松后按」是为了松**引擎自己**的键；
+                #   引擎的键由 ``_engine_down`` 保证一定被松，
+                #   而用户按着的键不能被松 —— 否则用户正走着位就被抽走。
+                pre_released = len(release_all_compat(
+                    self.sim, exclude_physical=self._user_took_over()))
                 self._held = ()
             self._last_action = action_name
             self._pending_hold = []
@@ -448,16 +550,19 @@ class IntentExecutor:
                 return self._finish(res, Outcome.FAILED, f"INPUT_INJECT: {exc}", ev)
             except _PanicStop:
                 return self._finish(res, Outcome.INTERRUPTED, "PANIC_KEY_PRESSED")
+            except _UserTakeover as exc:
+                # ★ 不调 mark_failure —— 让权不是失败（见 _UserTakeover 注释）
+                return self._finish(res, Outcome.REJECTED, str(exc))
             except _Timeout as exc:
                 return self._finish(res, Outcome.TIMEOUT, str(exc))
             if pre_released:
                 res.steps.insert(
                     0, f"release(切换自 {prev_action}): 松开 {pre_released} 个键")
 
-            if res.elapsed_ms > t.max_duration_ms:
+            if res.elapsed_ms > max_dur_ms:
                 return self._finish(
                     res, Outcome.TIMEOUT,
-                    f"耗时 {res.elapsed_ms}ms 超过 max_duration_ms={t.max_duration_ms}",
+                    f"耗时 {res.elapsed_ms}ms 超过 max_duration_ms={max_dur_ms}",
                 )
 
             # ⑤ 记账。**必须传 now**，不能传 time.time()*1000 ——
@@ -481,7 +586,14 @@ class IntentExecutor:
             #    这里只把按住状态结转给下一条意图。**不做任何松键**：
             #    同一条 NORMAL_ATTACK 连着来时左键保持按住（真·长按）。
             if res.outcome is not Outcome.OK:
-                res.released_keys = self.sim.release_all()
+                # ★ exclude_physical（2026-10-19）：让权导致的失败
+                #   （``_UserTakeover`` -> REJECTED）走到这里时，
+                #   **无条件**松键会把用户正按着的键也弹起来 ——
+                #   用户按住 E 的长按被引擎当场掐断。
+                #   「引擎自己按着的键照旧全松」这条底线**不变**
+                #   （模拟器会把引擎的键从受保护集合里减掉）。
+                res.released_keys = release_all_compat(
+                    self.sim, exclude_physical=self._user_took_over())
                 self._held = ()
             else:
                 # ★ 只有**真的新按下**了键才更新 _held。
@@ -515,7 +627,121 @@ class IntentExecutor:
 
     # -- 动作序列 --------------------------------------------------------
 
+    @staticmethod
+    def _effective_max_duration_ms(intent: IntentPacket, t: ActionTraits) -> int:
+        """这次执行的**有效**时长上限（毫秒）。
+
+        ★ 为什么需要它（2026-10-19 加）
+          显式写的 ``hold_ms`` 是**长按**语义 —— 钟离长按 E 要按满
+          1.5 秒才出护盾。而 traits 的 ``max_duration_ms`` 是按
+          「点一下」标的（USE_SKILL = 2000ms）：
+
+            1500ms 按住 + 120ms 空档 = 1620ms
+
+          刚好卡在 2000ms 的边上，慢一点就超时。
+
+          ★ 超时的后果不是「慢」，是**明明按成了却报失败**：
+            执行层返回 TIMEOUT -> 连招以为技能没放出去 ->
+            接着切人 —— 症状是「盾没上出来」，
+            而日志里只有一条 TIMEOUT，没有任何别的线索。
+
+          所以**显式 hold_ms 要求的时间必须算进预算**。
+          上限仍然是有限的（配置写多大就认多大，不会变成无底洞）。
+        """
+        p = intent.params or {}
+        raw_hold = p.get("hold_ms")
+        if raw_hold is None:
+            return t.max_duration_ms
+        try:
+            hold = max(0, int(raw_hold))
+            gap = max(0, int(p.get("gap_ms", 0) or 0))
+        except (TypeError, ValueError):
+            return t.max_duration_ms
+        return max(t.max_duration_ms, hold + gap + 500)
+
     def _run_sequence(
+        self,
+        intent: IntentPacket,
+        t: ActionTraits,
+        key_id: KeyId,
+        res: ExecutionResult,
+        state: StatePacket | None = None,
+    ) -> list[str]:
+        """把一个意图展开成动作序列并执行。
+
+        ★ 这一层是**组合键的外壳**（2026-10-19）。
+          真正的动作展开在 :meth:`_run_sequence_inner` 里。
+
+        ★ 为什么要「组合键」这一层
+          「按住 W 的同时按 E」这种动作，一行按键配置表达不了：
+
+          * 一个意图 = 一个键（``DEFAULT_KEYMAP`` 的单键映射）；
+          * ``MOVE_FORWARD`` 的 W 是**跨 tick 结转**的（``self._held``），
+            而下一条意图开头的「先松后按」会先 ``release_all()`` 把它放掉
+            —— 于是 W 和 E **永远不可能同时按着**。
+
+          所以这里加了「动作期内的附加按住」：``params["hold_keys"]``
+          列出的键在**动作执行期间**按住，动作结束（成功 / 失败 /
+          抛异常 / 急停 / 让权）**一定抬起**。
+
+          这正是「夜兰按住 W 冲刺 → 同时按 E 拉线 → 松开 W」的实现：
+          ``{ char = "夜兰", action = "USE_SKILL", hold_keys = ["W"] }``。
+        """
+        extra = self._extra_hold_keys(intent.params or {})
+        if not extra:
+            return self._run_sequence_inner(intent, t, key_id, res, state)
+
+        steps: list[str] = []
+        inner: list[str] = []
+        pressed: list[tuple[int, str]] = []
+        try:
+            for code, name in extra:
+                self.sim.key_down(code)
+                pressed.append((code, name))
+                steps.append(f"组合键 {name} down")
+            inner = self._run_sequence_inner(intent, t, key_id, res, state)
+        finally:
+            # ★ 无论怎么退出（正常 / 抛异常 / 急停 / 让权）都抬起 ——
+            #   不抬的话键会**卡在游戏里**（角色一直往前跑）。
+            #   逆序抬起，与按下配对。
+            for code, name in reversed(pressed):
+                try:
+                    self.sim.key_up(code)
+                except Exception:  # noqa: BLE001 - 松键失败不能盖掉真正的错
+                    logger.exception("抬起组合键 %s 失败", name)
+                # ★ 抬起记在**最后**，不能提前塞进 steps ——
+                #   那样 steps 会显示成「W down / W up / 按 E」，
+                #   与真实顺序（按 E 时 W 还按着）正好相反，
+                #   读日志的人会以为组合键没生效。
+                inner.append(f"组合键 {name} up")
+        return steps + inner
+
+    def _extra_hold_keys(self, params: dict[str, Any]) -> list[tuple[int, str]]:
+        """读 ``params["hold_keys"]`` -> ``[(vk 码, 名字), ...]``。
+
+        ★ 认不出来的键名**跳过并记日志**，不抛。
+          组合键是「锦上添花」：认错一个键名不该让整条连招断掉。
+          （连招**加载期**已经校验过一遍 —— 那里报错是因为配置写错了，
+          这里是运行时兜底。）
+        """
+        raw = params.get("hold_keys")
+        if not raw:
+            return []
+        if isinstance(raw, str):
+            raw = [raw]
+        out: list[tuple[int, str]] = []
+        for item in raw:
+            name = str(item).strip()
+            if not name:
+                continue
+            vk = _vk_by_name(name)
+            if vk is None:
+                logger.warning("组合键 %r 认不出来，忽略（动作照常执行）", name)
+                continue
+            out.append((int(vk), name.upper()))
+        return out
+
+    def _run_sequence_inner(
         self,
         intent: IntentPacket,
         t: ActionTraits,
@@ -537,14 +763,23 @@ class IntentExecutor:
         p = intent.params or {}
         steps: list[str] = []
         # ★ deadline 走 monotonic，不走 res.started_ms（那可能是注入的假时间）
-        deadline_mono = res.start_mono + t.max_duration_ms / 1000.0
+        #   上限用「有效值」：显式长按要算进去（见 _effective_max_duration_ms）。
+        max_dur_ms = self._effective_max_duration_ms(intent, t)
+        deadline_mono = res.start_mono + max_dur_ms / 1000.0
 
         def check() -> None:
             """每个动作之间都问一次急停 —— 急停必须**立刻**生效。"""
             if self.guard.panic_active:
                 raise _PanicStop()
+            # ★ 用户物理输入让权（2026-10-17）
+            #   和急停一样**必须立刻生效** —— 一个长按动作
+            #   （比如按住左键平A）中间没有 check()，用户就抢不走。
+            #   放在急停之后：急停优先级更高。
+            if self.guard.user_takeover_active:
+                raise _UserTakeover(
+                    f"USER_TAKEOVER:{self.guard.user_takeover_key}")
             if time.monotonic() > deadline_mono:
-                raise _Timeout(f"超过 max_duration_ms={t.max_duration_ms}")
+                raise _Timeout(f"超过 max_duration_ms={max_dur_ms}")
 
         def hold_key(vk) -> bool:
             """长按一个**键盘**键（按下 + 登记为「本次不松」）。返回是否真按了。
@@ -717,21 +952,42 @@ class IntentExecutor:
             #   ⚠️ 时长不过 humanizer：点按时长是**游戏机制阈值**
             #     （超过就变成冲刺），加抖动等于拿机制边界赌运气。
             hold_ms = int(p.get("hold_ms", t.tap_hold_ms or 120))
-            steps.append(f"key {key_id.name} tap {hold_ms}ms")
+            steps.append(f"key {_key_label(key_id)} tap {hold_ms}ms")
             self.sim.key_press(key_id, hold_ms=hold_ms)
             check()
             return steps
 
         if action == "SPRINT":
-            steps.append(f"key {key_id.name} down (sprint hold)"
+            steps.append(f"key {_key_label(key_id)} down (sprint hold)"
                          if hold_key(key_id)
-                         else f"key {key_id.name} 保持按住（跳过重复 down）")
+                         else f"key {_key_label(key_id)} 保持按住（跳过重复 down）")
             check()
             return steps
 
         if action in ("MOVE_FORWARD", "MOVE_BACK", "MOVE_LEFT", "MOVE_RIGHT"):
             # 移动类：按方向键，保持住（原则 5：移动中才转得动视角）
             vk = _move_key(action)
+            # ★★ 定时轻点（2026-10-20 加）：写了 ``hold_ms`` 就是
+            #   「按 N 毫秒后松开」，**不写**仍然是「跨 tick 按住」。
+            #
+            #   ★ 为什么需要它
+            #     连招要「极短距离地偏一下」—— 钟离放完盾留下柱子，
+            #     夜兰在正后方直接 W 冲刺会撞上去。
+            #     而跨 tick 按住 A 会**一直按着**，直到下一条意图开头的
+            #     「先松后按」才放掉 —— 那时角色已经撞上去了。
+            #     轻点则是「按 200ms -> 松开 -> 再走」，正是要的。
+            #
+            #   ⚠ 对既有行为**零影响**
+            #     全仓库没有任何地方给 MOVE_* 传 ``hold_ms``
+            #     （导航走的是 MOVE_TO），所以老路径一行都不变。
+            tap_ms = int(p.get("hold_ms") or 0)
+            if tap_ms > 0:
+                steps.append(f"key {vk.name} tap {tap_ms}ms")
+                # ★ abort_check=check：轻点期间也可被急停 / 让权打断，
+                #   而且 key_press 保证键**一定抬起**（finally）。
+                self.sim.key_press(vk, hold_ms=tap_ms, abort_check=check)
+                check()
+                return steps
             steps.append(f"key {vk.name} down (move hold)"
                          if hold_key(vk)
                          else f"key {vk.name} 保持按住（跳过重复 down）")
@@ -740,17 +996,38 @@ class IntentExecutor:
 
         if action == "JUMP":
             hold = self.humanizer.hold_ms(int(p.get("hold_ms", 50)))
-            steps.append(f"key {key_id.name} press {hold}ms")
+            steps.append(f"key {_key_label(key_id)} press {hold}ms")
             self.sim.key_press(key_id, hold_ms=hold)
             check()
             return steps
 
         if action in ("USE_SKILL", "USE_BURST", "CONFIRM", "CANCEL"):
-            hold = self.humanizer.hold_ms(int(p.get("hold_ms", 30)))
-            steps.append(f"key {key_id.name} press {hold}ms")
-            self.sim.key_press(key_id, hold_ms=hold)
-            check()
+            # ★ 显式写的 hold_ms 是**游戏机制阈值**，不抖。
+            #   钟离长按 E 要按满 1.5 秒才出护盾；humanizer 的 ±15%
+            #   会把它抖到 1275ms —— 差一点就**放不出护盾**，
+            #   而症状是「按了没反应」，日志里一条错都没有。
+            #   （与 tap_hold_ms 同一个道理：机制边界不拿抖动去赌。）
+            raw_hold = p.get("hold_ms")
+            if raw_hold is None:
+                hold = self.humanizer.hold_ms(30)
+            else:
+                hold = max(0, int(raw_hold))
             gap = self.humanizer.delay_ms(int(p.get("gap_ms", 120)))
+            # ★ 长按会把超时闸撑爆：1500ms 的按住 + 120ms 的空档
+            #   = 1620ms，而 USE_SKILL 的 max_duration_ms 只有 2000ms。
+            #   不撑开的话，按**确实按满了**却会被判成 TIMEOUT ——
+            #   明明按成了却报失败，连招还以为技能没放出去。
+            deadline_mono = max(
+                deadline_mono,
+                time.monotonic() + (hold + gap) / 1000.0 + 0.25,
+            )
+            steps.append(f"key {_key_label(key_id)} press {hold}ms")
+            # ★ abort_check=check：长按期间**随时可被打断**。
+            #   用户在这 1.5 秒里按了 E -> 让权 -> check() 抛
+            #   _UserTakeover -> 键立刻抬起 -> 这一步判为 REJECTED。
+            #   没有它，引擎会一直按着 E，用户根本按不动（物理抢占失效）。
+            self.sim.key_press(key_id, hold_ms=hold, abort_check=check)
+            check()
             if gap:
                 time.sleep(gap / 1000.0)
                 steps.append(f"gap {gap}ms")
@@ -762,16 +1039,26 @@ class IntentExecutor:
             if slot is None and want is not None:
                 slot = self._slot_of(want)
             if slot is None:
-                steps.append("switch: 无 slot/char_id，跳过（无可切的位）")
+                # ★ 这条跳过信息要能自解释 —— 它是「连招切不动人」时
+                #   唯一会留下痕迹的地方（屏幕上看不出任何异常）。
+                steps.append(
+                    f"switch: 不知道 {want!r} 在几号位，跳过"
+                    "（静态 [char_slots] 没填，且大世界 OCR 名册里也还没有它 —— "
+                    "OCR 轮转一圈要 ~20 秒）" if want is not None else
+                    "switch: 无 slot/char_id，跳过（无可切的位）")
                 return steps
             k = _slot_key(int(slot))
             steps.append(f"key {k.display_name} press (switch slot {slot})")
             self.sim.key_press(k, hold_ms=self.humanizer.hold_ms(30))
+            # ★ 记账**在按下之后**，不在之前 —— 按失败/被闸拦掉的时候
+            #   游戏里并没有换人，记了账就是撒谎。
+            #   ``check()`` 在下面，抛 _UserTakeover 时会跳过记账。
             check()
+            self._note_switch(int(slot))
             return steps
 
         if action in ("OPEN_INVENTORY", "OPEN_MAP", "OPEN_PAIMON_MENU", "CLOSE"):
-            steps.append(f"key {key_id.name} press (menu)")
+            steps.append(f"key {_key_label(key_id)} press (menu)")
             self.sim.key_press(key_id, hold_ms=self.humanizer.hold_ms(30))
             check()
             return steps
@@ -796,25 +1083,65 @@ class IntentExecutor:
 
         # 兜底：traits 表里没有对应实现的动作，用单键按压
         hold = self.humanizer.hold_ms(int(p.get("hold_ms", 30)))
-        steps.append(f"key {key_id.name} press {hold}ms (fallback)")
+        steps.append(f"key {_key_label(key_id)} press {hold}ms (fallback)")
         self.sim.key_press(key_id, hold_ms=hold)
         return steps
 
     def _slot_of(self, char_id: str) -> int | None:
         """角色 id -> 位置编号 1..4。
 
-        ★ 数据源是 :attr:`_char_slots`，由构造参数或
-          :meth:`set_char_slots` 注入 —— 见那里的长注释说明「为什么不能
-          从 ``self.keymap`` 里取」。
+        两级查找，**静态配置优先**：
 
-        :returns: 查不到返回 ``None``（调用方据此跳过并**记进 steps**，
+        1. :attr:`_char_slots` —— 用户在 ``keymap.toml`` 的 ``[char_slots]``
+           里手填的。填了就以它为准：用户是**故意**写的，可能和 OCR
+           不一致（比如 OCR 把「琴」当成「甘雨」），这时候必须听用户的。
+        2. :attr:`_slot_index` —— 大世界 OCR 自动建的名册（2026-10-18）。
+           这是**免配置**路径：队伍是每个玩家自己的信息，逼用户抄一遍
+           角色名既烦又容易抄错，而抄错**不会报错、只会切错人**。
+
+        ★ 数据源 :attr:`_char_slots` 由构造参数或 :meth:`set_char_slots`
+          注入 —— 见那里的长注释说明「为什么不能从 ``self.keymap`` 里取」。
+
+        :returns: 两处都查不到返回 ``None``（调用方据此跳过并**记进 steps**，
             不是静默无事发生）。
         """
         v = self._char_slots.get(char_id)
-        try:
-            return int(v) if v is not None else None
-        except (TypeError, ValueError):
+        if v is not None:
+            try:
+                slot = int(v)
+            except (TypeError, ValueError):
+                slot = None
+            if slot in (1, 2, 3, 4):
+                return slot
+            # 静态表里有这个键但值非法 -> 不静默退回 OCR，那会掩盖
+            # 用户的笔误。记一条，下面的 None 会让调用方跳过。
+            logger.warning("[char_slots] 里 %r 的值非法：%r（应为 1..4）",
+                           char_id, v)
             return None
+
+        index = self._slot_index
+        if index is None:
+            return None
+        try:
+            slot = index.slot_of(char_id)
+        except Exception:  # noqa: BLE001 - 索引挂了不该让切人变未知错误
+            logger.warning("编队名册查询异常，%r 查不到槽位", char_id,
+                           exc_info=True)
+            return None
+        if slot in (1, 2, 3, 4):
+            return slot
+        return None
+
+    def _note_switch(self, slot: int) -> None:
+        """记一次「切人了」。没接记账器就是空操作。"""
+        tracker = self._active_slots
+        if tracker is None:
+            return
+        try:
+            if not tracker.note_switch(slot, source="engine"):
+                logger.warning("切到非法槽位 %r，未记入在场状态", slot)
+        except Exception:  # noqa: BLE001 - 记账失败不该让一次成功的切人变失败
+            logger.warning("切人记账异常（切人本身已生效）", exc_info=True)
 
     # -- 诊断 ------------------------------------------------------------
 
@@ -834,6 +1161,19 @@ class IntentExecutor:
 
 class _PanicStop(Exception):
     """F12 被按下。立即中止当前意图。"""
+
+
+class _UserTakeover(Exception):
+    """用户在操作，引擎让权。立即中止当前意图（2026-10-17）。
+
+    ★ 与 :class:`_PanicStop` 的区别
+      急停是**整个执行层停机**（熔断器会打开、状态变 INTERRUPTED）；
+      让权只是**这一次意图不做**，引擎还要继续跑。
+
+    ★ 为什么**不**走 ``guard.mark_failure()``
+      让权不是失败。记一次失败会让熔断器的连续失败计数 +1 ——
+      用户按几下键就能把熔断器打开，那是把「礼让」变成了「停机」。
+    """
 
 
 class _Timeout(Exception):
