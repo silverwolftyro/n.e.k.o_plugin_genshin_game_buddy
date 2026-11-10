@@ -148,3 +148,33 @@ def test_scenes__no_legacy_generic_terms(scenes: dict) -> None:
             assert sig not in forbidden, (
                 f"{name}: signal {sig!r} is a 泛词（用户标记的反例）"
             )
+
+
+# =============================================================================
+# 2026-11-09 接线：18 个场景的 avoid / known_suppress 真的被解析出来
+# =============================================================================
+
+
+@pytest.mark.unit
+def test_scenes__each_has_avoid(scenes: dict) -> None:
+    """每个场景都要有 avoid 清单——防剧透标记的数据侧（接线的原料）。"""
+    for name, scene in scenes.items():
+        assert scene.avoid, f"{name}: avoid 为空"
+        for item in scene.avoid:
+            assert item.strip(), f"{name}: avoid 含空白项 {item!r}"
+
+
+@pytest.mark.unit
+def test_scenes__each_known_suppress_is_true(scenes: dict) -> None:
+    """known_suppress 被解析成**真布尔** True（不是字符串 "true"）。"""
+    for name, scene in scenes.items():
+        assert scene.known_suppress is True, f"{name}: known_suppress 不是 True"
+
+
+@pytest.mark.unit
+def test_scenes__avoid_items_are_spoiler_guards(scenes: dict) -> None:
+    """avoid 每条都是"不要…"式的禁令（至少一条以「不要」开头）。"""
+    for name, scene in scenes.items():
+        assert any(item.startswith("不要") for item in scene.avoid), (
+            f"{name}: avoid 里没有「不要…」式的禁令"
+        )

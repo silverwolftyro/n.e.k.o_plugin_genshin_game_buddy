@@ -3594,6 +3594,18 @@ class GenshinGameBuddyPlugin(NekoPluginBase):
         else:
             header = self._t("context.title", game=session.display_name)
 
+        # ★ 2026-11-09 接线：场景级 avoid 进语境块（防剧透标记真正被消费）。
+        #   当前场景优先用 _last_scene_pushed（OCR 命中过、已推过 scene prompt 的那个）。
+        #   防御式：_scene_store 在启动早期可能还是空 dict（见 __init__ 里
+        #   _load_scenes_for_current 的注释），取不到就用空 avoid —— 绝不抛异常。
+        #   读法沿用本文件既有惯例（与 ocr_perceive 里 self._scene_store.get(...) 一致）：
+        #   不引入新的锁语义。
+        scene = self._scene_store.get(self._last_scene_pushed) if self._last_scene_pushed else None
+        scene_avoid = scene.avoid if scene is not None else ()
+        # TODO(guide): 主动提示层据此抑制同话题
+        #   known_suppress 挂在 scene_store.SceneEntry 上，本轮只做到"可读、可查"；
+        #   主动提示层（chat_state / event_to_yui 的主动路径）尚未消费它，留给下一轮。
+
         block = build_context_block(
             header=header,
             tone_line=self._t("context.tone", tone=library.tone) if library.tone else "",
@@ -3602,6 +3614,8 @@ class GenshinGameBuddyPlugin(NekoPluginBase):
             empty_note=self._t("context.no_terms"),
             hint=self._t("context.hint"),
             note=self._t("context.no_speculation"),
+            scene_avoid=scene_avoid,
+            scene_avoid_label=self._t("context.scene_avoid"),
             max_chars=self._options.max_context_chars,
         )
         # push_message v2：只用 parts + visibility + ai_behavior。

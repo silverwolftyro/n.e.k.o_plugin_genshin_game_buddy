@@ -14,10 +14,11 @@
 #
 # avoid:          该场景下**不该说**的内容清单（至少 1 条）——剧透／数值／战斗指令等。
 # known_suppress: 该场景条目被注入语境块后，同话题不再主动提（true = 抑制该话题的主动发言）。
-#                ★ 2026-11-09 接线缺口：scene_store.SceneEntry 目前只暴露
-#                  name / signals / context_terms / prompt，**这两个字段没有消费方**
-#                  （term_store 的 avoid / source 白名单只作用于术语层，不作用于场景层）。
-#                  本轮只补结构、不改消费方，因此这两个字段暂不会被读到。
+#                ★ 2026-11-09 接线现状：scene_store.SceneEntry 已暴露
+#                  name / signals / context_terms / prompt / avoid / known_suppress。
+#                  avoid 已由 __init__._push_context 接进语境块（术语区之后、末尾提示之前，
+#                  整行放不下就整行丢）；known_suppress 目前**可读可查但无消费方**——
+#                  主动提示层（chat_state / event_to_yui 的主动路径）尚未消费它，留给下一轮。
 #
 # 18 场景：深境螺旋 / 大世界探索 / 角色养成 / 角色详情页 / 祈愿 / 背包 / 圣遗物 /
 #          武器 / 天赋升级 / 命之座 / 任务 / 地图 / 活动 / 冒险之证 / 尘歌壶 /

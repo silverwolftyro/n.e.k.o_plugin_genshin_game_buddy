@@ -279,3 +279,65 @@ def test_build_lookup_block__joins_header_and_cards() -> None:
     assert build_lookup_block("", ["A"]) == "A"
     assert build_lookup_block("", []) == ""
     assert build_lookup_block("header", []) == "header"
+# =============================================================================
+# 2026-11-09 接线：场景级 avoid 进语境块
+# =============================================================================
+
+SCENE_AVOID_LABEL = "本场景避免："
+SCENE_AVOID_ITEMS = (
+    "不要剧透当期深渊敌人的配招与后续版本改动",
+    "不要照抄游戏内可读的 buff 数值",
+)
+
+
+@pytest.mark.unit
+def test_context_pack__scene_avoid__reaches_the_block() -> None:
+    """avoid 真的进了语境块输出（不是只加了个字段）。"""
+    block = _block(
+        scene_avoid=list(SCENE_AVOID_ITEMS),
+        scene_avoid_label=SCENE_AVOID_LABEL,
+    )
+    assert SCENE_AVOID_LABEL + SCENE_AVOID_ITEMS[0] in block
+    assert SCENE_AVOID_ITEMS[1] in block
+    # 一句约束，不拆行
+    assert len([line for line in block.splitlines() if SCENE_AVOID_LABEL in line]) == 1
+
+
+@pytest.mark.unit
+def test_context_pack__scene_avoid__absent_keeps_old_output() -> None:
+    """没有 scene_avoid 时，输出与改动前**逐字一致**（老行为不变）。"""
+    without = _block()
+    explicit_empty = _block(scene_avoid=[], scene_avoid_label=SCENE_AVOID_LABEL)
+    assert without == explicit_empty
+    assert SCENE_AVOID_LABEL not in without
+    # 老行为的完整形状（标题 → 口吻 → 术语区 → 末尾提示）
+    assert without.splitlines() == [
+        HEADER,
+        TONE,
+        TERMS_HEADER,
+        *TERM_LINES,
+        HINT,
+    ]
+
+
+@pytest.mark.unit
+def test_context_pack__scene_avoid__no_label_yields_no_line() -> None:
+    """没有 label → 不产生 avoid 行（也不产生悬空标签）。"""
+    block = _block(scene_avoid=list(SCENE_AVOID_ITEMS), scene_avoid_label="")
+    assert SCENE_AVOID_ITEMS[0] not in block
+
+
+@pytest.mark.unit
+def test_context_pack__scene_avoid__dropped_whole_when_over_budget() -> None:
+    """预算不够时**整行丢**（沿用既有语义，不切半个词）。"""
+    roomy = _block(scene_avoid=list(SCENE_AVOID_ITEMS), scene_avoid_label=SCENE_AVOID_LABEL)
+    assert SCENE_AVOID_LABEL in roomy
+
+    tight = _block(
+        scene_avoid=list(SCENE_AVOID_ITEMS),
+        scene_avoid_label=SCENE_AVOID_LABEL,
+        max_chars=60,
+    )
+    assert len(tight) <= 60
+    assert SCENE_AVOID_LABEL not in tight
+    assert SCENE_AVOID_ITEMS[0] not in tight

@@ -3,7 +3,7 @@
 两个产出
 --------
 * **语境块**（自动注入 LLM 上下文）：省字符、按行装配、超预算时**整行丢弃**，
-  不切半个词。标题/口吻是最高优先级，术语行与末尾提示按顺序让位。
+  不切半个词。标题/口吻是最高优先级，术语行、场景约束与末尾提示按顺序让位。
 * **查询卡片**（``lookup_game_term`` 返回体）：单条也受字符上限约束。
 
 本模块不含 i18n、不含 IO、不接触 ``self``：模板文本与标签由调用方渲染后传入，
@@ -78,6 +78,22 @@ def select_context_terms(
     return ContextSelection(entries=library.context_candidates()[:limit])
 
 
+def render_scene_avoid(avoid: Sequence[str], *, label: str) -> str:
+    """把场景级 ``avoid`` 清单渲染成**一句**约束文本。
+
+    * 清单为空 → 返回空串（调用方据此不产生空行）。
+    * ``label`` 由调用方传入（与 ``terms_header`` / ``empty_note`` 同一约定）：
+      本模块不含 i18n，不硬编码中文文案。
+    * 多条之间用「、」连接，渲染成**一行**。
+    """
+    if not label:
+        return ""
+    items = [item.strip() for item in avoid if isinstance(item, str) and item.strip()]
+    if not items:
+        return ""
+    return f"{label}{'、'.join(items)}"
+
+
 def build_context_block(
     *,
     header: str,
@@ -87,11 +103,13 @@ def build_context_block(
     empty_note: str = "",
     hint: str = "",
     note: str = "",
+    scene_avoid: Sequence[str] = (),
+    scene_avoid_label: str = "",
     max_chars: int = 800,
 ) -> str:
     """装配语境块，保证 ``len(result) <= max_chars``（``max_chars`` 至少按 1 处理）。
 
-    装配顺序即优先级：标题 → 口吻 → 术语区 → 末尾提示 → 常驻规则。
+    装配顺序即优先级：标题 → 口吻 → 术语区 → 场景约束 → 末尾提示 → 常驻规则。
     术语区只有在"标题行 + 至少一条术语行"放得下时才展开，避免出现悬空的"常用术语："。
 
     ★ ``note`` 与 ``hint`` 分开装（2026-10-18）
@@ -123,6 +141,15 @@ def build_context_block(
                     break
     elif not clean_terms and empty_note and fits(empty_note):
         lines.append(empty_note)
+
+    # ★ 场景级防剧透约束（2026-11-09 接线）：术语区之后、末尾提示之前。
+    #   放不下就整行丢（沿用本文件既有语义），不做半行裁剪。
+    # TODO(guide): 主动提示层据此抑制同话题
+    #   known_suppress 挂在 scene_store.SceneEntry 上，本轮只做到"可读、可查"；
+    #   主动提示层（chat_state / event_to_yui 的主动路径）尚未消费它，留给下一轮。
+    avoid_line = render_scene_avoid(scene_avoid, label=scene_avoid_label)
+    if avoid_line and fits(avoid_line):
+        lines.append(avoid_line)
 
     if hint and fits(hint):
         lines.append(hint)
@@ -187,6 +214,7 @@ __all__ = [
     "build_context_block",
     "build_lookup_block",
     "clip_text",
+    "render_scene_avoid",
     "render_term_card",
     "select_context_terms",
 ]

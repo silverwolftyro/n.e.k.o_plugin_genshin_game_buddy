@@ -18,6 +18,12 @@ class SceneEntry:
     signals: tuple[str, ...] = ()
     context_terms: tuple[str, ...] = ()
     prompt: str = ""  # 拍板 2.0.61 补丁：原 hint 改名 prompt，避免与 context_pack.hint 混淆
+    # ★ 2026-11-09 接线：场景级防剧透字段。
+    #   avoid          —— 该场景下**不该说**的内容清单（剧透／数值／战斗指令）。
+    #   known_suppress —— 该场景条目被注入语境块后，同话题不再主动提。
+    #   用 tuple 而非 list：SceneEntry 是 frozen dataclass，list 字段会让它不可 hash。
+    avoid: tuple[str, ...] = ()
+    known_suppress: bool = False
 
 
 def _clean_str_list(raw: object) -> tuple[str, ...]:
@@ -47,6 +53,10 @@ def _parse_scenes(payload: dict, warnings: list[str]) -> dict[str, SceneEntry]:
             signals=_clean_str_list(values.get("signals")),
             context_terms=_clean_str_list(values.get("context_terms")),
             prompt=str(values.get("prompt") or values.get("hint") or "").strip(),  # 向后兼容旧 "hint" key
+            avoid=_clean_str_list(values.get("avoid")),
+            # 只认**真布尔** true：字符串 "false" / "true"、数字 1 一律当 False。
+            # （bool("false") 是 True —— 那会把显式关掉的场景误当成要抑制。）
+            known_suppress=values.get("known_suppress") is True,
         )
     return scenes
 
