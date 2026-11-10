@@ -62,7 +62,7 @@ CONSOLE_IPC_COMMAND = "SHOW"
 CONSOLE_EXE_ENV = "NEKO_CONSOLE_EXE"
 
 #: 环境变量没给时的兜底。仅在浮窗被单独跑起来时用得上。
-CONSOLE_EXE_FALLBACK = Path(r"D:\NEKO\NEKO-Console\build\Console.exe")
+CONSOLE_EXE_FALLBACK = Path(r"D:\workspace\N.E.K.O\NEKO-genshin\NEKO-Console\build\Console.exe")
 
 #: 报错时提一句文件名，比甩一整条路径好懂。
 CONSOLE_EXE_NAME = "Console.exe"

@@ -88,7 +88,7 @@ except OSError:
 PLUGIN_ROOT = Path(os.environ.get(
     "NEKO_PLUGIN_ROOT",
     str(_DEFAULT_ROOT) if _DEFAULT_ROOT else
-    r"D:\NEKO\N.E.K.O-main\N.E.K.O-main\plugin\plugins\genshin_game_buddy",
+    r"D:\workspace\N.E.K.O\NEKO-genshin\N.E.K.O-main\N.E.K.O-main\plugin\plugins\genshin_game_buddy",
 ))
 RUNTIME_DIR = PLUGIN_ROOT / "autopilot" / "_runtime"
 

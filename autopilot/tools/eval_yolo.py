@@ -1,6 +1,6 @@
 """评估 ONNX 模型：mAP + confusion matrix + 逐类指标。
 
-    python -m autopilot.tools.eval_yolo --data D:/NEKO/yolo_data
+    python -m autopilot.tools.eval_yolo --data D:/项目/N.E.K.O/NEKO-genshin/yolo_data
 
 用 **onnxruntime** 跑推理（不用 ultralytics），保证评估的是**运行时真正用的
 那条路径** —— 不是"训练框架跑得好好的、导出后掉了点"。

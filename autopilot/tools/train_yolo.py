@@ -1,6 +1,6 @@
 """训练 YOLO11n 并导出 ONNX。
 
-    python -m autopilot.tools.train_yolo --data D:/NEKO/yolo_data
+    python -m autopilot.tools.train_yolo --data D:/项目/N.E.K.O/NEKO-genshin/yolo_data
 
 ⚠️ **许可证说明（重要）**：
     本脚本 **import ultralytics**（AGPL-3.0）。这是**允许的**，因为：

@@ -98,6 +98,15 @@ def main() -> int:
                          "运行中按 Alt+T 也能轮换")
     ap.add_argument("--log-level", default="WARNING",
                     choices=["DEBUG", "INFO", "WARN", "ERROR"])
+    # ★ 孤儿守卫开关（2026-10-17）
+    #   默认跟主控台走完一生：它没了，卡片就自己退，不留在屏幕上当孤儿。
+    #   要常驻卡片（比如脱离主控台单独看状态）就传 --no-follow-console-exit。
+    #   手动启动时本来就没有主控台 PID，开关不影响任何行为。
+    ap.add_argument(
+        "--follow-console-exit", action=argparse.BooleanOptionalAction,
+        default=True,
+        help="主控台退出/崩溃后卡片是否自行退出（默认开）。"
+             "用 --no-follow-console-exit 让卡片常驻。")
     args = ap.parse_args()
 
     bootstrap()
@@ -152,7 +161,9 @@ def main() -> int:
 
     app = build(x=args.x, y=args.y, alpha=args.alpha,
                 scale=args.scale, reset_pos=args.reset_pos,
-                mode=args.mode, **build_kw)
+                mode=args.mode,
+                follow_console_exit=args.follow_console_exit,
+                **build_kw)
     print(f"{C.DIM}overlay 已启动（{args.mode}），Ctrl+C 关闭{C.OFF}")
     return app.run()
 

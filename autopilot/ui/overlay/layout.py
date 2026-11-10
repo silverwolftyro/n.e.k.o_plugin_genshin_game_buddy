@@ -297,12 +297,22 @@ def resolve_pos(screen_w: int, screen_h: int, *,
 # --------------------------------------------------------------------------
 
 #: RuntimePhase -> 中文标签。**只做显示**，判断逻辑一律用枚举值本身。
+#:
+#: ★ ``UNKNOWN`` 必须在这里有条目
+#:   --------------------------
+#:   ``RuntimePhase.UNKNOWN`` 的含义是「引擎没报出可映射的相位」
+#:   （见 ``run_loop._ui_snapshot`` 的兜底分支）。它**不是**一个正常的
+#:   运行态，原先漏掉它、而 ``_state_text`` 又对未知值原样透出，于是
+#:   headline 会印出字面量 ``RuntimePhase``。给「未连接」比给它
+#:   「未知」准 —— 用户看到「未连接」知道该去看引擎，看到「未知」
+#:   只会以为是识别层在瞎猜。
 _PHASE_LABEL: dict[str, str] = {
     "IDLE": "空闲",
     "RUNNING": "运行中",
     "PAUSED": "已暂停",
     "STOPPING": "停止中",
     "STOPPED": "已停止",
+    "UNKNOWN": "未连接",
 }
 
 
@@ -354,6 +364,8 @@ class PanelModel:
     height: int = 0
     #: 边框是否闪红（急停）
     panic: bool = False
+    #: 接管状态（``CONTROL_STYLE`` 的键）。None = 引擎离线，模式无从谈起。
+    control: str | None = None
     #: 底部事件提示（None = 不显示）
     toast: str | None = None
     toast_color: str = theme.DIM
@@ -363,9 +375,14 @@ class PanelModel:
 
         没有这个，空转时每 100ms 都会触发一次 tk 文本重画，
         白白消耗 CPU，还可能引起闪烁。
+
+        ★ ``control`` **必须**进指纹
+          不进的话，用户按下键让权时圆点颜色不变（红点->蓝点的
+          变化不在 key 里），而那次重绘正好被这个比对挡掉 ——
+          卡片会「变绿不变蓝」，而这正是本功能要解决的那个症状。
         """
         return (tuple((ln.text, ln.color, ln.accent) for ln in self.lines),
-                self.panic, self.toast, self.toast_color)
+                self.panic, self.control, self.toast, self.toast_color)
 
 
 #: 寻路 state -> (中文标签, 颜色)。未知值走 (原样, DIM) —— UI 不能因脏数据崩。
@@ -379,8 +396,45 @@ _NAV_STATE_STYLE: dict[str, tuple[str, str]] = {
     # 「用户点了浮窗主动停的」。刻意**不进** NAV_FINAL_STATES：
     # 已停止是一次性事件，不该在浮窗上挂 5 分钟（5s 档正好）。
     "stopped":    ("已停止", theme.ACCENT_PAUSE),
-    "dry_run":    ("空跑",   theme.ACCENT_IDLE),
+    "dry_run":    ("仅观察·不按键", theme.ACCENT_PAUSE),
 }
+
+
+#: 接管状态 -> (徽标文字, 颜色)。键与 ``StateSnapshot.control_state`` 一一对应。
+#:
+#: ★ 为什么用「彩色圆点 + 文字」而不是 emoji（🟢🟡🔵）
+#:   卡片的字体是 Microsoft YaHei UI，emoji 在 tk 里退化成**单色**方块 ——
+#:   三种状态看起来一模一样，正好毁掉这个功能的全部意义。
+#:   ``●`` 是这个面板本来就在用的字形（headline 那个点），彩色可靠。
+#:   真正的区分靠**颜色** + **文字**，圆点只是把颜色放到最显眼的位置。
+#:
+#: ★★ 为什么干跑写全称「仅观察 · 不按按键」（2026-10-19）
+#:   「仅观察」两个字太容易被读成「看着点、按得轻」。
+#:   而 2026-10-19 之后**干跑是出厂默认**，用户双击 bat 看到的就是这一行 ——
+#:   这一行的每一个字都在回答「我的键鼠安不安全」，含糊不得。
+#:   「不按按键」是那句话的直接答案，别的都不如它。
+CONTROL_STYLE: dict[str, tuple[str, str]] = {
+    "TAKEOVER": ("用户接管中",   theme.ACCENT_IDLE),   # 蓝：引擎正在礼让
+    "LIVE":     ("完全接管",     theme.ACCENT_RUN),    # 绿：真发按键
+    "DRY_RUN":  ("仅观察·不按按键", theme.ACCENT_PAUSE),  # 黄：只决策不按键
+}
+
+
+def _control_state(snap: Any) -> str:
+    """读快照里的接管三态。
+
+    ★ 为什么**不用** ``snap.control_state`` 属性直接调
+      overlay 可能读到**上一代引擎**写的旧快照文件（升级没重启引擎，
+      或用户手改过通道文件）。那时这个属性根本不存在，直接调会
+      AttributeError 把整个 overlay 打死 —— 卡片一崩，用户连急停键
+      都看不见了，那是比「少显示一个模式」严重得多的事。
+    ``getattr`` 兜到 DRY_RUN：旧快照一律显示「仅观察」，保守。
+    """
+    try:
+        st = str(getattr(snap, "control_state", "") or "")
+    except Exception:  # noqa: BLE001
+        st = ""
+    return st if st in CONTROL_STYLE else "DRY_RUN"
 
 
 def _fmt_target(nav: dict) -> str:
@@ -576,11 +630,21 @@ def build_panel(snap: Any, *, toast: str | None = None,
                           toast_color=theme.severity_color(toast_sev),
                           panic=panic or str(nav.get("state")) == "panic")
 
-    state = str(getattr(snap, "state", "UNKNOWN"))
-    health = str(getattr(snap, "health", "OFFLINE"))
+    # ★ state / health **必须**过 _enum_value，不能直接 str()
+    #   快照是 pydantic 模型，ChannelReader 用 model_validate_json 读回来
+    #   时这两个字段会**重新变成枚举实例**，直接 str() 拿到的是
+    #   "RuntimePhase.STOPPED" / "Health.OFFLINE"。后果有两处：
+    #     · _state_text 查表落空 -> headline 印出 "RuntimePhase.…"
+    #     · health == "OFFLINE" 永远不成立 -> 整个离线分支形同虚设
+    #   第二条更隐蔽：引擎根本没跑时，面板不会显示「○ 离线」，
+    #   而是掉进正常分支渲染成一副「在跑但场景未知」的样子。
+    state = _enum_value(getattr(snap, "state", None))
+    health = _enum_value(getattr(snap, "health", None), "OFFLINE")
     hz = float(getattr(snap, "tick_hz", 0.0))
     p95 = float(getattr(snap, "tick_p95_ms", 0.0))
-    scene = str(getattr(snap, "scene", "UNKNOWN"))
+    # ★ scene 默认空串而不是 "UNKNOWN"：空串 = 引擎还没报过场景，
+    #   与「判过了、判的是非大世界」是两件事（见 _scene_text）。
+    scene = str(getattr(snap, "scene", "") or "").strip()
     intent = getattr(snap, "intent", None)
     cap = getattr(snap, "capture", None)
 
@@ -635,10 +699,22 @@ def build_panel(snap: Any, *, toast: str | None = None,
         head_color = theme.ACCENT_RUN
 
     # 场景枚举同理：UNKNOWN 是内部值，观众看到只会以为没做完
-    scene_txt = "未知" if scene == "UNKNOWN" else scene
+    scene_txt = _scene_text(scene)
+
+    # ★★ 接管状态（2026-10-18）：卡片第一眼必须能回答
+    #   「它现在到底动不动我的键」。
+    #   之前这条信息在 UI 上**完全不存在** —— dry-run 和 live 的日志、
+    #   快照、颜色全都一样，用户只能在事件流里猜自己启动时带了什么参数。
+    control = _control_state(snap)
+    ctl_text, ctl_color = CONTROL_STYLE[control]
 
     lines = [
-        Line(f"● {sess_txt} · {state_txt}", head_color, head_color),
+        # 圆点（accent）用**接管色**，文字用 head_color。
+        # 两者刻意分开：head_color 承载「无会话 / 已完成 / 已崩溃」
+        # 这套诊断语义（见上面 A6 那段），接管色承载「能不能动我的键」，
+        # 合成一个颜色会让其中一个语义消失。
+        Line(f"● {sess_txt} · {state_txt} · {ctl_text}",
+             head_color, ctl_color),
         Line(f"场景: {scene_txt}", theme.FG),
         Line(f"意图: {intent_txt}", theme.FG),
     ]
@@ -660,14 +736,44 @@ def build_panel(snap: Any, *, toast: str | None = None,
         lines.insert(1, Line(f"{hz:.1f} Hz · {p95:.0f}ms P95", theme.DIM))
 
     return PanelModel(lines=lines, height=5 * theme.LINE_HEIGHT,
+                      control=control,
                       toast=toast,
                       toast_color=theme.severity_color(toast_sev),
                       panic=panic)
 
 
+def _scene_text(scene: str) -> str:
+    """场景 ID -> 面板文字。
+
+    ★ 空串与 ``UNKNOWN`` 是**两件事**，不能都显示成「未知」
+      --------------------------------------------------------
+      空串     = 引擎**还没报过**场景（刚起，还没跑出第一个 tick）。
+      UNKNOWN = SceneDetector **确实判过**，判的结论是「非大世界」。
+
+      真机 2026-10-14 踩的就是合二为一的代价：那一次引擎全程在
+      WORLD（快照里 ``by_scene={"WORLD": 355}``），可 UI 显示了一整场
+      「场景: 未知」。根因是 ``run_loop`` 只在**场景变化事件**里更新
+      场景，而第一次赋值被 ``CoreLoop`` 吞掉（见 :func:`_state_text`
+      同段的说明），于是 UI 手里的值永远停在初始的 UNKNOWN ——
+      一个「从没判过」的值被渲染成了「判成了非大世界」。
+
+      开机头几秒显示「等待连接」是诚实的：它说明引擎还在起，
+      而不是说识别层把大世界判没了。
+    """
+    if not scene:
+        return "等待连接"
+    if scene == "UNKNOWN":
+        return "未知"
+    return scene
+
+
 def _state_text(state: str) -> str:
-    return {"RUNNING": "运行中", "PAUSED": "已暂停", "STOPPING": "停止中",
-            "STOPPED": "已停止", "IDLE": "空闲"}.get(state, state)
+    """RuntimePhase -> 中文。**未知值原样透出**，不静默吞掉新枚举。
+
+    真值表统一用模块级的 :data:`_PHASE_LABEL` —— 之前这里另起了一份
+    五个 key 的字典，模块级那份成了死代码，两份迟早会漂。
+    """
+    return _PHASE_LABEL.get(state, state or "未连接")
 
 
 __all__ = [
@@ -682,6 +788,7 @@ __all__ = [
     "SESSION_SCHEMA_VERSION",
     "SESSION_STATE_FILE",
     "SESSION_STATE_MAX_AGE_S",
+    "CONTROL_STYLE",
     "load_session_state",
     "OverlayPos",
     "POS_FILE",

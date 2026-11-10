@@ -1,6 +1,6 @@
 """数据集质量检查（训练前必跑）。
 
-    python -m autopilot.tools.check_dataset --data D:/NEKO/yolo_data
+    python -m autopilot.tools.check_dataset --data D:/项目/N.E.K.O/NEKO-genshin/yolo_data
 
 检查项：
     1. images/ 与 labels/ 数量是否一致

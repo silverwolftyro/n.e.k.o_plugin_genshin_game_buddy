@@ -44,6 +44,7 @@ BAR = "═" * 54
 
 logger = logging.getLogger("autopilot.run_loop")
 
+
 #: ``--title`` 的 ASCII 别名 -> 真实窗口标题。
 #:
 #: ★ 为什么需要它（2026-10-10 真机事故）
@@ -118,7 +119,50 @@ def _ui_kill() -> None:
     os._exit(1)
 
 
-def _ui_snapshot(ctx, loop, run_id: str, scene: str, last_action: str):
+def _ui_party(stack) -> list:
+    """编队 1~4 号位的角色名，供 Console 展示。**任何异常都退回空列表。**
+
+    ★ 为什么要固定四条、空的也写
+      Console 的「当前队伍」是四个**固定格子**。少一条时它得自己补，
+      而「补出来的那一格」和「引擎真的没认出来」在界面上长得一样 ——
+      用户会以为队友是空的。所以空位也显式传出去（``name=""``）。
+
+    ★ 为什么 ``active`` 来自**切人记账**而不是画面
+      跟 :class:`ActiveSlotTracker` 的语义保持一致 —— 在场是谁靠
+      「按了哪个数字键」记账，不是 OCR 认头像。两者在已知场景
+      （角色阵亡自动切人、中途换队）会不一致，而 UI 显示的那个
+      必须是**执行层真正认的那个**，否则用户看到的和引擎做的
+      对不上，那比不知道更糟。
+    """
+    try:
+        from autopilot.ui.schema import PartySlot  # noqa: PLC0415
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("读不到 PartySlot（UI 用空名册）：%s", exc)
+        return []
+
+    index = getattr(stack, "char_slot_index", None)
+    tracker = getattr(stack, "active_slots", None)
+    cur: int | None = None
+    try:
+        cur = tracker.current() if tracker is not None else None
+    except Exception:  # noqa: BLE001
+        cur = None
+
+    out = []
+    for slot in (1, 2, 3, 4):
+        name = ""
+        if index is not None:
+            try:
+                v = index.name_of(slot)
+                name = str(v) if v else ""
+            except Exception:  # noqa: BLE001
+                name = ""
+        out.append(PartySlot(slot=slot, name=name, active=(cur == slot)))
+    return out
+
+
+def _ui_snapshot(ctx, loop, run_id: str, scene: str, last_action: str,
+                 stack=None):
     """从 ctx / loop 组一份 StateSnapshot。
 
     ★ 每个来源都单独 try —— 截图器、stats、bus 任何一处出问题
@@ -126,7 +170,7 @@ def _ui_snapshot(ctx, loop, run_id: str, scene: str, last_action: str):
       而 run_loop 明明还好好地跑着）。
     """
     from autopilot.ui.schema import (  # noqa: PLC0415
-        CaptureStat, IntentStat, RuntimePhase, StateSnapshot,
+        DRY_RUN, CaptureStat, IntentStat, RuntimePhase, StateSnapshot,
     )
 
     try:
@@ -140,12 +184,36 @@ def _ui_snapshot(ctx, loop, run_id: str, scene: str, last_action: str):
     except Exception:  # noqa: BLE001
         phase = RuntimePhase.UNKNOWN
 
+    # ★ 场景**问引擎要**，不只靠事件
+    #   --------------------------------
+    #   SCENE_CHANGED 只在场景**变化**时发，且第一次赋值被 CoreLoop
+    #   吞掉（不然开场会多一句「None -> WORLD」）。只靠事件的话，
+    #   引擎全程停在 WORLD 时 UI 会一直显示 UNKNOWN —— 真机
+    #   2026-10-14 整场如此（快照 scene="UNKNOWN" 而 by_scene={"WORLD":355}）。
+    #
+    #   优先问 loop.last_scene（当前真值）；它还没跑出第一个 tick 时
+    #   返回 None，这时退回事件里攒下的值，最后兜底空串（= 等待连接）。
+    try:
+        live_scene = str(getattr(loop, "last_scene", "") or "")
+    except Exception:  # noqa: BLE001
+        live_scene = ""
+    scene = live_scene or str(scene or "").strip()
+
     try:
         gac = getattr(ctx.capturer, "get_active_channel", None)
         ch = gac() if callable(gac) else None
         active = str(getattr(ch, "value", "") or "")
     except Exception:  # noqa: BLE001
         active = ""
+
+    # ★ 接管状态一次取两个（CoreLoop.runtime_info）
+    #   分两次读的话，让权窗口可能在两次之间到期 —— 快照就会记下
+    #   「不在让权中」而 UI 恰好读到 True，那种不一致极难复现。
+    #   拿不到 loop（单测里传 None）就退回保守值：DRY_RUN + 没让权。
+    try:
+        run_mode, takeover = loop.runtime_info()
+    except Exception:  # noqa: BLE001
+        run_mode, takeover = DRY_RUN, False
 
     return StateSnapshot(
         run_id=run_id,
@@ -162,6 +230,9 @@ def _ui_snapshot(ctx, loop, run_id: str, scene: str, last_action: str):
                           idle_streak=int(st.get("consecutive_idle", 0)),
                           last_action=last_action),
         capture=CaptureStat(active=active, degraded_from=""),
+        run_mode=run_mode,
+        user_takeover=takeover,
+        party=_ui_party(stack),
         raw_stats=st,
     )
 
@@ -189,6 +260,10 @@ def main() -> int:
     ap.add_argument("--title", default="",
                     help="窗口匹配关键字（默认取配置里的 window_title_substr）")
     ap.add_argument("--rules-dir", default="", help="覆盖默认规则目录")
+    ap.add_argument("--keymap", default="",
+                    help="键位配置路径（默认 autopilot/config/keymap.toml）")
+    ap.add_argument("--combos", default="",
+                    help="连招配置路径（默认 autopilot/combos/combos.toml）")
     ap.add_argument("--dry-run", action="store_true",
                     help="执行层用 DryRunBackend（默认）")
     ap.add_argument("--live", action="store_true",
@@ -229,8 +304,10 @@ def main() -> int:
 
     args = ap.parse_args()
 
+
     bootstrap()
     setup_logging(args.log_level == "DEBUG")
+
 
     if not sys.stdout.isatty():
         C.disable()
@@ -315,15 +392,45 @@ def main() -> int:
         # ★ 用**绝对**导入而不是 `from ._stack import`：直接
         #   `python tools/run_loop.py` 时 __package__ 为空，
         #   相对导入会 ImportError —— 只有 `python -m` 才走得通。
-        from autopilot.tools._stack import build_stack  # noqa: PLC0415
+        # ★ keymap_path / combos_path 必须显式给（2026-10-19）。
+        #   本文件以前**不传**，而 _stack.load_static_char_slots 在
+        #   keymap_path 为空时直接返回 {}（_stack.py:92），于是：
+        #     · keymap.toml 的 [char_slots] 整份被丢弃 —— 连招切人
+        #       只能等大世界 OCR 认满 ~20 秒，认错就切错人；
+        #     · 执行层退回**内置默认键位**（_stack.py:154），用户的
+        #       自定义键位也不生效。
+        #   两边都是**静默**的：启动不报错、界面不显示，只有行为不对。
+        #   打包版同样中招 —— autopilot_entry.py 只是转发到本模块。
+        from autopilot.tools._stack import (            # noqa: PLC0415
+            build_stack,
+            load_static_char_slots,
+        )
+
+        # autopilot 包根 = autopilot/tools/ 的上一级（run_loop.py:33 已 import Path）
+        _ap_root = Path(__file__).resolve().parents[1]
+        keymap_path = (Path(args.keymap) if args.keymap
+                       else _ap_root / "config" / "keymap.toml")
+        combos_path = (Path(args.combos) if args.combos
+                       else _ap_root / "combos" / "combos.toml")
+        if not keymap_path.is_file():
+            logger.warning("键位配置不存在，改用内置默认：%s", keymap_path)
 
         st = build_stack(cfg=cfg, rules_dir=args.rules_dir or None,
-                         dry_run=not live)
+                         dry_run=not live, keymap_path=keymap_path,
+                         combos_path=combos_path if combos_path.is_file()
+                         else None)
+        # 这张表填了没有，是「连招切不动人」的唯一预警点。
+        _slots = load_static_char_slots(keymap_path)
+        say_slots = _slots or {}
+        print(f"  {C.DIM}键位/名册  : {keymap_path}{C.OFF}")
+        print(f"  {C.DIM}[char_slots]: "
+              f"{say_slots if say_slots else '（空 —— 切人将只依赖 OCR 名册）'}{C.OFF}")
     except Exception as exc:  # noqa: BLE001
         print(f"{C.ERR}✗ 组装失败：{type(exc).__name__}: {exc}{C.OFF}",
               file=sys.stderr)
         print(f"{C.DIM}  先跑 python -m autopilot.tools.loop_diagnose 看哪一环挂了{C.OFF}")
         return 2
+
 
     for w in st.warnings or []:
         print(f"{C.WARN}⚠ {w}{C.OFF}")
@@ -339,11 +446,23 @@ def main() -> int:
     #   / CoreLoop 自己的默认值（本来就一致：5Hz / 10 次 / 5 次 / 10s）。
     ctx = RuntimeContext(capturer=st.capturer, builder=st.builder,
                          policy=st.policy, executor=st.executor,
-                         guard=st.guard, tick_rate_hz=args.tick_rate)
+                         guard=st.guard, tick_rate_hz=args.tick_rate,
+                         # ★ 同一个记账器对象喂给执行层、监听层、感知层。
+                         #   不传的话 loop 收不到 ctx.active_slots，
+                         #   用户按数字键就记不进账（builder 仍读得到自己那份，
+                         #   于是「用户切人」这半边会静默失效）。
+                         active_slots=st.active_slots)
     # 急停直接读 SafetyGuard —— 它是唯一碰 GetAsyncKeyState 的地方，
     # 这里不再自己轮询一遍（两处轮询迟早会不一致）。
     guard = st.guard
     loop = CoreLoop(ctx, panic_check=((lambda: guard.panic_active) if guard else None))
+    # ★ 声明执行模式（2026-10-18）。这是**唯一**的真值来源：卡片上的
+    #   「完全接管 / 仅观察」读的就是 loop.run_mode()，而它由这里
+    #   从 argparse 的解析结果写死。之前 UI 上根本看不出 dry-run 和
+    #   live 的区别，两者的日志和快照长得一模一样。
+    loop.set_run_mode(live)
+
+
     ctx.bus.subscribe(LogSubscriber(), name="log")
 
     # ---- A 轨 UI 通道 ----
@@ -355,7 +474,11 @@ def main() -> int:
     from autopilot.ui.writer import ChannelWriter  # noqa: PLC0415
 
     ui_state = {"stop": False, "kill": False,
-                "scene": "UNKNOWN", "last_action": ""}
+                # ★ 空串 = 「引擎还没报过场景」，不是 UNKNOWN。
+                #   UNKNOWN 有确切含义（判过了，判的是非大世界），
+                #   拿它当初始值会让开机头几秒假装已经判过 —— 详见
+                #   layout._scene_text 与 CoreLoop.last_scene。
+                "scene": "", "last_action": ""}
     ui_stop = threading.Event()
     ui_thread: threading.Thread | None = None
     ui_unsub = None
@@ -406,7 +529,7 @@ def main() -> int:
                 try:
                     writer.write_snapshot(_ui_snapshot(
                         ctx, loop, writer.run_id,
-                        ui_state["scene"], ui_state["last_action"]))
+                        ui_state["scene"], ui_state["last_action"], st))
                 except Exception as exc:  # noqa: BLE001
                     # ★ 从 debug 提到 warning（2026-10-13 修）。
                     #   「写快照失败」在默认 INFO 级别下**完全不可见** ——
@@ -478,6 +601,7 @@ def main() -> int:
 
     # ---- banner（一次性，不刷屏）----
     win_ok = bool(getattr(st.capturer, "window_rect", None))
+
     win_txt = (f"{cfg.capture.window_title_substr} {C.OK}(已找到){C.OFF}"
                if win_ok else
                f"{cfg.capture.window_title_substr} {C.ERR}(未找到){C.OFF}")
@@ -487,7 +611,6 @@ def main() -> int:
     mode_txt = (f"{C.ERR}LIVE{C.OFF} {C.WARN}⚠ 会真的控制键鼠{C.OFF}"
                 if live else
                 f"{C.OK}DRY-RUN{C.OFF} {C.DIM}(不发按键){C.OFF}")
-
     print(f"\n{BAR}")
     print(f"{C.BOLD}N.E.K.O. Autopilot — 主循环{C.OFF}")
     print(f"{BAR}")
@@ -599,7 +722,7 @@ def main() -> int:
                 try:
                     writer.write_snapshot(_ui_snapshot(
                         ctx, loop, writer.run_id,
-                        ui_state["scene"], ui_state["last_action"]))
+                        ui_state["scene"], ui_state["last_action"], st))
                     writer.write_event(StateEvent(
                         code=EventCode.RUN_STOPPED.value, severity="INFO",
                         message=f"run_loop 已停止（{reason}）", context={}))
@@ -608,7 +731,6 @@ def main() -> int:
                     print(f"{C.WARN}关闭 UI 通道时出错：{exc}{C.OFF}",
                           file=sys.stderr)
 
-    # ---- 最终统计 ----
     print(f"\n{line()}")
     print(f"{C.BOLD}最终统计{C.OFF}  {C.DIM}({reason}){C.OFF}")
     print(ctx.stats.format_report("运行结束"))

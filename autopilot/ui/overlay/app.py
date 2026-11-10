@@ -29,6 +29,7 @@ import uuid
 from pathlib import Path
 
 from . import console_launcher, layout, theme
+from .guardian import ParentWatchdog
 from .interaction import Interaction
 
 logger = logging.getLogger(__name__)
@@ -58,7 +59,7 @@ LIVE_SCALE_EPS = 0.005
 CONSOLE_CMD_DIR_ENV = "NEKO_CONSOLE_CMD_DIR"
 
 #: 环境变量没给时的兜底路径。只在 overlay 被单独跑起来（验收场景 3）时用得上。
-CONSOLE_CMD_DIR_FALLBACK = r"D:\NEKO\NEKO-Console\runtime"
+CONSOLE_CMD_DIR_FALLBACK = r"D:\workspace\N.E.K.O\NEKO-genshin\NEKO-Console\runtime"
 
 #: 主控台命令文件。与主控台 bridge.py::COMMANDS_FILE_NAME 必须一致。
 CONSOLE_COMMANDS_FILE = "console_commands.jsonl"
@@ -104,7 +105,8 @@ class OverlayApp:
     def __init__(self, reader, *, sender=None, x: int | None = None,
                  y: int | None = None, alpha: float | None = None,
                  scale: float | None = None,
-                 reset_pos: bool = False) -> None:
+                 reset_pos: bool = False,
+                 follow_console_exit: bool = True) -> None:
         from autopilot.ui.commands import CommandSender  # noqa: PLC0415
         from autopilot.ui.reader import ChannelReader  # noqa: PLC0415
 
@@ -182,6 +184,16 @@ class OverlayApp:
         # 必须放在最后 —— 它依赖 widgets / interaction 都已就位。
         self._setup_live_scale_channel()
         self.root.after(LIVE_SCALE_POLL_MS, self._poll_live_scale)
+
+        # 孤儿守卫（2026-10-17）：主控台没了就自己退，避免留下置顶孤儿窗口。
+        # 手动启动时 console_pid 取不到，守卫自动空转 —— 单跑卡片不受影响。
+        self._watchdog = ParentWatchdog.from_env(
+            console_cmd_dir(), follow_exit=follow_console_exit)
+        if self._watchdog.armed:
+            logger.info("孤儿守卫已上膛：主控台 pid=%d（跟随退出=%s）",
+                        self._watchdog.console_pid, follow_console_exit)
+        else:
+            logger.info("未检测到主控台，卡片按常驻模式运行（孤儿守卫空转）")
 
         # Alt+T 轮换颜色主题（2026-10-10）。只换**颜色**不换字号/尺寸 ——
         # 那两条轴归 --scale 管，混在一起会出现"两套缩放"的歧义。
@@ -814,8 +826,33 @@ class OverlayApp:
             return StateSnapshot.model_validate(stale)
         return StateSnapshot(health=Health.OFFLINE)
 
+    def _check_guardian(self) -> None:
+        """问一次孤儿守卫，要不要自杀。
+
+        ★ 为什么直接 destroy 而不是先 ``update()`` 提示一句
+          --------------------------------------------------
+          主控台已经没了，这个窗口的存在本身**就是 bug** —— 用户看到的是一个
+          "还活着但没人管"的浮窗，还会以为主控台在跑。先闪一下提示再消失，
+          反而让人多看一眼。直接退，问题消失得干净。
+        """
+        reason = self._watchdog.check()
+        if reason is None:
+            return
+        logger.warning("主控台已不在，卡片自行退出（理由=%s）", reason)
+        try:
+            self.root.destroy()
+        except Exception:  # noqa: BLE001 - 销毁失败也要让进程真的结束
+            logger.exception("销毁窗口失败，改用退出兜底")
+            os._exit(0)
+
     def tick(self) -> None:
         """一次刷新。**只在内容变化时碰 tk**。"""
+        # ★ 孤儿守卫优先于一切（2026-10-17）
+        #   必须放在最前面：主控台没了的时候，面板上的每一行都是过期信息，
+        #   再去渲染它们是白费功夫。tick 由 mainloop 驱动，destroy 之后
+        #   after 链自然断掉，不用管后续。
+        self._check_guardian()
+
         self._drain_events()
 
         now = time.monotonic()
@@ -843,7 +880,20 @@ class OverlayApp:
             return                      # ★ 省电关键
         self._last_key = key
 
-        border = theme.ACCENT_ERROR if panic else theme.BORDER
+        # ★ 边框也承载接管状态（2026-10-18）。
+        #   只改圆点颜色的话，用户低头打字的余光里那点颜色变化很容易
+        #   漏掉，而「我现在在抢它的键」恰恰是**必须一眼看到**的信息。
+        #   整个面板描一圈蓝，等于把整块卡片变成一个提醒。
+        #
+        #   优先级：panic（红）> 让权（蓝）> 常���边框。
+        #   急停比让权严重 —— 让权期间引擎本来就不动作，急停才是
+        #   「我必须马上把手拿开」。
+        if panic:
+            border = theme.ACCENT_ERROR
+        elif model.control == "TAKEOVER":
+            border = theme.ACCENT_IDLE
+        else:
+            border = theme.BORDER
         self.root.configure(bg=border)
         # ★ 2026-10-16（B2）：行数会变少了（通道行只在有话可说时出现），
         #   所以**必须显式清空多余的 Label**。

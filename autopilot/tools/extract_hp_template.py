@@ -36,6 +36,42 @@ from typing import Any
 import cv2
 import numpy as np
 
+
+def _imread_unicode(path):
+    """Unicode 安全读图（Windows 中文绝对路径）。
+
+    ``cv2.imread`` 在 Windows 上按 ANSI 码页解路径，含中文的绝对路径会
+    **静默返回 None**（不抛异常），所以这里绕开它的文件 IO，只喂 buffer::
+
+        cv2.imdecode(np.fromfile(path, dtype=np.uint8), flags)
+
+    与 ``autopilot/perception/image_io.py`` 里的 ``imread_unicode`` 等价。
+    这里**不 import 那个模块**：本脚本要能 ``python autopilot/tools/xxx.py``
+    单文件直接跑（此时 ``autopilot`` 包不一定在 sys.path 上）。
+    """
+    try:
+        buf = np.fromfile(str(path), dtype=np.uint8)
+    except OSError:
+        return None
+    if buf.size == 0:
+        return None
+    return cv2.imdecode(buf, cv2.IMREAD_COLOR)
+
+
+def _imwrite_unicode(path, img) -> bool:
+    """Unicode 安全写图（Windows 中文绝对路径）。见 :func:`_imread_unicode`。"""
+    try:
+        ok, buf = cv2.imencode(Path(path).suffix or ".png", img)
+    except cv2.error:
+        return False
+    if not ok:
+        return False
+    try:
+        buf.tofile(str(path))
+    except OSError:
+        return False
+    return True
+
 #: 血条 ROI 相对 2560x1600 参考分辨率的默认值（真机实测）。
 REF_WIDTH = 2560
 REF_HEIGHT = 1600
@@ -150,7 +186,7 @@ def main(argv: list[str] | None = None) -> int:
     if not img_path.is_file():
         print(f"[X] 截图不存在：{img_path}")
         return 1
-    frame = cv2.imread(str(img_path))
+    frame = _imread_unicode(img_path)
     if frame is None:
         print(f"[X] 解码失败（不是图片？）：{img_path}")
         return 1
@@ -177,11 +213,11 @@ def main(argv: list[str] | None = None) -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     # 1) 真实满血条 —— 逐像素原样
-    cv2.imwrite(str(out_dir / "full_hp_template.png"), bar)
+    _imwrite_unicode(out_dir / "full_hp_template.png", bar)
 
     # 2) 合成空条 —— 明确标注
     empty = synth_empty(tuple(m["frame_bgr"]), tuple(m["fill_bgr"]), rw, rh)
-    cv2.imwrite(str(out_dir / "empty_hp_template.png"), empty)
+    _imwrite_unicode(out_dir / "empty_hp_template.png", empty)
 
     # 3) 实测事实
     ref = {

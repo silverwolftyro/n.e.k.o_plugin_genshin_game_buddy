@@ -100,13 +100,13 @@ def _resolve_rules(rule_set: str) -> tuple[Path, str]:
 # ---------------------------------------------------------------- 阶段
 
 def _stage_sense(image: Path, verbose: bool) -> "object":
-    import cv2
-
     from autopilot.perception.builder import StateBuilder
     from autopilot.perception.capturer import CapturedFrame
+    from autopilot.perception.image_io import imread_unicode
     from autopilot.perception.scene_detector import SceneDetector
 
-    bgr = cv2.imread(str(image))
+    # ⚠️ 不用 cv2.imread：路径含中文时它会静默返回 None
+    bgr = imread_unicode(image)
     if bgr is None:
         raise SystemExit(f"[X] 图片解码失败（不是图片？）：{image}")
     h, w = bgr.shape[:2]
@@ -168,7 +168,13 @@ def _stage_execute(intent) -> str | None:
         print("  没有意图 -> 不会按任何键")
         return None
     key = DEFAULT_KEYMAP.get(intent.action.value)
-    label = key.name if key is not None else "（该动作未配键位）"
+    # ★ 不能写 `key.name` —— `KeyId` 是 int 子类，**没有** `.name`
+    #   （2026-10-19 实机就崩在 executor 的同一处）。
+    #   `DEFAULT_KEYMAP` 现在恰好是 VK 成员所以没炸，但这是**同族潜伏点**：
+    #   任何时候把它换成 KeyId 就会重演实机那次崩溃。
+    #   统一走 executor 的 `_key_label`（两种类型都能过）。
+    from autopilot.actuator.executor import _key_label
+    label = _key_label(key) if key is not None else "（该动作未配键位）"
     print(f"  将会执行 {OK(label)}   {DIM('← 只是打印，没有真的按键')}")
     return str(label)
 
