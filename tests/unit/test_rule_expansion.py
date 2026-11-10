@@ -31,7 +31,7 @@ FUTURE = RULES / "_future"
 #: 今天恒 UNKNOWN 的信号 —— 依赖它们的规则进了 _future/ 就等于关掉。
 #: 另外 scene() 是**二值**的（WORLD / UNKNOWN），比别的不在列表里就永远不匹配。
 #:
-#: ⚠️ 两个**不要**加进来的：
+#: ⚠️ 三个**不要**加进来的：
 #:   ``enemy_count`` —— 2026-10-11 已接血条兜底，是活信号。
 #:   ``since``      —— builder.py:592 **一直**在设 ``scene.entered_ms``，
 #:   所以 since() 在生产里是真值。之前我用合成的 StatePacket 探测（没带
@@ -39,10 +39,49 @@ FUTURE = RULES / "_future"
 #:   combat_settle_on_enter 挪进了 _future/。这条已经改正。
 #:   ——教训：探测用的夹具必须**逐字段复刻真实状态**，否则会把「夹具缺字段」
 #:   误判成「生产没接」。
+#:   ``e_ready``    —— 2026-10-18 变了。它不再是「恒 UNKNOWN」，而是
+#:   **配置门控的条件活信号**：[autopilot.skill_cd] enabled=true 时
+#:   perception.detectors.key_e 会往 PartyMember.cd_ready["skill"] 填三态。
+#:   ⚠️ 但它**默认关着**，所以「今天跑会不会触发」仍取决于配置 ——
+#:   这正是本文件看不见的东西。硬判它死会把刚接上的规则逼进 _future/
+#:   （等于把功能悄悄关掉），硬判它活又会漏掉「接线被回滚」。
+#:   → 改判成 :func:`test_conditional_signal_has_a_live_wiring` 那条守卫：
+#:     只要活跃目录里有规则用 e_ready()，就必须存在能填它的配置 + 接线。
+#:
+#:   ``onfield``    —— 2026-10-18 **第二次**变了，现在**不是死的**。
+#:     视觉路线仍然不通（296 帧素材标不出「谁在场」），但换成了
+#:     **记账**：``actuator/active_slot.ActiveSlotTracker`` 记住
+#:     「引擎按了哪个数字键 / 用户按了哪个数字键」，builder 据此把对应
+#:     ``PartyMember.active`` 置 True。于是 ``active_member`` 有了，
+#:     ``onfield()`` 能答出 True/False —— 前提是有人切过人。
+#:     剩下的门是**名字**：[autopilot.character_id] 关着时 ``name`` 恒为
+#:     ``""``，``onfield('钟离')`` 恒 False，所以它进了
+#:     :data:`CONDITIONAL_FUNCS`。
+#:     ⚠️ 记账的**唯一失效场景**是「角色阵亡自动切人」—— 引擎无从发现。
+#:
+#:   ``q_ready``    —— 2026-10-18 变了，不再死。
+#:     [autopilot.burst_cd] enabled=true 时 ``detectors/key_q.py`` 往
+#:     ``cd_ready["burst"]`` 填就绪态（296 帧实测：15 命中 0 误报 0 漏报）。
 DEAD_FUNCS = {"hp", "energy", "resin", "pos_quality", "pos_usable",
-              "q_ready", "e_ready", "has_enemy",
-              "target_locked", "onfield", "slot"}
+              "has_enemy",
+              "target_locked", "slot"}
 LIVE_SCENES = {"WORLD", "UNKNOWN"}
+
+#: **条件活**信号：默认可能关着，但开着就能出真值。
+#:
+#: 这些不能进 :data:`DEAD_FUNCS`（它们能被接线救活），也不能当活信号看待
+#: （接线被回滚时没有任何静态检查会红）。对应的守卫见
+#: ``test_conditional_signal_has_a_live_wiring``。
+#:
+#: 值是 ``(配置段, PolicyContext 里必须还能读到的源码标记)``。
+#: 两个函数读的是不同东西 —— ``e_ready``/``q_ready`` 走 ``_active_cd()``
+#: 读 ``cd_ready``，``onfield`` 直接读 ``active_member``。用同一个断言
+#: 去卡它们会把其中一个永久判红。
+CONDITIONAL_FUNCS: dict[str, tuple[str, tuple[str, ...]]] = {
+    "e_ready": ("skill_cd", ("_active_cd(",)),
+    "q_ready": ("burst_cd", ("_active_cd(",)),
+    "onfield": ("character_id", ("active_member",)),
+}
 
 #: 本轮新增的规则文件（仍在活跃目录里）
 NEW_FILES = ("genshin_combat_advanced.toml", "genshin_interaction.toml",
@@ -163,25 +202,213 @@ def test_future_dir__exists_and_is_not_loaded() -> None:
 
 @pytest.mark.unit
 def test_active_dir__has_no_unreachable_rules() -> None:
-    """★★ 核心守卫：活跃目录里不许有「结构合法但永远不触发」的规则。"""
+    """★★ 核心守卫：活跃目录里不许有「结构合法但永远不触发」的规则。
+
+    ⚠ ``enabled = false`` 的规则**不参与**这条检查（2026-10-18）
+    --------------------------------------------------------------
+    一条 ``enabled = false`` 的规则**明确就是关着的** —— 它不会误触发、
+    不会抢风，把它按「死规则」处理只会逼所有人把「写好但先关着」的
+    规则挪进 ``_future/``（那就等于把规则删了，只是换了个目录）。
+
+    真正要防的是另一种情况：**先关着、悄悄就忘了打开**。所以下面
+    :func:`test_disabled_rules_say_why_they_are_off` 补了一条强制要求 ——
+    关着的规则**必须**写清为什么关着。这让「临时关一下」和
+    「永远没人打开」在代码里可区分。
+
+    ⚠ 这条口子**不能**被拿来藏接线回滚：``e_ready()`` 这类
+    「配置门控的活信号」走的是 :func:`test_conditional_signal_has_a_live_wiring`，
+    那里不看 ``enabled``，只看接线还在不在。
+    """
     offenders = []
     for f, r in _active():
+        if not r.get("enabled", True):
+            continue
         for why in _dead_reasons(r["when"]):
             offenders.append(f"{f}:{r['name']}  ({why})")
     assert not offenders, (
-        "这些规则依赖今天恒 UNKNOWN 的信号，应该挪到 rules/_future/：\n  "
+        "这些**启用中**的规则依赖今天恒 UNKNOWN 的信号，"
+        "应该挪到 rules/_future/ 或设 enabled = false：\n  "
         + "\n  ".join(offenders))
 
 
 @pytest.mark.unit
+def test_disabled_rules_say_why_they_are_off() -> None:
+    """★★ 关着的规则必须写清「为什么关着」。
+
+    :func:`test_active_dir__has_no_unreachable_rules` 放过了
+    ``enabled = false`` 的规则 —— 这是必要的（关着的规则本来就不该被
+    判死），但它开了一个口子：**把规则设成关着，就可以永久绕过死信号检查**。
+
+    所以要求每条关着的规则都带 ``note``，并且 note 里至少有一个中文字符
+    —— 后者是刻意的：项目里所有 note 都是中文说明，写成
+    ``note = "disabled"`` 的那条几乎肯定是随手糊的。
+
+    ⚠ 这**不是**形式主义。它是让下面这件事在 code review 里看得见：
+    「这条规则为什么还关着、什么时候会打开」。
+    """
+    offenders = []
+    for f, r in _active():
+        if r.get("enabled", True):
+            continue
+        note = (r.get("note") or "").strip()
+        if not note:
+            offenders.append(f"{f}:{r['name']}  (enabled=false 但 note 为空)")
+        elif not any("\u4e00" <= ch <= "\u9fff" for ch in note):
+            offenders.append(
+                f"{f}:{r['name']}  (note 没有中文说明：{note!r})")
+    assert not offenders, (
+        "关着的规则必须写清为什么关着（note），否则等于偷偷藏一条永不触发的规则：\n  "
+        + "\n  ".join(offenders))
+
+
+@pytest.mark.unit
+def test_conditional_signal_has_a_live_wiring() -> None:
+    """★★ :data:`CONDITIONAL_FUNCS` 的配套守卫（取代把它们塞进 DEAD_FUNCS）。
+
+    :data:`DEAD_FUNCS` 判的是「信号今天恒 UNKNOWN」。但 ``e_ready()`` 现在
+    是**配置门控**的：``[autopilot.skill_cd] enabled=true`` 就能出真值。
+    两种一刀切的判法都会出事：
+
+    * 判它死 -> 刚接上的规则被逼进 ``_future/``，等于把功能悄悄关掉，
+      而且测试**是绿的**（守卫和规则一起搬到「正确」的位置）。
+    * 判它活 -> 有人把接线回滚了（builder 不再填 cd_ready、配置段被删），
+      这条规则又变成死规则，而**没有任何静态检查会红**。
+
+    所以这里改成一条**双向**检查：活跃目录里只要有规则用了条件信号，
+    就必须同时存在 ① 对应的配置段 ② 感知侧的填充路径 ③ 真值能打通到规则。
+    三者缺一，这条规则就是死的 —— 明确报错，而不是安静地不触发。
+
+    ⚠️ 这里刻意**不**去查配置默认值。默认关着不是缺陷（关着 = 与接入之前
+      完全一致，是刻意的安全姿态）；缺陷是「关着的时候没人知道它关着」。
+      那是 ``tools/_stack.py`` 的 warnings 的活。
+    """
+    used = [(f, r["name"]) for f, r in _active()
+            if any(fn + "(" in r["when"] for fn in CONDITIONAL_FUNCS)]
+    if not used:
+        return                      # 没人用，条件自然满足
+
+    from autopilot.config.loader import load_config
+    cfg = load_config()
+
+    for fname, rname in used:
+        for fn, (attr, markers) in CONDITIONAL_FUNCS.items():
+            if f"{fn}(" not in next(r["when"] for f, r in _active()
+                                    if r["name"] == rname):
+                continue
+
+            # ① 配置段还在
+            section = getattr(cfg, attr, None)
+            assert section is not None, (
+                f"{fname}:{rname} 用了 {fn}()，但 autopilot.{attr} 配置段不见了。"
+                f"把它删掉会让这条规则永远不触发，且不会报错。")
+            assert hasattr(section, "enabled"), (
+                f"autopilot.{attr} 的配置类少 enabled 字段 —— "
+                f"_stack.py 靠它决定接不接线。")
+
+            # ② 决策侧还认这个信号
+            import inspect
+
+            from autopilot.policy.context import PolicyContext
+
+            src = inspect.getsource(getattr(PolicyContext, fn))
+            assert any(m in src for m in markers), (
+                f"{fn}() 不再读 {markers}，autopilot.{attr} 填的东西没人读了。")
+
+    # ③ 端到端：真值确实能打通到**某个消费者**（不是只验了各个零件都在）
+    #    详细三态用例在 tests/unit/test_skill_cd_wiring.py 与
+    #    tests/unit/test_burst_cd_wiring.py，这里只钉住
+    #    「确实有一个规则 / 连招会因为它而活过来」。
+    #
+    # ★ 2026-10-18：这里原来硬编码了两条探针规则
+    #   （``world_use_skill_if_ready`` / ``combo_yelan_burst``）。
+    #   后者随 7 条 ``combo_*`` 规则一起删掉了 —— q_ready 的消费者
+    #   搬到了 ``combos/combos.toml``。改成「在规则**和连招**里都找一遍」，
+    #   钉的还是同一件事（有活着的消费者），但不再被某一次搬家打脸。
+    consumers = {fn: [r["name"] for _f, r in _active()
+                      if f"{fn}(" in (r.get("when") or "")]
+                  for fn in CONDITIONAL_FUNCS}
+    for seq in _combos():
+        name = seq.name
+        if any(f"{fn}(" in seq.trigger for fn in CONDITIONAL_FUNCS):
+            for fn in CONDITIONAL_FUNCS:
+                if f"{fn}(" in seq.trigger:
+                    consumers[fn].append(f"combo:{name}(trigger)")
+        for i, st in enumerate(seq.steps, 1):
+            for fn in CONDITIONAL_FUNCS:
+                if f"{fn}(" in st.when:
+                    consumers[fn].append(f"combo:{name}#{i}")
+
+    for fn, why in (("e_ready", "配置门控 skill_cd"),
+                    ("q_ready", "配置门控 burst_cd")):
+        assert consumers[fn], (
+            f"{fn}()（{why}）已经没有任何规则或连招在用了 —— "
+            f"接线要么被挪走了（功能就废了），要么全被删/改名字了。"
+            f"如果不打算再用，就把 autopilot.{CONDITIONAL_FUNCS[fn][0]} "
+            f"一起清掉；否则补一个消费者。")
+
+    # ★ ``onfield()`` **不要求**仓库内有消费者 —— 这是 2026-10-18 迁移连招
+    #   之后的真实状态，不是遗漏：它原本唯一的消费者是 7 条 ``combo_*`` 规则，
+    #   那些规则删掉之后就没有了。
+    #
+    #   但它是**给玩家用的公共 DSL 函数**（docs/combat_architecture.md 里有），
+    #   玩家在自己的 rules/*.toml 里写 onfield('夜兰') 完全正常。所以判它
+    #   「必须有人用」会逼着仓库留一条假规则来凑数 —— 那比没有消费者更糟。
+    #
+    #   它的接线仍然被上面 ① 配置段 ② ``PolicyContext.onfield`` 读
+    #   ``active_member`` 两条守着；端到端三态用例在
+    #   tests/unit/test_character_id_wiring.py。
+    assert CONDITIONAL_FUNCS["onfield"][0] == "character_id"
+
+
+def _combos():
+    """发布的那份连招配置（没有就当空）。"""
+    from autopilot.policy.combo_manager import (  # noqa: PLC0415
+        DEFAULT_COMBOS_PATH, load_optional_combos,
+    )
+
+    book = load_optional_combos(DEFAULT_COMBOS_PATH)
+    return list(book) if book is not None else []
+
+
+@pytest.mark.unit
 def test_future_dir__only_contains_unreachable_rules() -> None:
-    """反向守卫：``_future/`` 里不该混进其实能触发的规则。"""
+    """反向守卫：``_future/`` 里不该混进其实能触发的规则。
+
+    ★ 2026-10-18 修正：判「能不能触发」**不能只看 when 里的信号**
+      ``_dead_reasons`` 只看信号，不看 ``enabled`` / ``scenes``。于是
+      ``combat_skill_ready``（``enabled = false`` + ``scenes = ["COMBAT"]``）
+      在 ``e_ready()`` 变成条件活信号之后被判成「能触发」——
+      **假阳性**：它既关着、又锁在一个永不产出的场景上，两条都够它躺一辈子。
+
+      留着 :func:`_structurally_parked` 一起判：只要它还有**任何一条**
+      「结构上就发不出去」的理由，就该继续待在 ``_future/``。
+      反过来，两边都判不出理由才报错。
+    """
     reachable = []
     for f, r in _pending():
-        if not _dead_reasons(r["when"]):
+        if not _dead_reasons(r["when"]) and not _structurally_parked(r):
             reachable.append(f"{f}:{r['name']}")
     assert not reachable, (
         f"这些规则其实能触发，不该待在 _future/：{reachable}")
+
+
+def _structurally_parked(rule: dict) -> list[str]:
+    """与信号无关、光靠规则自身就发不出去的理由。
+
+    只给 :func:`test_future_dir__only_contains_unreachable_rules` 用 ——
+    活跃目录那条守卫**故意不看**这些：那里放一条 ``enabled = false``
+    是「先摆着别删」的正常写法（``combat_settle_on_enter`` 就是），
+    拿这条去卡活跃目录会把正常代码判成违规。
+    """
+    out = []
+    if rule.get("enabled") is False:
+        out.append("enabled = false")
+    scenes = rule.get("scenes") or []
+    # "*" / 空 = 不限场景；否则只看是不是全部落在产出不到的场景里
+    dead = [s for s in scenes if s not in LIVE_SCENES]
+    if scenes and "*" not in scenes and len(dead) == len(scenes):
+        out.append(f"scenes={scenes} 全是产出不到的场景")
+    return out
 
 
 # ==================================================================
@@ -335,7 +562,12 @@ def test_rules__new_dsl_functions_work() -> None:
             self.kind = kind
             self.group = group
             self.screen_pos = pos
-            self.bbox = bbox or (0.5, 0.4, 0.1, 0.01)
+            # ⚠️ h 必须 >= ENEMY_HEALTH_BAR_H_MIN（0.015），否则
+            #    is_enemy_evidence 会按「UI 细条」挡掉（2026-10-18）。
+            #    这里的 0.02 是**实测**值，不是随手写的 ——
+            #    notes/a5_attack_gating_root_cause.md §2.3 记的唯一一条
+            #    真实敌人血条 bbox=(0.30, 0.22, 0.05, 0.02)。
+            self.bbox = bbox or (0.5, 0.4, 0.1, 0.02)
             self.conf = 0.9
 
     from autopilot.contracts.state_packet import StatePacket
@@ -378,7 +610,9 @@ def test_rules__enemy_count_falls_back_to_health_bars() -> None:
 
     class _E:
         kind = group = "combat"
-        bbox = (0.5, 0.4, 0.1, 0.01)
+        # h=0.02 = 实测真敌人血条高度（见 is_enemy_evidence 的常量注释）。
+        # 原来的 0.01 是随手写的，被 2026-10-18 的尺寸下限判掉了。
+        bbox = (0.5, 0.4, 0.1, 0.02)
         screen_pos = (640.0, 360.0)
         conf = 0.9
 

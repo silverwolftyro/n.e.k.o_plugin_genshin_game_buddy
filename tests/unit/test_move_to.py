@@ -20,6 +20,7 @@
 from __future__ import annotations
 
 import time
+from dataclasses import replace
 
 import pytest
 
@@ -45,10 +46,44 @@ from autopilot.contracts.state_packet import (
 
 pytestmark = pytest.mark.unit
 
-#: 用**真实墙钟**，不用固定常量 —— ``IntentPacket.make`` 的
-#: ``issued_at_ms`` 取的就是墙钟，拿一个 2023 年的常量当 now 会让
-#: 每条意图都 ``INTENT_EXPIRED``（而那条日志长得像引擎坏了）。
+#: 仿真的「起始墙钟」。⚠️ 它在 **import 时**求值（即 pytest 收集阶段），
+#: 而本文件后面所有 ``ex.execute(..., NOW + delta)`` 都拿它当基准。
+#:
+#: ⚠️ **它不是真墙钟。** ``IntentPacket.make()`` 里的 ``issued_at_ms``
+#:   用的是**真实** ``time.time()``。两者会随套件运行时长拉开距离 ——
+#:   全量跑到本文件时已过去 160 秒，于是每条意图都「来自未来」，
+#:   ``validator._check_ttl`` 的 CLOCK_SKEW 宽限（``age < -60_000``）
+#:   被击穿，**20 条用例一片红**；而单独跑本文件只要 2 秒，全绿。
+#:   ——症状极像「我改坏了导航」，其实是被测代码完全没动。
+#:
+#:   修法不是放宽宽限（那是产品代码，60 秒的时钟偏移确实该拒），
+#:   而是让**测试自己声明的 now 与意图的签发时刻一致** —— 这本来就是
+#:   不变量。见 :func:`_issued`。
 NOW = int(time.time() * 1000)
+
+
+def _issued(intent: IntentPacket, at_ms: int) -> IntentPacket:
+    """把意图的 ``issued_at_ms`` 对齐到测试声明的「现在」。
+
+    :param intent: :meth:`IntentPacket.make` 刚造出来的意图
+    :param at_ms: 同一个值随后会传给 ``ex.execute(..., now_ms=at_ms)``
+
+    :returns: 一个 ``intent_id`` 不变、只有时间戳被改写的副本
+
+    ★ 为什么不 ``freeze time`` / monkeypatch ``time.time``
+      那会连 ``monotonic`` 一起动，而 ``_NavWindow`` 的老化、人类化
+      延迟（``humanizer.hold_ms``）全都读真时钟 —— 改全局时间会把
+      「窗口老化」也一起冻住，退化成仿真的失真（``_simulate`` 的
+      docstring 记着 2026-10-14 在这儿栽过一次）。
+      只改这一个字段，别的时序行为原封不动。
+
+    ★ 为什么不默认全打 ``NOW``
+      ``_simulate`` 跑 400 tick，每 tick 都重新签发一条 MOVE_TO。
+      全打成 ``NOW`` 会让 tick 399 的意图看起来「已经放了 80 秒」，
+      恰好躲在 ``TTL=300`` 之内 —— 那是把 TTL 相关的真 bug 藏起来。
+      所以调用点按各自的 tick 传 ``at_ms``。
+    """
+    return replace(intent, issued_at_ms=at_ms)
 
 #: TTL 给足：本组测试要跨多个 tick 推进同一条 MOVE_TO，
 #: 默认的 10s 会让第 N 帧的意图被判过期。
@@ -151,20 +186,34 @@ def _state(x: float | None = 0.0, y: float | None = 0.0,
     )
 
 
-def _attack(sv: int = 1) -> IntentPacket:
-    return IntentPacket.make(ActionType.NORMAL_ATTACK, state_version=sv,
-                             ttl_seconds=TTL)
+def _attack(sv: int = 1, at_ms: int | None = None) -> IntentPacket:
+    """一条普攻。
+
+    ``at_ms`` 会同时成为 ``issued_at_ms`` 和随后 ``execute()`` 的 now_ms
+    （见 :func:`_issued`）。``None`` = 用 :data:`NOW`。
+    """
+    return _issued(
+        IntentPacket.make(ActionType.NORMAL_ATTACK, state_version=sv,
+                          ttl_seconds=TTL),
+        NOW if at_ms is None else at_ms,
+    )
 
 
 def _move_to(x: float, y: float, radius: float = 1.5,
-             sv: int = 1) -> IntentPacket:
+             sv: int = 1, at_ms: int | None = None) -> IntentPacket:
     """一条 MOVE_TO。**每次调用都是新的 intent_id** ——
     ``SeenIntentStore`` 会把重复 intent_id 当网络重投拒掉，
-    而同一条 MOVE_TO 跨 tick 重复下发本来就是正常形态。"""
-    return IntentPacket.make(
-        ActionType.MOVE_TO, state_version=sv, ttl_seconds=TTL,
-        target=IntentTarget(world_position={"x": x, "y": y,
-                                            "radius": radius}),
+    而同一条 MOVE_TO 跨 tick 重复下发本来就是正常形态。
+
+    ``at_ms`` 语义同 :func:`_attack`。
+    """
+    return _issued(
+        IntentPacket.make(
+            ActionType.MOVE_TO, state_version=sv, ttl_seconds=TTL,
+            target=IntentTarget(world_position={"x": x, "y": y,
+                                                "radius": radius}),
+        ),
+        NOW if at_ms is None else at_ms,
     )
 
 
@@ -345,8 +394,9 @@ class TestMoveToExecution:
     def test_missing_world_position_fails_loudly(self) -> None:
         """★ 响亮失败，不猜一个"大概是那边"的点走下去。"""
         ex, rec = _executor()
-        it = IntentPacket.make(ActionType.MOVE_TO, state_version=1,
-                               ttl_seconds=TTL)      # 故意不给坐标
+        it = _issued(IntentPacket.make(ActionType.MOVE_TO, state_version=1,
+                                       ttl_seconds=TTL),
+                     NOW)                      # 故意不给坐标
         r = ex.execute(it, _state(0.0, 0.0), NOW)
         assert r.outcome is Outcome.OK          # 没抛异常
         assert any("缺少可用的 x/y" in s for s in r.steps), r.steps
@@ -399,8 +449,9 @@ class TestMoveToExecution:
         ex, rec = _executor()
         ex.execute(_move_to(0.0, 50.0), _state(0.0, 0.0), NOW)   # 盲走 -> 按下 W
         assert rec.downs(VK.W) == 1
-        ex.execute(_move_to(0.0, 50.0), _state(1.0, 0.0), NOW + 200)
-        ex.execute(_move_to(0.0, 50.0), _state(2.0, 0.0), NOW + 400)
+        for i, x in ((200, 1.0), (400, 2.0)):
+            t = NOW + i
+            ex.execute(_move_to(0.0, 50.0, at_ms=t), _state(x, 0.0), t)
         assert rec.ups(VK.W) == 1, "该停却没松 W"
         assert rec.downs(VK.W) == 1, "不应该重复按 W"
 
@@ -409,6 +460,43 @@ class TestMoveToExecution:
         ex, _rec = _executor()
         ex.execute(_move_to(0.2, 0.0, radius=1.5), _state(0.0, 0.0), NOW)
         assert ex._nav.target_key is None
+
+    # --------------------------------------------------------------
+    # 时钟不变量守卫（2026-10-18）
+    # --------------------------------------------------------------
+
+    def test_factories_stamp_the_intent_with_the_declared_now(self) -> None:
+        """★★ 钉死「签发时刻 == 测试声明的 now」。
+
+        这条不是为了测导航，是为了**保护这个文件自己**。2026-10-18 全量
+        跑时 20 条用例一片红，报的是
+        ``CLOCK_SKEW: 意图的 issued_at_ms 比当前时间晚 160372ms`` ——
+        而被测代码一行没动。真因是 ``IntentPacket.make()`` 打**真实**墙钟，
+        本文件把 ``now_ms`` 冻结在 import 时刻的 :data:`NOW`；套件越长，
+        两者离得越远，超过 ``validator`` 的 60 秒宽限就全灭。
+
+        ⚠️ 这个守卫**单独跑也会红** —— 那正是它的价值：地雷在
+          「单独跑 2 秒全绿 / 全量跑 3 分钟全红」的夹缝里躲着，
+          只有把不变量写成断言才能把它从夹缝里拽出来。
+        """
+        for it, at in ((_move_to(1.0, 2.0), NOW),
+                       (_move_to(1.0, 2.0, at_ms=NOW + 4000), NOW + 4000),
+                       (_attack(), NOW),
+                       (_attack(at_ms=NOW + 1234), NOW + 1234)):
+            assert it.issued_at_ms == at, (it.action, it.issued_at_ms, at)
+
+    def test_unstamped_intent_is_rejected_which_is_why_they_must_be_stamped(
+            self) -> None:
+        """★ 反证：漏盖章的后果**确实**是 CLOCK_SKEW（不是猜的）。
+
+        模拟「忘了盖章」= 拿一个把 ``issued_at_ms`` 设成 61 秒之后的意图
+        去执行 —— 正好越过 ``validator._check_ttl`` 的宽限。
+        """
+        ex, _rec = _executor()
+        stale = _issued(_move_to(1.0, 2.0), NOW + 61_000)
+        r = ex.execute(stale, _state(0.0, 0.0), NOW)
+        assert r.outcome is Outcome.REJECTED
+        assert r.reason.startswith("CLOCK_SKEW"), r.reason
 
     def test_changing_target_resets_the_window(self) -> None:
         """旧目标的位移方向对新目标毫无意义。
@@ -419,14 +507,16 @@ class TestMoveToExecution:
         ex, _rec = _executor()
         ex.execute(_move_to(0.0, 50.0), _state(0.0, 0.0), NOW)
         assert len(ex._nav._hist) == 1
-        ex.execute(_move_to(1.0, 60.0), _state(1.0, 0.0), NOW + 200)
+        ex.execute(_move_to(1.0, 60.0, at_ms=NOW + 200), _state(1.0, 0.0),
+                   NOW + 200)
         assert len(ex._nav._hist) == 1, "换目标后窗口应该只剩当前样本"
 
     def test_repeated_ticks_do_not_multiply_mouse_input(self) -> None:
         """每 tick 只注入**本 tick 算出来的**那点像素，不重复累加。"""
         ex, rec = _executor()
         for i, x in enumerate((0.0, 1.0, 2.0)):
-            ex.execute(_move_to(0.0, 50.0), _state(x, 0.0), NOW + i * 200)
+            t = NOW + i * 200
+            ex.execute(_move_to(0.0, 50.0, at_ms=t), _state(x, 0.0), t)
         rel = [e for e in rec.events if e[0] == "rel"]
         assert rel
         # 每一段都必须落在单段饱和上限内（否则就是没限幅硬塞）
@@ -484,17 +574,22 @@ class TestClosedLoopConvergence:
         for tick in range(max_ticks):
             vclock[0] += tick_s
             st = _state(px, pz, sv=tick + 1)
+            # ★ 本 tick 的「现在」：意图的签发时刻与执行器拿到的 now_ms
+            #   **必须是同一个值**（见 _issued 的说明）。不一致会让
+            #   tick 399 的意图看起来「来自未来 80 秒」，被 CLOCK_SKEW 拒掉。
+            now_ms = NOW + tick * int(tick_s * 1000)
             if sprint:
-                it = IntentPacket.make(
+                it = _issued(IntentPacket.make(
                     ActionType.MOVE_TO, state_version=tick + 1,
                     ttl_seconds=TTL, params={"sprint": True},
                     target=IntentTarget(world_position={
-                        "x": target[0], "y": target[1], "radius": 1.5}))
+                        "x": target[0], "y": target[1], "radius": 1.5})), now_ms)
             else:
-                it = _move_to(target[0], target[1], sv=tick + 1)
+                it = _move_to(target[0], target[1], sv=tick + 1,
+                              at_ms=now_ms)
 
             before = len(rec.events)
-            r = ex.execute(it, st, NOW + tick * int(tick_s * 1000))
+            r = ex.execute(it, st, now_ms)
             assert r.outcome is Outcome.OK, (tick, r.reason)
 
             # 游戏对鼠标位移的响应：转视角

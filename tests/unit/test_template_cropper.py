@@ -350,7 +350,10 @@ def test_save_crop__writes_a_png_with_the_standard_name(tmp_path) -> None:
     p = save_crop(img, cand, tmp_path, pad=3)
     assert p.name == "hp_bar.png"
     assert p.exists()
-    out = cv2.imread(str(p))
+    # ⚠️ 不用 cv2.imread：路径含中文时它会静默返回 None
+    from autopilot.perception.image_io import imread_unicode
+
+    out = imread_unicode(p)
     assert out is not None and out.shape[0] == 12 + 6
 
 

@@ -291,32 +291,32 @@ def test_roi_rect__clamps_into_the_frame() -> None:
 
 @need_real
 def test_real__full_hp_frame_reads_one_with_bg() -> None:
-    import cv2
+    from autopilot.perception.image_io import imread_unicode
 
     got = _sb(hp_estimation=HpEstConfig(
         enabled=True, background_bgr=SYNTH_BG))._estimate_hp(
-        cv2.imread(str(_REAL_FRAME)))
+        imread_unicode(_REAL_FRAME))
     assert got == (1.0, "geometry"), got
 
 
 @need_real
 def test_real__full_hp_frame_is_unknown_without_bg() -> None:
     """真机满血帧 + 不给底色 -> UNKNOWN。这不是缺陷，是「不猜」。"""
-    import cv2
+    from autopilot.perception.image_io import imread_unicode
 
     got = _sb(hp_estimation=HpEstConfig(enabled=True))._estimate_hp(
-        cv2.imread(str(_REAL_FRAME)))
+        imread_unicode(_REAL_FRAME))
     assert got == (None, "none")
 
 
 @need_real
 def test_real__extracted_templates_round_trip() -> None:
     """提取脚本产出的两个模板必须能直接喂回估算器。"""
-    import cv2
+    from autopilot.perception.image_io import imread_unicode
 
     tdir = B.HP_TEMPLATE_DIR
-    full = cv2.imread(str(tdir / "full_hp_template.png"))
-    empty = cv2.imread(str(tdir / "empty_hp_template.png"))
+    full = imread_unicode(tdir / "full_hp_template.png")
+    empty = imread_unicode(tdir / "empty_hp_template.png")
     if full is None or empty is None:
         pytest.skip("模板资产缺失（跑一下 autopilot.tools.extract_hp_template）")
     bg = tuple(json.loads((tdir / "hp_bar_reference.json")
@@ -336,10 +336,13 @@ def test_real__frame_is_a_readable_screenshot() -> None:
 
     这里只守「资产可用」：能解码、分辨率与标定一致。
     画面的**内容**不该由一条测试钉死。
-    """
-    import cv2
 
-    img = cv2.imread(str(_REAL_FRAME))
+    ⚠️ 用 :func:`~autopilot.perception.image_io.imread_unicode`：截图在含中文的
+    绝对路径下，``cv2.imread`` 会静默返回 ``None``。
+    """
+    from autopilot.perception.image_io import imread_unicode
+
+    img = imread_unicode(_REAL_FRAME)
     assert img is not None, "真机截图解码失败"
     assert img.shape[:2] == (1600, 2560), (
         f"分辨率变成 {img.shape[:2]}，与 hp_bar_reference.json 标定的 "

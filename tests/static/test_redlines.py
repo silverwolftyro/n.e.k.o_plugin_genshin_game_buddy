@@ -396,7 +396,7 @@ def test_redline__no_undeclared_third_party_imports() -> None:
       所以从未触发过降级），而 WGC 走 DWM 合成管道是唯一不碰注册表的解法。
       真机实测原神无边框全屏 2560x1600 下 luma=124.4、颜色种类 618。
       评估过的替代方案与落选理由见
-      ``D:\\NEKO\\recognition\\notes\\session_20261010_wrapup.md``。
+      ``D:\\workspace\\N.E.K.O\\NEKO-genshin\\recognition\\notes\\session_20261010_wrapup.md``。
 
     ⚠️ 白名单是**逐条列举**的，不是通配。下一个依赖仍要在这里显式加一行
        并写清来历 —— 否则这条测试就退化成了摆设。

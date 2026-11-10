@@ -27,7 +27,7 @@ A companion plugin that switches game context and terminology on demand.
 - **规则决策**：`autopilot/rules/*.toml` 里的 24 条规则按优先级命中即停
 - **按键执行**：注入键盘/鼠标（战斗、闪避、拾取、导航）
 - **事件播报**：引擎事件流经 `event_to_yui.py` 翻译成台词推给 YUI，
-  让它主动开口（「引擎起来了」「有怪！3个，小心点」「这个我收下了」）
+  让它主动开口（「引擎起来了」「发现3个敌人，没看清是哪种」「这个我收下了」）
 
 ## 架构 / Architecture
 

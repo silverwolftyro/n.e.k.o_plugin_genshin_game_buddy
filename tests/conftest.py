@@ -255,13 +255,23 @@ def make_config(
 #: 目录**不可写**（建一级成功、往里写就 PermissionError，实测于 Windows 沙箱），
 #: 而插件源码目录在测试时一定可写（``__pycache__`` / ``.pytest_cache`` 本来就在这里）。
 #:
-#: ⚠️ **打包前必须删掉它**（``rm -- .pytest-tmp``）。
-#:    这里曾经注释说「用点前缀，打包规则会跳过」——**那是错的**：
-#:    ``neko_plugin_cli`` 的暂存树检查不认点前缀，会报
-#:    ``[WARN] ... staged tree contains directories that cannot survive
-#:    packaging (['.pytest-tmp'])``，并因此**跳过 metadata 推导**，
-#:    打出来的包没有 ``plugin.meta.json``，要等宿主运行时重扫才能补上入口参数 schema。
-#:    即便目录是空的也一样会触发 —— 所以只要跑过测试就要删。
+#: ✅ **打包前不需要删它**（2026-11-09 更正）。
+#:    旧注释写的是「打包前必须删掉 .pytest-tmp」「即便目录是空的也一样会触发」
+#:    —— 那描述的是**更早的 builder** 行为：当时的暂存树检查不认点前缀，
+#:    会报 ``[WARN] ... staged tree contains directories that cannot survive
+#:    packaging (['.pytest-tmp'])``。
+#:    现在的 builder 是**先按 ``[tool.neko.build]`` 的规则复制出暂存树**，
+#:    metadata 探测跑在**暂存副本**上；而 ``.pytest-tmp`` 已列在
+#:    ``exclude_dirs`` 里，于是：
+#:      * 它**不会**被复制进暂存树；
+#:      * 暂存树里不会因此出现空目录，metadata 推导不会被跳过，
+#:        产物里的 ``plugin.meta.json`` 照常产出。
+#:    真正的防线不是「目录是不是空的」，而是**排除规则本身**：一旦
+#:    ``exclude_dirs`` 被改动，``.pytest-tmp`` 会重新进暂存树 → 暂存树出现
+#:    空目录 → metadata 推导被**跳过** → 产物**静默**丢掉
+#:    ``plugin.meta.json``（入口参数 schema 要等宿主运行时重扫才补上），
+#:    而 ``check --release`` 仍然报绿（只多一条 WARN）。
+#:    这条红线由 ``tests/unit/test_packaging_hygiene.py`` 钉住。
 SCRATCH_ROOT = PLUGIN_DIR / ".pytest-tmp"
 
 

@@ -74,11 +74,11 @@ class FakeCapturer:
 
 @pytest.fixture
 def frame() -> CapturedFrame:
-    import cv2
-
     from autopilot.perception.capturer import CaptureChannel
+    from autopilot.perception.image_io import imread_unicode
 
-    img = cv2.imread(str(REAL_FRAME))
+    # ⚠️ 不用 cv2.imread：路径含中文时它会静默返回 None
+    img = imread_unicode(REAL_FRAME)
     if img is None:
         pytest.skip(f"截图解码失败：{REAL_FRAME}")
     return CapturedFrame(image=img, rect=(0, 0, img.shape[1], img.shape[0]),

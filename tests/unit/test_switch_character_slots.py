@@ -136,14 +136,23 @@ def test_switch__explicit_slot_still_works_without_config() -> None:
 
 
 def test_switch__unresolvable_is_skipped_but_recorded() -> None:
-    """★ 仍然跳过的场景必须**留下痕迹**。
+    """★ 仍然跳过的场景必须**留下痕迹**，而且要说清**为什么**。
 
-    这不是「静默」：steps 里明写「跳过（无可切的位）」，
-    排障时能看到 AI 为什么没切人。真正的静默是「什么都没发生且无从查起」。
+    这不是「静默」：steps 里明写跳过原因，排障时能看到 AI 为什么没切人。
+    真正的静默是「什么都没发生且无从查起」。
+
+    ⚠️ 2026-10-18 文案变长了：以前只说「无可切的位」，现在会指出
+       **是静态表没填、还是 OCR 名册里还没有它**，以及要等多久。
+       因为免配置之后，「切不动人」最常见的原因就是
+       「启动不到 20 秒、OCR 还没轮转完」—— 不说清楚的话，
+       用户只会看到「切人没反应」，根本想不到要去等 OCR。
     """
     ex = _ex()
     joined = " ".join(_steps(ex, _switch_intent("raiden")))
-    assert "跳过" in joined and "无可切的位" in joined, joined
+    assert "跳过" in joined, joined
+    assert "raiden" in joined, "必须点名是哪个角色查不到"
+    assert "[char_slots]" in joined, joined
+    assert "OCR" in joined, "必须指出还有 OCR 这条免配置的路要走"
 
 
 # ==================================================================

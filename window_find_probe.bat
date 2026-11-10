@@ -11,7 +11,7 @@ REM    B) what the title-only fallback sees
 REM    C) what the PLUGIN HOST process reported in its own log
 REM ============================================================
 
-cd /d D:\NEKO\N.E.K.O-main\N.E.K.O-main\plugin\plugins\genshin_game_buddy
+cd /d D:\workspace\N.E.K.O\NEKO-genshin\N.E.K.O-main\N.E.K.O-main\plugin\plugins\genshin_game_buddy
 
 echo.
 echo  *** SWITCH TO GENSHIN (fullscreen) NOW ***
@@ -30,7 +30,7 @@ for /L %%i in (15,-1,1) do (
 )
 
 echo.
-"D:\NEKO\N.E.K.O-main\N.E.K.O-main\.venv\Scripts\python.exe" -m autopilot.tools.window_find_probe
+"D:\workspace\N.E.K.O\NEKO-genshin\N.E.K.O-main\N.E.K.O-main\.venv\Scripts\python.exe" -m autopilot.tools.window_find_probe
 
 echo.
 pause

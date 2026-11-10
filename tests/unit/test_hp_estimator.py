@@ -518,10 +518,16 @@ needs_capture = pytest.mark.skipif(
 
 
 def _real_hp_bar():
-    """从真实截图里裁出玩家血条。只读，不往 _runtime 写任何东西。"""
-    import cv2  # 局部导入：这条测试被 skip 时不必加载
+    """从真实截图里裁出玩家血条。只读，不往 _runtime 写任何东西。
 
-    frame = cv2.imread(str(CAPDIAG_PNG))
+    ⚠️ 用 :func:`~autopilot.perception.image_io.imread_unicode`，**不用**
+    ``cv2.imread`` —— 截图在插件目录（含中文）下，``cv2.imread`` 按 ANSI
+    码页解路径会静默返回 ``None``，断言就会变成「截图读不出来」。
+    """
+    # 局部导入：这条测试被 skip 时不必加载 cv2 / numpy
+    from autopilot.perception.image_io import imread_unicode
+
+    frame = imread_unicode(CAPDIAG_PNG)
     assert frame is not None, "截图读不出来"
     x, y, w, h = REAL_HP_BOX
     return frame[y: y + h, x: x + w]

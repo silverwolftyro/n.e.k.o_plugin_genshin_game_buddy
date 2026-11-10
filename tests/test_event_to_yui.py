@@ -35,7 +35,7 @@ class _Rig:
     """一套「假事件流目录 + 假 push + 真适配器」。"""
 
     def __init__(self, throttle: float = 5.0, templates=None,
-                 poll: float = 99.0):
+                 poll: float = 99.0, group_cooldown: float = 0.0):
         self.dir = Path(tempfile.mkdtemp(prefix="e2y_test_"))
         self.run_id = "20261008_120000"
         (self.dir / "run_current.txt").write_text(
@@ -46,7 +46,13 @@ class _Rig:
         self.a = EventToYui(
             lambda **kw: (self.sent.append(kw) or {"submitted": True}),
             self.dir, poll_seconds=poll, throttle_seconds=throttle,
-            templates=templates)
+            templates=templates,
+            # ★ 场景组冷却默认**关掉**
+            #   这份测试验的是「翻译 + 节流」这一层。
+            #   场景组冷却（Companion Mode）会让同组内第二条非 tier1
+            #   台词被压掉 —— 那样六句业务台词只出一句，测不到翻译本身。
+            #   场景组冷却由 ``test_yui_companion_mode.py`` 单独钉。
+            scene_group_cooldown_s=group_cooldown)
         self.a.log.addHandler(_Null())
 
     @property
@@ -119,8 +125,12 @@ def test_t1_six_lines_rendered_and_pushed(rig):
     rig.write("ESCAPE_SUCCESS", level=3, moved_m=4.8)
     rig.write("PATHFIND_ARRIVED", x=2094.7, z=-707.7, spent_s=58.0)
     assert rig.a.drain_once() == 6
-    assert rig.texts == ["走，去那边看看", "有怪！3个，小心点", "跑了45.0米了",
-                         "又卡住了……", "出来了，继续", "到了到了"]
+    assert rig.texts == ["走啦走啦，那边有东西~",
+                         "有3个坏东西来了，主人小心~",
+                         "走了45.0米啦，主人腿不酸吗~",
+                         "唔……卡住了，主人推一下下~",
+                         "逃出来啦~ 主人命真大。",
+                         "到啦~ 就在这儿哦。"]
     # 占位符真的被替换了，不是把 "{count}" 原样推出去
     assert "3个" in rig.texts[1] and "45.0" in rig.texts[2]
     # respond = 要 YUI 开口；read 只进上下文不触发回复
@@ -203,7 +213,7 @@ def test_skip_codes__other_codes_still_broadcast(rig):
     """
     rig.write("RUN_STARTED")
     rig.a.drain_once()
-    assert "启动了" in rig.texts
+    assert any("开始咯" in t for t in rig.texts), rig.texts
 
 
 def test_skip_codes__core_started_is_now_skipped(rig):
@@ -231,9 +241,8 @@ def test_t3_torn_json_line_not_lost(rig):
         {"code": "RUN_STOPPED", "severity": "INFO",
          "message": "", "context": {}}, ensure_ascii=False) + "\n")
     rig.a.drain_once()
-    assert "歇下了" in rig.texts
+    assert any("歇下了" in t for t in rig.texts), rig.texts
     assert not any("TORN" in t for t in rig.texts)
-
 
 # ================================================================== T4 表外 code
 def test_t4_unknown_code_falls_back(rig):
@@ -278,7 +287,7 @@ def test_t6_thread_lifecycle_and_really_reads(rig):
         t0 = time.monotonic()
         while not rig.texts and (time.monotonic() - t0) < 5.0:
             time.sleep(0.05)
-        assert rig.texts == ["到了到了"], "后台线程没读到文件"
+        assert rig.texts == ["到啦~ 就在这儿哦。"], "后台线程没读到文件"
     finally:
         rig.a.stop()
     assert rig.a.running is False

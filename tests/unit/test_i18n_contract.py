@@ -215,9 +215,11 @@ def test_i18n__context_keys_complete(messages: dict[str, str]) -> None:
         "context.term_line",
         "context.no_terms",
         "context.hint",
+        # 2026-10-18：YUI 瞎编种族（盗宝团 -> 丘丘人）的硬约束。
+        "context.no_speculation",
     }
     assert expected <= set(messages)
-    assert len([key for key in messages if key.startswith("context.")]) == 7
+    assert len([key for key in messages if key.startswith("context.")]) == 8
 
 
 @pytest.mark.static
@@ -264,7 +266,7 @@ def test_i18n__no_placeholder_like_todo(messages: dict[str, str]) -> None:
 
 @pytest.mark.static
 def test_i18n__total_key_count(messages: dict[str, str]) -> None:
-    assert len(messages) == 52
+    assert len(messages) == 53
 
 
 # =============================================================================

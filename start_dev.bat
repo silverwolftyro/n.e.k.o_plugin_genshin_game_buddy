@@ -21,7 +21,7 @@ REM  --title genshin is an ASCII alias resolved by run_loop to the
 REM  real window title. See TITLE_ALIASES in run_loop.py.
 REM ============================================================
 
-cd /d D:\NEKO\N.E.K.O-main\N.E.K.O-main\plugin\plugins\genshin_game_buddy
+cd /d D:\workspace\N.E.K.O\NEKO-genshin\N.E.K.O-main\N.E.K.O-main\plugin\plugins\genshin_game_buddy
 
 echo.
 echo ============================================================
@@ -37,7 +37,7 @@ echo      window collapses its client area to 0x0 and no capture
 echo      channel can read it.
 echo.
 
-set "NEKO_PY=D:\NEKO\N.E.K.O-main\N.E.K.O-main\.venv\Scripts\python.exe"
+set "NEKO_PY=D:\workspace\N.E.K.O\NEKO-genshin\N.E.K.O-main\N.E.K.O-main\.venv\Scripts\python.exe"
 
 start "" "%NEKO_PY%" -m autopilot.tools.overlay --mode dev --event-rows 10
 

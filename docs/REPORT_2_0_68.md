@@ -16,7 +16,7 @@
 ## 用户命令序列（先生手动跑）
 
 ```bash
-cd D:\NEKO\N.E.K.O-main\N.E.K.O-main
+cd D:\workspace\N.E.K.O\NEKO-genshin\N.E.K.O-main\N.E.K.O-main
 uv run neko-plugin check multi_game_companion
 uv run --with pytest pytest plugin/plugins/multi_game_companion/tests -q
 Remove-Item -Recurse -Force 'plugin\plugins\multi_game_companion\.pytest-tmp'

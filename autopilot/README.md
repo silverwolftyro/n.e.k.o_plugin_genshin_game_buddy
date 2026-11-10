@@ -51,10 +51,10 @@ python -m autopilot.tools.autopilot_demo --title 原神 --out work/states.jsonl
 训练与评估（等有数据后）：
 
 ```bash
-python -m autopilot.tools.check_dataset --data D:/NEKO/yolo_data   # 先查脏数据
+python -m autopilot.tools.check_dataset --data D:/项目/N.E.K.O/NEKO-genshin/yolo_data   # 先查脏数据
 pip install ultralytics                                          # 仅训练
-python -m autopilot.tools.train_yolo  --data D:/NEKO/yolo_data    # 训完自动导出 ONNX
-python -m autopilot.tools.eval_yolo    --data D:/NEKO/yolo_data    # 用 onnxruntime 评估
+python -m autopilot.tools.train_yolo  --data D:/项目/N.E.K.O/NEKO-genshin/yolo_data    # 训完自动导出 ONNX
+python -m autopilot.tools.eval_yolo    --data D:/项目/N.E.K.O/NEKO-genshin/yolo_data    # 用 onnxruntime 评估
 python -m autopilot.tools.convert_to_onnx --weights runs/detect/train/weights/best.pt
 ```
 
@@ -156,5 +156,5 @@ autopilot/
 
 ## 相关文档
 
-- 架构设计：`D:\NEKO\N.E.K.O.3.0-架构设计文档-v1.0.md`
-- 参考项目逆向：`D:\NEKO\BetterGI-技术路线逆向报告.md`、`D:\NEKO\MaaEnd-技术路线逆向报告.md`
+- 架构设计：`D:\workspace\N.E.K.O\NEKO-genshin\N.E.K.O.3.0-架构设计文档-v1.0.md`
+- 参考项目逆向：`D:\workspace\N.E.K.O\NEKO-genshin\BetterGI-技术路线逆向报告.md`、`D:\workspace\N.E.K.O\NEKO-genshin\MaaEnd-技术路线逆向报告.md`

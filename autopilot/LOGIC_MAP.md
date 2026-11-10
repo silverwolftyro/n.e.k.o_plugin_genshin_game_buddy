@@ -1,7 +1,7 @@
 # autopilot 逻辑地图
 
 > 生成方式：只读盘点（glob / grep / AST 检索），未执行任何模块。
-> 路径基准：`D:\NEKO\N.E.K.O-main\N.E.K.O-main\plugin\plugins\genshin_game_buddy\autopilot\`
+> 路径基准：`D:\workspace\N.E.K.O\NEKO-genshin\N.E.K.O-main\N.E.K.O-main\plugin\plugins\genshin_game_buddy\autopilot\`
 > 日期：2026-09-28
 
 ---
@@ -334,7 +334,7 @@ protocol.stamp()          → (st_size, st_mtime_ns) 比对
 
 ## 六、周边文件（autopilot 目录之外）
 
-### 6.1 `D:\NEKO\` 根目录下的 `.py`
+### 6.1 `D:\workspace\N.E.K.O\NEKO-genshin\` 根目录下的 `.py`
 
 全部是本次开发过程中我写的**离线验证脚本**，不属于交付物：
 
@@ -363,7 +363,7 @@ protocol.stamp()          → (st_size, st_mtime_ns) 比对
 
 | 项 | 值 |
 |---|---|
-| 路径 | `D:\NEKO\N.E.K-O-main\mock_states.jsonl` |
+| 路径 | `D:\workspace\N.E.K.O\NEKO-genshin\N.E.K-O-main\mock_states.jsonl` |
 | ⚠ 位置 | **在误建目录 `N.E.K-O-main\` 里，不在真仓库** |
 | 大小 | 约 160 KB / 200 行 |
 | 内容 | 200 帧 `StatePacket.to_dict()` 的 JSONL，覆盖战斗（满血/掉血/危急）、背包、地图、定位 GOOD/DEGRADED/LOST、场景 UNKNOWN、`perception_ok=False`。由 `_make_mock_states.py` 生成，供 `replay.py` 离线回放决策。 |
@@ -372,10 +372,10 @@ protocol.stamp()          → (st_size, st_mtime_ns) 比对
 
 | 项 | 值 |
 |---|---|
-| 路径 | `D:\NEKO\N.E.K.O-main\.build-tmp\` **与** `D:\NEKO\N.E.K-O-main\.build-tmp\` |
+| 路径 | `D:\workspace\N.E.K.O\NEKO-genshin\N.E.K.O-main\.build-tmp\` **与** `D:\workspace\N.E.K.O\NEKO-genshin\N.E.K-O-main\.build-tmp\` |
 | 状态 | **两个路径下都不存在**（glob 无匹配） |
 
-### 6.4 误建目录 `D:\NEKO\N.E.K-O-main\`
+### 6.4 误建目录 `D:\workspace\N.E.K.O\NEKO-genshin\N.E.K-O-main\`
 
 ⚠ **该目录不是工作仓库**，但里面有 autopilot 的**重复副本**（连字符 vs 圆点）：
 
@@ -389,7 +389,7 @@ protocol.stamp()          → (st_size, st_mtime_ns) 比对
 | `N.E.K-O-main/N.E.K.O-main/.../tools/overlay.py` | 72 | 与真仓库同 |
 
 只有 `ui/` 4 个文件是真仓库的**旧版本**，`tools/` 2 个一致。真仓库
-`D:\NEKO\N.E.K.O-main\`（圆点）才是有效工作目录。
+`D:\workspace\N.E.K.O\NEKO-genshin\N.E.K.O-main\`（圆点）才是有效工作目录。
 
 ---
 

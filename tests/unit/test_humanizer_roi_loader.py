@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+import math
 import random
 
 import numpy as np
@@ -184,14 +185,75 @@ def test_jitter_heading__disabled_is_identity() -> None:
 
 
 def test_turn_steps__sum_equals_the_total() -> None:
-    """★★ 所有分段加起来必须等于总角度 —— 少一段就会转不到位。"""
-    # ★ 允许 ~15% 偏差：每段独立抖动，末段不补差（实测 45° -> 分段和 41°）。
-    #   这不是精确控制，转向本来就带随机性；别把它当成「转不到位」的 bug。
-    h = Humanizer(HumanizerConfig(enabled=True, turn_step_jitter_deg=0.8))
+    """★★ 所有分段加起来必须等于总角度 —— 少一段就会转不到位。
+
+    ★★ 这条测试曾经 13% 概率爆红（2026-10-19 修）
+      根因**不是**实现有问题，是断言的容差没有依据：
+      老写法 ``abs = total*0.15 + 1`` 在 ``total=1`` 时容差只有 1.15，
+      而 ``total=9`` 时最大偏差实测能到 **5.0** —— 直接越界。
+
+      两处一起改：
+
+      ① **固定随机种子**。``Humanizer(rng=...)`` 本来就是文档里写好的
+         测试接缝（见 humanizer.py 类注释）。固定种子之后这条测试是
+         **确定性**的，30 次跑必然全绿 —— 不再靠「运气好」。
+
+      ② 容差改成**从实测分布推出来的**，不是拍一个数。
+         实测（每档 20000 次，turn_step_jitter_deg=0.8）：
+
+             total    n   最大偏差   最大偏差/(√n×jitter)
+               1.0    1      1.00            1.25
+               9.0    5      5.00            2.80
+              45.0   28     12.00            2.83
+              90.0   56     17.00            2.84
+             180.0  112     23.00            2.72
+             350.0  218     38.00            2.57
+
+         比值稳定落在 2.6~2.8 —— 这正是「n 段各自独立抖动、末段不补差」
+         的随机游走尾部分布。所以容差取 ``4×√n×jitter + 1``：
+         对实测最大值有 1.3~2.7 倍余量，同时**随步数缩放**
+         （老容差在 total=9 时根本不够，在 total=350 时又太松）。
+
+      ⚠️ 这条容差**抓不到**大步数下「少一段」。
+        它是 n 步随机游走的量级，而少一段只差 ``per``（≈1.6°），
+        远在量级之内 —— 老容差同样抓不到。这不是本次引入的退化，
+        但也别把这条测试当成「漏一段会被发现」的保证；
+        那个不变量由 ``test_turn_steps__every_step_is_non_zero``
+        与本文件顶部的分段长度断言覆盖。
+    """
+    cfg = HumanizerConfig(enabled=True, turn_step_jitter_deg=0.8)
+    h = Humanizer(cfg, rng=random.Random(42))
     for total in (1.0, 9.0, 45.0, 90.0, 180.0, 350.0):
         steps = h.turn_steps(total)
         assert all(isinstance(x, int) for x in steps), total
-        assert sum(steps) == pytest.approx(total, abs=total * 0.15 + 1), total
+        tol = 4.0 * math.sqrt(len(steps)) * cfg.turn_step_jitter_deg + 1.0
+        assert sum(steps) == pytest.approx(total, abs=tol), (total, steps)
+
+
+def test_turn_steps__dispersion_matches_the_documented_bound() -> None:
+    """★ 容差公式不许悄悄过期。
+
+    上面那条把容差写成了 ``4√n×jitter``。如果有人调大
+    ``turn_step_jitter_deg`` 或改掉分段逻辑，这个比值就会越界 ——
+    到那时上面那条测试的容差就是**凭空的**，又会变回一条 flaky 测试。
+
+    所以这里独立地量一遍「实测最大偏差 /(√n×jitter)」，
+    断言它仍然落在文档里写的区间里。
+
+    采样次数取 2000 而不是 20000：断言的是**量级**不是尾端，
+    2000 次足够把比值定在 2 附近，而整条测试只要几十毫秒。
+    """
+    cfg = HumanizerConfig(enabled=True, turn_step_jitter_deg=0.8)
+    trials = 2000
+    for total in (9.0, 45.0, 90.0):
+        h = Humanizer(cfg)
+        worst = max(abs(sum(h.turn_steps(total)) - total)
+                    for _ in range(trials))
+        n = len(h.turn_steps(total))
+        ratio = worst / (math.sqrt(n) * cfg.turn_step_jitter_deg)
+        assert ratio < 4.0, (
+            f"total={total}: 实测最大偏差 {worst}° = {ratio:.2f}×√n×jitter，"
+            f"已经越过上面那条测试用的 4 倍上界 —— 容差公式需要重算")
 
 
 def test_turn_steps__zero_total_moves_nothing() -> None:

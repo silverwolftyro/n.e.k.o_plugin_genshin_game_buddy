@@ -15,7 +15,7 @@ import json
 import sys
 from pathlib import Path
 
-REPO = Path(r"D:\NEKO\N.E.K.O-main\N.E.K.O-main")
+REPO = Path(r"D:\workspace\N.E.K.O\NEKO-genshin\N.E.K.O-main\N.E.K.O-main")
 PLUGIN_ROOT = REPO / "plugin" / "plugins" / "genshin_game_buddy"
 sys.path.insert(0, str(PLUGIN_ROOT))
 

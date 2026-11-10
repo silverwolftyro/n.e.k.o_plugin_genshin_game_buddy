@@ -96,7 +96,7 @@ multi_game_companion: STRESS FINAL elapsed=3600.5s total_ocr=14400 errors=5 time
 
 ### a. pytest 层（L1+L4，秒级）
 ```bash
-cd D:\NEKO\N.E.K.O-main\N.E.K.O-main
+cd D:\workspace\N.E.K.O\NEKO-genshin\N.E.K.O-main\N.E.K.O-main
 uv run --with pytest pytest plugin/plugins/multi_game_companion/tests/stress -v
 # 或排除：pytest tests -m "not stress"
 ```
