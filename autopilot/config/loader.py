@@ -266,6 +266,147 @@ class HpEstConfig(_Base):
         return v
 
 
+class SkillCdConfig(_Base):
+    """元素战技（E）就绪态视觉感知接线配置。
+
+    **默认打开**（2026-10-18）。打开后从右下角 E 图标 ROI
+    （``rois.toml`` 的 ``key_e``）取 HSV 统计，填进
+    ``PartyMember.cd_ready["skill"]``：
+    ``True``=就绪 / ``False``=CD 中 / ``None``=UNKNOWN。
+
+    设 ``enabled = false`` 时 ``StateBuilder`` 拿到 ``skill_cd=None``，
+    ``PlayerInfo.party`` 恒为 ``()``，``e_ready()`` 恒 UNKNOWN ——
+    **与接入之前的行为完全一致**（逃生阀，改一个 bool 就能回退）。
+
+    ★ 为什么复用 :mod:`autopilot.perception.detectors.key_e` 而不是新写一个
+      ``key_e`` 检测器**早就存在**，且它实测推翻了"用亮度判"这条路：
+      就绪=彩色、CD=去饱和的灰白，**两者的明度几乎一样**（实测 190~205），
+      真正有区分度的是**饱和度**。另写一个基于亮度的版本等于把一个已经
+      踩过的坑再踩一次。
+
+    ⚠️ **阈值未标定，别当它准**
+      ``key_e.SAT_READY`` 现在是 30.0，模块 docstring 说得很清楚：
+      实测分布是**连续的一团、没有天然谷底**。开着之后冷却中也可能被判
+      成就绪 -> 对着 CD 按 E。标定：
+
+          python -m autopilot.tools.calibrate_skill_cd
+
+      进游戏按 F8/F9 标记「E 亮」/「E 灰」两种状态，脚本给建议阈值
+      加回测准确率。
+
+      ★ 为什么开着也比「阈值不准」本身安全
+        出错方向是**单向**的：读不到 / 看不清一律 UNKNOWN，而 UNKNOWN
+        一律不触发规则 —— 引擎退回只放普攻（接入前的水平）。
+        反向（「不确定时也放」）才是灾难。
+    """
+
+    #: 总开关。``true``（默认）-> 填 ``cd_ready["skill"]``；``false`` -> ``party`` 恒空。
+    enabled: bool = True
+
+
+class BurstCdConfig(_Base):
+    """元素爆发（Q）就绪态视觉感知接线配置（2026-10-18）。
+
+    打开后从右下角 Q 徽章 ROI（``rois.toml`` 的 ``key_q``）取
+    **环形青色占比**，填进 ``PartyMember.cd_ready["burst"]``：
+    ``True``=就绪 / ``None``=UNKNOWN。
+
+    设 ``enabled = false`` 时 ``StateBuilder`` 拿到 ``burst_cd=None``，
+    ``cd_ready`` 里**没有** ``burst`` 这一把 —— ``q_ready()`` 恒 UNKNOWN
+    （不是 False，是 UNKNOWN：``policy/context.py`` 读不到键就走
+    :meth:`PolicyContext._unk`），**与接入之前行为完全一致**。
+
+    ★ 为什么单独一个开关，不并进 ``skill_cd``
+      两个信号的**可信度完全不同**：
+        · ``key_q`` 的阈值在 296 帧上**量出来了**（就绪 0.822~0.824 /
+          不就绪 ≤0.091，间隔 0.731，15 命中 0 误报 0 漏报）；
+        · ``key_e`` 的阈值**没标定**，特征还被背景主导（r = 0.88）。
+      并成一个开关就等于强迫用户「要么两个都信、要么两个都不用」。
+
+    ⚠️ **它判不出「在冷却」**
+      296 帧素材里一个冷却样本都没有（详见
+      ``perception/detectors/key_q.py`` 的模块文档）。不就绪时报
+      UNKNOWN 而非 False —— 对规则等价（都不触发），但
+      ``out.unknowns`` 里会出现 ``cd``，这是特性不是 bug。
+
+    ⚠️ **只在 1 个角色的爆发按钮上标定过**
+      发光环按设计是角色无关的，但没拿第二个角色验证过。
+      换角色不准时先看 :mod:`key_q` 的模块文档，别调阈值。
+    """
+
+    #: 总开关。``true``（默认）-> 填 ``cd_ready["burst"]``。
+    enabled: bool = True
+
+
+class AvatarClassifierConfig(_Base):
+    """队伍栏**头像分类器**（ONNX）接线配置（2026-10-18）。
+
+    **默认关闭**，而且这不是保守，是有依据的：
+
+    * 队伍栏每个槽位有两条信息 —— 头像左边那行**角色名文字**（OCR 读）
+      和**头像本身**（这个模块读）。OCR 那条路实测 296 帧单帧误识
+      **0.00%**、时序滤波后稳态 **100%**，已经够好。
+    * OCR 失败通常意味着「切屏 / 开菜单 / 队伍栏虚化」，那时候头像
+      **也跟着一起糊**。两条路会**同时**失效，不是互补关系。
+    * 权重本身的真实准确率写在
+      ``recognition/models/character_classifier.onnx.provenance.json``
+      的 ``real_top1`` 里。低于可用线之前，开着只会**制造错误的角色名** ——
+      那比读不到更糟：``onfield()`` 会拿一个错名字去判连招。
+
+    ★ 什么情况下才该打开
+      只在**名字被遮挡、头像还在**的场景（比如开着角色详情面板）。
+      那种场景确实存在，但很窄，所以它一直是备胎而不是主路。
+
+    设 ``enabled = true`` 时 :func:`build_stack` 会去
+    ``recognition/models/character_classifier.onnx`` 找模型；
+    **找不到就保持关闭并记一条 warning**（可选功能，不该让感知层崩）。
+    """
+
+    #: 总开关。默认 ``False``（理由见类文档）。
+    enabled: bool = False
+    #: 模型路径。空 = 用默认位置（源码树 ``recognition/models/``、
+    #: 发行包 ``<插件根>/recognition/models/``）。
+    path: str = ""
+    #: softmax 置信度低于此值 -> 报 UNKNOWN 而不是那个错名字。
+    #:
+    #: ★ 这个闸必须有：分类器**一定会**给出一个 argmax，
+    #:   没有阈值就等于每次都输出一个名字，哪怕它 90% 不确定。
+    min_confidence: float = 0.35
+class CharacterIdConfig(_Base):
+    """队伍栏**角色名**识别接线配置（2026-10-18）。
+
+    打开后每 ``interval_ticks`` 个 tick 轮转读 1 格（4 格轮一圈），
+    用 rapidocr 读 ``rois.toml`` 的 ``party_name_N``，再在
+    ``terms/genshin/characters.toml`` 的 125 条角色名里做编辑距离纠错，
+    填进 ``PlayerInfo.party[i].name``。
+
+    设 ``enabled = false`` 时 ``StateBuilder`` 拿到 ``character_id=None``，
+    ``party`` 里每个成员的 ``name`` 恒为 ``""`` —— ``onfield('钟离')``
+    与任何按名字判的规则恒 UNKNOWN，**与接入之前行为完全一致**。
+
+    ★ 为什么是 OCR 而不是头像模板匹配
+      BetterGI 的 123 张头像素材与真机队伍栏**不是同一套美术**：
+      真机是 95x87 的圆形裁切小头像，素材是 64~79px 的满方块立绘。
+      实测 6 种描述子匹配真机裁切，top-1 与 top-2 只差 0.004 且
+      帧间不稳定 —— 是噪声不是识别。详见
+      ``perception/detectors/character_detector.py`` 的模块文档。
+
+    ⚠️ **``active``（谁在场）不填**
+      现有 296 帧素材无法标定：同一队伍同一在场角色（没有正负样本）、
+      4 格渲染尺寸一致、数字框不透明度随 UI 淡入淡出剧烈波动。
+      所以 ``PartyMember.active`` 恒 False、``active_member`` 恒 None。
+      恢复条件见 :func:`character_detector.read_active`。
+    """
+
+    #: 总开关。``true``（默认）-> 读角色名；``false`` -> ``name`` 恒空。
+    enabled: bool = True
+
+    #: 每几个 tick 读**一格**。默认 25（5 Hz 下 = 每 5 秒一格，
+    #: 4 格轮一圈 20 秒）。⚠️ 单次 OCR 是百毫秒级，tick 预算只有 200 ms，
+    #:    所以必须轮转而不是一次读 4 格 —— 见 CharacterDetector 的类文档。
+    interval_ticks: int = Field(default=25, ge=1, le=600)
+
+
 class AutopilotConfig(_Base):
     """autopilot 顶层配置。"""
 
@@ -281,6 +422,15 @@ class AutopilotConfig(_Base):
     locator: LocatorConfig = Field(default_factory=LocatorConfig)
     #: 血量几何投影接线（默认关；见 :class:`HpEstConfig`）
     hp_estimation: HpEstConfig = Field(default_factory=HpEstConfig)
+    #: E 技能就绪态视觉感知接线（默认关；见 :class:`SkillCdConfig`）
+    skill_cd: SkillCdConfig = Field(default_factory=SkillCdConfig)
+    #: Q 大招就绪态视觉感知接线（见 :class:`BurstCdConfig`）
+    burst_cd: BurstCdConfig = Field(default_factory=BurstCdConfig)
+    #: 队伍栏角色名识别接线（见 :class:`CharacterIdConfig`）
+    character_id: CharacterIdConfig = Field(default_factory=CharacterIdConfig)
+    #: 队伍栏头像分类器接线（见 :class:`AvatarClassifierConfig`，默认关）
+    avatar_classifier: AvatarClassifierConfig = Field(
+        default_factory=AvatarClassifierConfig)
     #: 公共 ROI 变量（表达式里的自定义名）
     roi_vars: dict[str, str] = Field(default_factory=dict)
     #: 公共区域别名 -> ROI 表达式

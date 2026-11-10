@@ -92,6 +92,30 @@ def _clean_profile(value: object) -> str:
     return "auto"
 
 
+#: YUI 话痨度预设（三档）。与 Console 滑块共用同一套口径。
+#:
+#: ★ 与 ``autopilot_bridge.VERBOSITY_PRESETS`` 是同一组名字 ——
+#:   那份给「预设名 → 档位数值」用，这份给「清单值 → 合法预设名」用。
+#:   两边允许的名字必须一致，由单测钉住。
+YUI_VERBOSITY_PRESETS: tuple[str, ...] = ("quiet", "normal", "chatty")
+
+
+def _clean_verbosity_preset(value: object) -> str:
+    """把 TOML 值规范成 yui_verbosity_preset 枚举：非法值→默认 'chatty'。
+
+    ★ 默认 'chatty' 的语义是「我没管它」
+      宿主会把清单默认值一起写进用户配置副本，于是这个键**永远存在**。
+      若"键存在即覆盖"，Console 滑块就永远轮不到说话。
+      所以 'chatty' 会被 ``autopilot_bridge.set_host_verbosity_preset``
+      解释成「交回给 Console 滑块」。
+    """
+    if isinstance(value, str):
+        v = value.strip().lower()
+        if v in YUI_VERBOSITY_PRESETS:
+            return v
+    return "chatty"
+
+
 def is_safe_relative_dir(value: str) -> bool:
     """``terms_dir`` 只允许 plugin_dir 下的普通相对路径（拒绝绝对路径与 ``..``）。"""
     if not value:
@@ -158,6 +182,19 @@ class PluginOptions:
     scene_hysteresis_count: int = 3  # 场景切换滞回次数。默认 3（连续 3 次同一新场景才算切换），[1, 10]
     desktop_markers_enabled: bool = True  # 黑名单总开关
     desktop_markers_extra: tuple[str, ...] = ()  # 用户自定义额外桌面特征
+    # 2026-10-29 落地 P0：YUI 话痨度预设（quiet/normal/chatty）。
+    # 三级优先的第一级：宿主配置 > Console 滑块 > 默认 1.0。
+    yui_verbosity_preset: str = "chatty"
+    # 2026-11-07：游戏生命周期守卫（前台检测 → 感知栈休眠）。
+    # enabled           : 总开关。关 = 永远不挂起（回到改造前的行为）。
+    # poll_seconds      : 探测周期。一次进程枚举 + 一次前台查询，毫秒级；
+    #                     5s 一次对 CPU 没有任何可测量的影响，但「关掉游戏
+    #                     后多久挂起」只差 5s。
+    # allow_background  : 游戏在后台（最小化 / 被遮挡 / Alt-Tab）时**不**挂起。
+    #                     默认关 —— BetterGI 本身也要求前台，保持一致更安全。
+    lifecycle_guard_enabled: bool = True
+    lifecycle_guard_poll_seconds: int = 5
+    lifecycle_guard_allow_background: bool = False
 
     @classmethod
     def from_section(cls, section: Mapping[str, Any] | None) -> PluginOptions:
@@ -222,6 +259,20 @@ class PluginOptions:
                 data.get("desktop_markers_enabled"), True
             ),
             desktop_markers_extra=_clean_str_list(data.get("desktop_markers_extra")),
+            # 2026-10-29 落地 P0：YUI 话痨度预设
+            yui_verbosity_preset=_clean_verbosity_preset(
+                data.get("yui_verbosity_preset")
+            ),
+            # 2026-11-07：游戏生命周期守卫
+            lifecycle_guard_enabled=_as_bool(
+                data.get("lifecycle_guard_enabled"), True
+            ),
+            lifecycle_guard_poll_seconds=_clamp_int(
+                data.get("lifecycle_guard_poll_seconds"), low=1, high=300, default=5
+            ),
+            lifecycle_guard_allow_background=_as_bool(
+                data.get("lifecycle_guard_allow_background"), False
+            ),
         )
 
 

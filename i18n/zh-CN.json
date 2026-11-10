@@ -34,6 +34,7 @@
   "context.term_line": "- {term}：{brief}",
   "context.no_terms": "（这款游戏暂未提供常驻术语，可调用 lookup_game_term 查询。）",
   "context.hint": "需要更细的术语（角色/机制/黑话）时，调用 lookup_game_term 查询。",
+  "context.no_speculation": "（引擎只会报告敌人的**数量**，没有任何种类信息。说到敌人时只说数量，不要给它们安名字或种族。）",
 
   "lookup.found_header": "找到 {count} 条相关术语：",
   "lookup.entry_line": "【{term}】（{kind}）{brief}",
