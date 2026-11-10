@@ -168,6 +168,10 @@ class PluginOptions:
     screen_activation_limit: int = 12  # 单次 screen-activate 上限
     query_activation_ttl_seconds: int = 300  # 用户消息命中术语的 TTL
     scene_prompt_reinject_seconds: int = 0  # scene prompt 重推间隔（0=只推一次）
+    # 2026-11-10：攻略场景 known_suppress 的主动抑制窗口（秒）。
+    # 该场景的攻略内容在窗口内被注入过语境 → 主动提示层不再主动提同话题
+    # （"玩家已经知道的不乱说"）。0 = 关闭抑制（回到改造前行为）。
+    known_suppress_window_s: int = 600
     # 拍板 2.0.67：场景切换感知增强——S1 变化驱动 OCR + S2 场景切换立即 respond
     change_driven_enabled: bool = False  # 拍板 2.0.70：默认关——S1 change-detect 真机连续 worker 卡死，默认关回到 2.0.66 稳定行为。用户手动开也行，但真根因未定位前默认关。
     change_detect_threshold: int = 8  # 轻量帧哈希差异阈值（dHash 16 位中允许的差异位，[1, 64]）
@@ -235,6 +239,10 @@ class PluginOptions:
             ),
             scene_prompt_reinject_seconds=_clamp_int(
                 data.get("scene_prompt_reinject_seconds"), low=0, high=3600, default=0
+            ),
+            # 2026-11-10：known_suppress 主动抑制窗口（0 = 关闭抑制）
+            known_suppress_window_s=_clamp_int(
+                data.get("known_suppress_window_s"), low=0, high=86400, default=600
             ),
             # 拍板 2.0.67：S1 变化驱动 OCR（开/关 + 哈希差异阈值 [1, 64]）
             #   S2 场景切换冷却 [10, 300]（绕过 300s 全局冷却）

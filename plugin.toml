@@ -185,6 +185,13 @@ query_activation_ttl_seconds = 300
 # scene prompt 重推间隔（秒）。0 = 只推一次；>0 = 每隔 N 秒重推一次（防长对话中 prompt 被挤出）
 scene_prompt_reinject_seconds = 0
 
+# 攻略场景 known_suppress 的主动抑制窗口（秒）。
+#   该场景的攻略内容在窗口内被注入过语境 → 主动提示层不再主动提同话题
+#   （"玩家已经知道的不乱说"）。
+#   0 = 关闭抑制（回到改造前行为：明知玩家已知也会再提一次）。
+#   默认 600 = 10 分钟。
+known_suppress_window_s = 600
+
 # 拍板 2.0.67：S1 变化驱动 OCR（每 3s tick 抓轻量帧做 dHash 对比，差异大则绕过 interval 立即 OCR）
 #   关 = 走老的 interval 节奏（用户嫌迟钝时可关掉试试）
 change_driven_enabled = false  # 拍板 2.0.70：默认关（S1 真机连续 worker 卡死，默认关回到 2.0.66 稳定行为）

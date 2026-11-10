@@ -71,6 +71,7 @@ from .game_registry import (
     as_section,
     normalize_key,
 )
+from .known_suppress import KnownSuppressRegistry
 from .ocr_engine import OcrEngine
 from .scene_store import SceneEntry, load_scenes
 from .screen_capture import capture_active_frame, find_genshin_window, is_black_frame
@@ -446,6 +447,12 @@ class GenshinGameBuddyPlugin(NekoPluginBase):
         self._scene_tracker_log_throttle: float = 0.0
         self._scene_tracker_log_interval: float = 30.0  # 秒
         self._scene_store: dict[str, SceneEntry] = {}
+        # 2026-11-10：攻略场景 known_suppress 的主动抑制登记簿。
+        # 记录"某场景的攻略内容刚被注入语境"，供主动提示层查询
+        # （玩家已经知道的话题不重复主动提）。纯内存，不落盘。
+        self._known_suppress = KnownSuppressRegistry(
+            window_seconds=float(self._options.known_suppress_window_s)
+        )
         # 归属检测的 (library, scenes) 按游戏缓存；config 重建时清空（2.0.14）。
         self._detect_cache: dict[str, tuple[Any, dict[str, SceneEntry]]] = {}
         # 2026-11-07：BetterGI 双向桥接（startup 里建，shutdown 里收）。
@@ -506,6 +513,10 @@ class GenshinGameBuddyPlugin(NekoPluginBase):
             self._config_ready = True
             self._detect_cache.clear()
         self._counter.reconfigure(options.reinject_every_n_messages)
+        # 2026-11-10：抑制窗口跟随配置热更新（不用重启插件）。
+        _known_registry = getattr(self, "_known_suppress", None)
+        if _known_registry is not None:
+            _known_registry.set_window(options.known_suppress_window_s)
         self._manager.set_options(options)
 
         for issue in registry.issues:
@@ -2737,7 +2748,9 @@ class GenshinGameBuddyPlugin(NekoPluginBase):
         except Exception:
             return 0
 
-    def _should_push_proactive(self, ocr_text: str, scene_switched: bool = False) -> bool:
+    def _should_push_proactive(
+        self, ocr_text: str, scene_switched: bool = False, *, scene_id: str = ""
+    ) -> bool:
         """拍板 2.0.67：场景切换路径绕过 300s 全局冷却，走独立 scene_switch_cooldown。
 
         同场景：hash 变化 + 300s 全局冷却 + 术语密度 < 5（2.0.59 沿用）。
@@ -2745,10 +2758,29 @@ class GenshinGameBuddyPlugin(NekoPluginBase):
           - hash 检查跳过：切场景文本必然不同；放宽信任。
           - 300s 跳过：用户切场景就该立即说话，300s 卡死体验。
           - 术语密度保留：太多术语命中（密集中文）会让提示语挤掉上下文，仍判负。
+
+        ★ 2026-11-10：known_suppress 抑制排在**最前面**。
+          若当前场景的攻略内容刚在窗口内被注入过语境（玩家已经知道了），
+          这次主动搭话就**不说**。抑制时**不更新** ``_last_pushed_hash`` ——
+          否则窗口过后同一段文本会被 hash 永久挡住，再也主动不了。
         """
         import hashlib
 
         now = time.monotonic()
+        # ★ known_suppress：玩家已知道的话题不重复主动提。
+        #   只在"主动"路径生效；用户提问走 on_chat_message，完全不查这里。
+        _known_registry = getattr(self, "_known_suppress", None)
+        if _known_registry is not None and scene_id:
+            if _known_registry.should_suppress(scene_id, now):
+                _injected_at = _known_registry.last_injected_at(scene_id)
+                _age = 0.0 if _injected_at is None else now - _injected_at
+                self.logger.info(
+                    "genshin_game_buddy: proactive suppressed by known_suppress scene={} age={:.1f}s window={:.0f}s",
+                    scene_id,
+                    _age,
+                    _known_registry.window_seconds,
+                )
+                return False
         if scene_switched:
             # 拍板 2.0.67：S2 独立冷却——切换就主动搭话，但同一切换间隔别刷屏
             if now - self._last_scene_switch_at < float(
@@ -3492,7 +3524,9 @@ class GenshinGameBuddyPlugin(NekoPluginBase):
                     scene_event.elapsed_in_old,
                 )
 
-            if matched_scenes and self._should_push_proactive(text, scene_switched):
+            if matched_scenes and self._should_push_proactive(
+                text, scene_switched, scene_id=matched_scenes[0]
+            ):
                 self._push_proactive(matched_scenes, added, removed)
                 # 拍板 2.0.67：S2 更新切换时间戳 + 上次主动搭话场景名。
                 # 切路径走独立冷却；同场景路径只更新场景名（让下一次切回能再触发）。
@@ -3534,6 +3568,9 @@ class GenshinGameBuddyPlugin(NekoPluginBase):
                             primary, len(scene.prompt),
                         )
                         self._last_scene_pushed_at = time.monotonic()
+                        # ★ 2026-11-10：场景攻略正文已进模型上下文 →
+                        #   登记"玩家已经知道这个场景了"，主动提示层据此抑制同话题。
+                        self._record_scene_injection(primary)
                     self._last_scene_pushed = primary
             else:
                 self._last_scene_pushed = ""
@@ -3562,6 +3599,30 @@ class GenshinGameBuddyPlugin(NekoPluginBase):
                 )
         except Exception:
             self.logger.exception("genshin_game_buddy: _ocr_perceive_body tick failed")
+
+    def _record_scene_injection(self, scene_id: str) -> None:
+        """登记"该攻略场景的内容刚刚被注入语境"——供主动提示层抑制同话题。
+
+        ★ 记录侧有两个入口（都是"场景内容进入模型上下文"的时刻）：
+          1. ``_push_context``  —— 语境块（术语 + 场景 avoid 约束）注入；
+          2. ``ocr_perceive`` 的 scene-prompt push —— 场景攻略正文注入。
+          只记 ① 不够：玩家走进"深境螺旋"的那一刻，主动提示走的是 ②，
+          而 ① 只在登记游戏 / 重推周期才跑 —— 只记 ① 这条功能基本不生效。
+
+        ★ 防御式：``_scene_store`` / ``_known_suppress`` 在启动早期可能还没就位
+          （测试也可能用 ``__new__`` 绕过 ``__init__``），取不到就什么都不记，
+          绝不抛异常。
+        """
+        key = (scene_id or "").strip()
+        if not key:
+            return
+        scenes = getattr(self, "_scene_store", None) or {}
+        scene = scenes.get(key)
+        known = bool(scene.known_suppress) if scene is not None else False
+        registry = getattr(self, "_known_suppress", None)
+        if registry is None:
+            return
+        registry.record(key, known_suppress=known)
 
     def _push_context(self, session: GameSession, *, announce_switch: bool = True) -> bool:
         """把语境块送进对话上下文。返回是否真的提交成功（失败绝不谎报）。
@@ -3602,9 +3663,12 @@ class GenshinGameBuddyPlugin(NekoPluginBase):
         #   不引入新的锁语义。
         scene = self._scene_store.get(self._last_scene_pushed) if self._last_scene_pushed else None
         scene_avoid = scene.avoid if scene is not None else ()
-        # TODO(guide): 主动提示层据此抑制同话题
-        #   known_suppress 挂在 scene_store.SceneEntry 上，本轮只做到"可读、可查"；
-        #   主动提示层（chat_state / event_to_yui 的主动路径）尚未消费它，留给下一轮。
+        # ★ 2026-11-10：known_suppress 已接上主动提示层。
+        #   语境块注入成功时登记"玩家已经知道这个场景了"（_record_scene_injection），
+        #   主动提示层据此在窗口内不再提同话题（见 _should_push_proactive）。
+        #   ⚠️ chat_state / event_to_yui 用的是**引擎场景** id 空间
+        #     （WORLD/COMBAT/IDLE），与这里的**攻略场景** id 空间不相交 ——
+        #     两者混用会造成真实误判，所以消费侧接在 __init__ 的攻略场景主动路径上。
 
         block = build_context_block(
             header=header,
@@ -3634,4 +3698,7 @@ class GenshinGameBuddyPlugin(NekoPluginBase):
                 "genshin_game_buddy: context injection not submitted ({})", receipt.get("reason")
             )
             return False
+        # ★ 2026-11-10：语境块注入成功 → 登记"玩家已经知道这个场景了"。
+        #   主动提示层据此在窗口内不再提同话题（known_suppress）。
+        self._record_scene_injection(getattr(self, "_last_scene_pushed", ""))
         return True
