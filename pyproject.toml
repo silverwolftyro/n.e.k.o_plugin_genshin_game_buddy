@@ -1,15 +1,134 @@
 [project]
 name = "genshin_game_buddy"
 version = "3.1.18"
+# ★ 运行时依赖**唯一**声明处，且这里只列**必须 vendor 进本插件**的包。
+#
+#   1) requirements.txt 被宿主明确拒绝（validate_cmd._check_requirements_file）：
+#        "requirements.txt is not supported; use pyproject.toml
+#         [project].dependencies and vendor/"
+#
+#   2) [project].dependencies 里每一条（非宿主自带）都必须在 vendor/ 里
+#      **实体存在**，否则 check 报
+#        "vendor/ does not satisfy Python runtime dependencies"（硬 error）。
+#      宿主的 _HOST_PROVIDED 只有 {"n-e-k-o"} 一个名字。
+#
+#   3) 所以这里**不能**把 numpy / opencv-python / onnxruntime-directml 之类
+#      全列进来 —— 那意味着要把 250 MB 依赖 pip install --target vendor/，
+#      插件包直接撞穿市场的 200 MB 一键安装上限（market_bridge
+#      _DOWNLOAD_MAX_BYTES）。物理上走不通。
+#
+#   4) 这些重依赖由**宿主运行环境**提供（N.E.K.O 自身就带 numpy 2.4.6 /
+#      opencv / onnxruntime / Pillow / psutil / PyYAML / pydantic），
+#      插件侧不重复声明、不重复 vendor。独立跑引擎脚本时用
+#      requirements-autopilot.txt（在 _release/ 分发包里）或直接 pip 装。
+#
+# ─────────────────────────────────────────────────────────────────────
+# ★ 2026-11-07 · 单插件合并后的依赖合并结论
+#   原独立插件 bettergi_companion 的 pyproject.toml 里
+#   `dependencies = []`（零第三方依赖，只用标准库 + 插件 SDK）。
+#   它被物理并入后**不带来任何新依赖**，所以本文件下面这条列表
+#   **一条都不用加**。
+#
+#   两处曾经的「看起来该加」但**故意不加**：
+#
+#   ① psutil（lifecycle_guard.py 用它扫进程名）
+#      —— psutil 4 MB+ 且宿主运行环境本就带着；写进 dependencies
+#         就必须 vendor 进插件包（见上面第 2 条规则），代价与收益完全
+#         不成比例。改成「psutil 优先 + Win32 Toolhelp32 兜底」：
+#         装了 psutil 走 psutil，没装就走 ctypes 调 kernel32。
+#         **不装 psutil 也不影响功能**。
+#
+#   ② requests / httpx 之类（若反向控制走 HTTP 拉指令）
+#      —— 桥接的 HTTP 服务端与长轮询**全部用标准库**
+#         （http.server / urllib），与原独立插件一致，零新增依赖。
+#
+#   ★ 判定口径：合并后 dependencies 数量不变 = 合并干净。
+#     如果哪天这里多出条目，必须同时在 vendor/ 里出现实体，否则
+#     check --release 直接报硬错误。
 dependencies = [
     # WGC 截图后端（CaptureChannel.WGC）。
     # 硬件加速全屏下 bitblt/dxcam/mss 三个全部只拿到黑帧，WGC 走 DWM
     # 合成管道，是唯一不碰注册表的解法。真机实测原神全屏可用。
     # 缺它不会炸：_init_channel 判为不可用并自动跳过。
+    # ★ 它是唯一必须 vendor 的：vendor/windows_capture-2.0.1.dist-info
+    #   实装版本与这里的 >=2.0.1 匹配，validate_dependency_layout 通过。
     "windows-capture>=2.0.1",
 ]
 authors = [
     { name = "silverwolftyro" },
+]
+
+[tool.neko.build]
+# ============================================================================
+# 打包排除规则
+# ----------------------------------------------------------------------------
+# ★ 为什么需要这段：build 规则**不读 .gitignore**。
+#   宿主的 build_rules.py 只按自己的内置表排除
+#   （__pycache__ / .venv / .git / .github / .vscode / .pytest_cache / ... ），
+#   其余一律进包。所以真机产物 autopilot/_runtime/ 会把包撑到 40 MB，
+#   并且让 publish 的 _ensure_clean_worktree 永远失败。
+#
+# ★ 为什么**不能**写 include：
+#   build_rules.py 的 should_skip_path 里，include 非空时会**变成白名单**
+#   （不匹配 include 的一律排除）。插件有 261 个文件要进包，
+#   写一条 include 等于把包剥到只剩那一条 —— 那是灾难不是配置。
+#
+# ★ 为什么 tests/ 排掉了但 release 门禁还在跑 pytest：
+#   release_cmd._run_tests 跑的是 **源码目录**（cwd=plugin_dir）的 tests/，
+#   产物里没有 tests/ 不影响 strict 检查。CI 同样跑源码仓。
+#
+# 实测（D:\workspace\N.E.K.O\NEKO-genshin\_构建与发布\_构建脚本\verify_rules.py 调宿主真函数）：
+#   空规则 1075 files / 40.01 MB  ->  候选规则 261 files / 5.53 MB
+#   14 条 MUST_KEEP 全部保留，10 条 MUST_DROP 全部排除。
+exclude_dirs = [
+    # 真机运行产物：81 文件 / 23.76 MB，含截图与状态文件
+    "autopilot/_runtime",
+    # 测试只在源码仓里跑，不进分发包
+    "tests",
+    # pytest 临时目录（未被内置表覆盖）
+    ".pytest-tmp",
+    # ★ 2026-11-09 合规清理：米游社地图与瓦片缓存，禁止随包分发。
+    #   recognition/data/mihoyo_maps/ = 300 文件 / 388.41 MB（teyvat_P0.png 单张 139.6 MB）
+    #   recognition/data/mihoyo_tiles/ = 12,961 文件 / 66.83 MB
+    #   两者合计约 455 MB，且是第三方站点抓取物 —— 一旦进包会直接撞穿市场体积上限，
+    #   同时越过 recognition/notes/LICENSING.md 定下的「不随包分发」边界。
+    #   ★ 现状说明：recognition/ 是本插件目录的**同级兄弟**，运行时经
+    #     NEKO_RECOGNITION_ROOT 引用，**本来就不在打包 staging 范围内**。
+    #     这两条属**纵深防御**（防止日后把 recognition/ 搬进插件目录，
+    #     或打包根 / 规则被改动），不是当前正在生效的拦截。
+    "recognition/data/mihoyo_maps",
+    "recognition/data/mihoyo_tiles",
+]
+exclude = [
+    # docs/ 不能整个排 —— plugin.toml 的 [[plugin.ui.guide]]
+    # entry = "docs/quickstart.md" 是快速开始的真实入口，
+    # 排掉整个 docs/ 会让插件的引导页 404。只排内部报告。
+    "docs/REPORT_*.md",
+    "CHANGELOG.md",
+    # 开发期锁定文件，运行时用不到
+    "uv.lock",
+    "ruff.toml",
+    ".gitignore",
+    # 改名清单：发布前一次性文档
+    "RENAME_BEFORE_RELEASE.md",
+]
+exclude_files = [
+    # 开发期启动脚本
+    "start_dev.bat",
+    "window_find_probe.bat",
+    # ★★ ``window_probe.py`` **必须进包**（2026-10-29 修正）
+    #   它不是开发期探针 —— 插件根模块 ``__init__.py`` 在**运行时**
+    #   就 ``from .window_probe import find_window_by_title``（会话探测的
+    #   窗口查找兜底），而且那个导入是**模块级、无保护**的。
+    #
+    #   把它排除掉的后果是打包产物**根本导不进来**：
+    #     ModuleNotFoundError: No module named
+    #     'plugins.genshin_game_buddy.window_probe'
+    #   症状是安装后插件静默不启动，而 ``check --release`` 只报一条 WARN
+    #   （元数据探测失败）——门禁是绿的，包是坏的。
+    #
+    #   真要瘦身，删的是 ``__init__.py`` 里那两行相对导入，
+    #   而不是把被依赖的模块从包里拿掉。
 ]
 
 [tool.pytest.ini_options]
