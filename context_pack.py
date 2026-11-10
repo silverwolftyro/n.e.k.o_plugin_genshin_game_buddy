@@ -86,12 +86,19 @@ def build_context_block(
     term_lines: Sequence[str] = (),
     empty_note: str = "",
     hint: str = "",
+    note: str = "",
     max_chars: int = 800,
 ) -> str:
     """装配语境块，保证 ``len(result) <= max_chars``（``max_chars`` 至少按 1 处理）。
 
-    装配顺序即优先级：标题 → 口吻 → 术语区 → 末尾提示。术语区只有在
-    "标题行 + 至少一条术语行"放得下时才展开，避免出现悬空的"常用术语："。
+    装配顺序即优先级：标题 → 口吻 → 术语区 → 末尾提示 → 常驻规则。
+    术语区只有在"标题行 + 至少一条术语行"放得下时才展开，避免出现悬空的"常用术语："。
+
+    ★ ``note`` 与 ``hint`` 分开装（2026-10-18）
+      ``hint`` 是「需要时去查」的操作提示，``note`` 是**常驻规则**
+      （比如「不许给敌人安名字」）。分开是因为它们**独立取舍**：
+      预算不够时先丢 ``note``（规则可以下次再推），``hint`` 的优先级更高。
+      合成一行的话，预算一紧就**两个一起丢**。
     """
     budget = max(int(max_chars), 1)
     lines: list[str] = []
@@ -119,6 +126,10 @@ def build_context_block(
 
     if hint and fits(hint):
         lines.append(hint)
+
+    # ★ 常驻规则最后装（2026-10-18）：预算不够时先丢它。
+    if note and fits(note):
+        lines.append(note)
 
     block = "\n".join(lines)
     if len(block) <= budget:
