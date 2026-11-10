@@ -27,6 +27,8 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Any
 
+from ..contracts.reasons import PERMISSION_REASON_PREFIXES, reason_head
+
 
 @dataclass
 class LoopStats:
@@ -66,6 +68,24 @@ class LoopStats:
     by_action: dict[str, int] = field(default_factory=dict)
     by_outcome: dict[str, int] = field(default_factory=dict)
     by_scene: dict[str, int] = field(default_factory=dict)
+    #: ★ 拒绝原因**前缀** -> 次数（2026-10-18）
+    #:
+    #: 为什么需要它
+    #:   ``intents_rejected`` 只说「被拒了多少」，不说「为什么」。
+    #:   而用户看到引擎不动时，最该知道的是「是不是**权限**不够」——
+    #:   那和「场景不对」要走的排查方向完全不同。
+    #:
+    #: 为什么存**前缀**而不是整串
+    #:   reason 带变量（``WINDOW_NOT_FOREGROUND``、
+    #:   ``MIN_GAP:USE_PICKUP(205<800ms)``），整串会把 key 撑爆。
+    #:   前缀是稳定的分类维度。
+    by_reason: dict[str, int] = field(default_factory=dict)
+    #: ★ 权限/焦点不足导致的拒绝次数（2026-10-18）
+    #:
+    #: 单独拎一个字段出来，是为了 Console 首页能**直接亮红牌**：
+    #:   这个数 > 0 就说明「引擎一直被 Windows 拦着」，
+    #:   用户该做的是**用管理员身份重跑**，不是查规则。
+    permission_blocks: int = 0
 
     #: ★ 存 **float** 毫秒。用 int 截断会让"每 tick 快过 1ms"的情况
     #: 全部记成 0，统计里就出现 avg=0.0 这种明显不对的数字。
@@ -118,6 +138,19 @@ class LoopStats:
         }.get(outcome)
         if bucket:
             setattr(self, bucket, getattr(self, bucket) + 1)
+
+    def record_rejection(self, reason: str) -> None:
+        """记一次**被拒**的原因（2026-10-18）。
+
+        :param reason: 执行层返回的 reason 串（带变量的完整串）。
+            这里只取**前缀**做分类。
+        """
+        head = reason_head(reason)
+        if not head:
+            return
+        self.by_reason[head] = self.by_reason.get(head, 0) + 1
+        if head in PERMISSION_REASON_PREFIXES:
+            self.permission_blocks += 1
 
     # ── 派生 ───────────────────────────────────────────────────
 
@@ -189,6 +222,9 @@ class LoopStats:
             "by_action": dict(sorted(self.by_action.items())),
             "by_outcome": dict(sorted(self.by_outcome.items())),
             "by_scene": dict(sorted(self.by_scene.items())),
+            # ★ 拒绝原因分类（2026-10-18）—— Console 的权限红牌靠它
+            "by_reason": dict(sorted(self.by_reason.items())),
+            "permission_blocks": self.permission_blocks,
         }
 
     def format_report(self, title: str = "运行统计") -> str:

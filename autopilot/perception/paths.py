@@ -3,7 +3,7 @@
 ★ 铁律：所有资产路径统一从这里取，不允许在别处硬编码
 --------------------------------------------------------
 ROI 配置、模板图、模型权重、抽帧样本……**任何地方都不许再写
-``D:/NEKO/...`` 或 ``templates/...`` 这类字面量**。要改路径就改这里，
+``D:/项目/N.E.K.O/NEKO-genshin/...`` 或 ``templates/...`` 这类字面量**。要改路径就改这里，
 改一处生效全局。
 
 硬编码路径的代价不是"多打几个字"，而是：
@@ -13,7 +13,7 @@ ROI 配置、模板图、模型权重、抽帧样本……**任何地方都不�
 
 ★ 根目录可以用环境变量覆盖
 --------------------------
-``NEKO_RECOGNITION_ROOT`` > 默认 ``D:\\NEKO\\recognition``。
+``NEKO_RECOGNITION_ROOT`` > 默认 ``D:\\workspace\\N.E.K.O\\NEKO-genshin\\recognition``。
 换机器 / 做对照实验时用环境变量即可，不必改代码。
 """
 
@@ -25,7 +25,7 @@ from pathlib import Path
 #: 资产根目录。环境变量优先，其次默认路径。
 RECOGNITION_ROOT: Path = Path(
     os.environ.get("NEKO_RECOGNITION_ROOT", "").strip()
-    or r"D:\NEKO\recognition"
+    or r"D:\workspace\N.E.K.O\NEKO-genshin\recognition"
 )
 
 # ── 配置 ────────────────────────────────────────────────────────────────

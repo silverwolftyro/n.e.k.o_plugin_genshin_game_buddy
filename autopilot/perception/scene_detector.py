@@ -97,7 +97,7 @@ _EPS = 1e-9
 #: 底层单帧判定模块路径。可用环境变量 NEKO_SCENE_TREE 覆盖。
 _TREE_PATH = Path(os.environ.get(
     "NEKO_SCENE_TREE",
-    r"D:\NEKO\recognition\exports\benchmark\scripts\misc\coord_scene_tree.py"))
+    r"D:\workspace\N.E.K.O\NEKO-genshin\recognition\exports\benchmark\scripts\misc\coord_scene_tree.py"))
 
 _TREE = None
 

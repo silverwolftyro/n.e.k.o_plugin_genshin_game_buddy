@@ -148,10 +148,26 @@ class OcrEngine:
         contains_all: list[str] | None = None,
         regex: list[str] | None = None,
         replace: dict[str, list[str]] | None = None,
+        count_failure: bool = True,
     ) -> OcrResult:
         """读 ROI 的文字并做匹配判定。
 
         三种匹配只能给一种。都没给时只返回原始文本（matched=UNKNOWN）。
+
+        ⚠️ ``count_failure=False`` —— **「这块没字」不是「OCR 坏了」**
+        -----------------------------------------------------------
+        :class:`~autopilot.perception.detectors.character_detector.CharacterDetector`
+        用它读队伍栏角色名。那块区域在**切屏 / 开派蒙菜单 / 队伍栏淡出**
+        时本来就是空的，此时 rapidocr 返回空是**正确结果**。
+
+        可它会走 ``ok=False`` 那条路，把 ``fail_streak`` 加一；
+        连续 5 次（:data:`DEFAULT_FAIL_THRESHOLD`）之后
+        ``self._available = False`` —— **整个 OCR 通道被判死**，
+        连传送点识别一起废掉。也就是说「菜单开了 1 秒」会牵连
+        全局健康状态。
+
+        所以「读不到目标文字」与「引擎读不出任何东西」必须分开计：
+        这里由调用方显式声明，而不是让引擎去猜。
         """
         img = region.image if isinstance(region, ImageRegion) else region
         t0 = time.perf_counter()
@@ -167,10 +183,11 @@ class OcrEngine:
         elapsed = (time.perf_counter() - t0) * 1000
 
         if not ok:
-            self._fail_streak += 1
-            self._last_error = err or "engine returned empty"
-            if self._fail_streak >= self._fail_threshold:
-                self._available = False
+            if count_failure:
+                self._fail_streak += 1
+                self._last_error = err or "engine returned empty"
+                if self._fail_streak >= self._fail_threshold:
+                    self._available = False
             return OcrResult(
                 text="",
                 matched=TriState.UNKNOWN,

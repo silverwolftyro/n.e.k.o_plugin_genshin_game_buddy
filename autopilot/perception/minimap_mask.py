@@ -45,7 +45,7 @@ def _default_cfg_path() -> Path:
             cand = up / "recognition" / "configs" / "rois.toml"
             if cand.is_file():
                 return cand
-        return Path(r"D:\NEKO\recognition\configs\rois.toml")
+        return Path(r"D:\workspace\N.E.K.O\NEKO-genshin\recognition\configs\rois.toml")
 
 
 def load_circle_cfg(cfg_path: Optional[str | Path] = None) -> dict:

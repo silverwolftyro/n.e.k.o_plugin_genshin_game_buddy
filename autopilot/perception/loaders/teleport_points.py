@@ -54,7 +54,7 @@ BETTERGI_RELPATH = Path("GameTask") / "AutoTrackPath" / "Assets" / "tp.json"
 #: 本机 BetterGI 可能的安装位置。**只用来"找到没有"**，不预置内容。
 #: 是列表而不是常量：换机器 / 多开时用 :func:`add_bettergi_candidate` 追加。
 BETTERGI_CANDIDATES: list[Path] = [
-    Path(r"D:\NEKO\现成的自动化工具参考\参考：better GI\BetterGI"),
+    Path(r"D:\workspace\N.E.K.O\NEKO-genshin\_参考资料\现成的自动化工具参考\参考：better GI\BetterGI"),
     Path(r"C:\Program Files\BetterGI"),
 ]
 

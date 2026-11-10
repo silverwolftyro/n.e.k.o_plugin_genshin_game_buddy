@@ -218,7 +218,7 @@ def _load_coord_transform():
     import sys
     p = Path(os.environ.get(
         "NEKO_COORD_TRANSFORM",
-        r"D:\NEKO\recognition\exports\benchmark\scripts\misc"
+        r"D:\workspace\N.E.K.O\NEKO-genshin\recognition\exports\benchmark\scripts\misc"
         r"\coord_transform.py"))
     if not p.is_file():
         raise FileNotFoundError(

@@ -154,7 +154,7 @@ def _paths():
     except Exception:                                    # noqa: BLE001
         import os
         root = Path(os.environ.get("NEKO_RECOGNITION_ROOT", "").strip()
-                    or r"D:\NEKO\recognition")
+                    or r"D:\workspace\N.E.K.O\NEKO-genshin\recognition")
         return type("_P", (), {
             "RECOGNITION_ROOT": root,
             "MINIMAP_SCALE_TOML": root / "configs" / "minimap_scale.toml",

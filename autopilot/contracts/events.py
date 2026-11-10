@@ -219,6 +219,31 @@ class Event:
             context={"intent_id": intent_id, "reason": reason},
         )
 
+    @classmethod
+    def user_interrupt(cls, key_name: str, released: int,
+                       pause_s: float) -> "Event":
+        """用户**物理按下**了键，引擎主动让权（2026-10-17）。
+
+        ★ 这不是故障，是**礼让**
+          事件严重级别是 INFO —— 用户按了个键，引擎松手让一下，
+          是正常交互，不是错误。报成 WARN/ERROR 会让「健康度」
+          凭空变差，把用户引向错误的方向。
+
+        ★ 为什么单独一个事件码而不是复用 INTENT_REJECTED
+          让权期间产生的拒绝（reason 带 ``USER_TAKEOVER:``）是
+          **引擎主动不做**，不是「有个动作被否了」。两者对用户
+          的含义不同，播报也不同。
+        """
+        return cls(
+            severity=Severity.INFO,
+            category=EventCategory.EXECUTION,
+            code="USER_INTERRUPT",
+            message=f"用户按下 {key_name}，引擎让权 {pause_s:.0f} 秒",
+            context={"key": key_name,
+                     "released_keys": released,
+                     "pause_s": pause_s},
+        )
+
     # -- 业务事件（2026-10-08）：给「事件流 -> YUI 说话」用 ------------
     #
     # ★ 为什么单独一组

@@ -73,8 +73,8 @@ SAME_LANDING_TOL_M = 1.0
 
 #: 传送点数据搜索顺序
 _TP_SEARCH = (
-    Path(r"D:\NEKO\recognition\data\teleport_points.json"),
-    Path(r"D:\NEKO\recognition\data\_ref_tp_sample.json"),
+    Path(r"D:\workspace\N.E.K.O\NEKO-genshin\recognition\data\teleport_points.json"),
+    Path(r"D:\workspace\N.E.K.O\NEKO-genshin\recognition\data\_ref_tp_sample.json"),
 )
 
 

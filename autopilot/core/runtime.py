@@ -135,6 +135,7 @@ class RuntimeContext:
         store: WorldStateStore | None = None,
         stats: LoopStats | None = None,
         connection: ConnectionState | None = None,
+        active_slots: Any = None,
         tick_rate_hz: float = 5.0,
         max_consecutive_capture_failures: int = 10,
     ) -> None:
@@ -144,6 +145,11 @@ class RuntimeContext:
         self.policy = policy
         self.executor = executor
         self.guard = guard
+        #: 在场槽位记账器（``actuator.active_slot.ActiveSlotTracker``）。
+        #: ``None`` = 不记 -> ``PlayerInfo.active_member`` 恒 None ->
+        #: ``onfield()`` 恒 UNKNOWN。放这里是因为**两个写入方**
+        #: （执行层线程、监听线程）都拿得到它，而读取方是 builder。"""
+        self.active_slots = active_slots
 
         # 聚合
         self.store = store or WorldStateStore()

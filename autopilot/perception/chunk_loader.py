@@ -30,7 +30,7 @@ __all__ = ["ChunkLoader", "PYRAMID_DIR"]
 PYRAMID_DIR = Path(
     __import__("os").environ.get(
         "NEKO_P0_PYRAMID",
-        r"D:\NEKO\recognition\data\mihoyo_maps\P0_pyramid"))
+        r"D:\workspace\N.E.K.O\NEKO-genshin\recognition\data\mihoyo_maps\P0_pyramid"))
 
 _DEFAULT_CACHE = 8
 

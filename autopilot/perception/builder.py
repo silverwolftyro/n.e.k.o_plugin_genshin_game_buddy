@@ -29,7 +29,7 @@ bgi_*.onnx），所以那条路径一直在跑 ``_scene_from_templates_only`` �
   而 YOLO 现在不参与场景判定了。见 :meth:`_compute_perception_ok`。
 
 🔴 **跨仓库硬依赖**：:class:`SceneDetector` 默认判定器要动态加载
-   ``coord_scene_tree.py``（``D:\\NEKO\\recognition\\...\\scripts\\misc\\``），
+   ``coord_scene_tree.py``（``D:\\workspace\\N.E.K.O\\NEKO-genshin\\recognition\\...\\scripts\\misc\\``），
    可用环境变量 ``NEKO_SCENE_TREE`` 覆盖。**缺文件时
    :meth:`build` 抛 FileNotFoundError** —— 故意不吞。静默判成"非大世界"
    会让定位永远不启动，且看不出原因。
@@ -82,6 +82,8 @@ from ..contracts.state_packet import (
 from .capturer import CapturedFrame
 from .fault_guard import FaultGuard
 from .hp_estimator import BarParams, estimate_fill_ratio
+from .detectors.key_e import read_skill_cd
+from .detectors.key_q import read_burst_cd
 from .ocr import OcrEngine
 from .position_mapping import position_from_state
 from .roi_expr import CompiledRoi, RoiExprEvaluator, RoiExprError
@@ -394,6 +396,13 @@ class StateBuilder:
         roi: RoiExprEvaluator | None = None,
         locator: Any = None,
 hp_estimation: Any = None,
+        skill_cd: Any = None,
+        burst_cd: Any = None,
+        active_slots: Any = None,
+        char_slot_index: Any = None,
+        avatar_classifier: Any = None,
+        avatar_classifier_cfg: Any = None,
+        character_id: Any = None,
         entity_detector: Any = "auto",
         entity_interval_ticks: int | None = None,
         scene_debouncer: SceneIdDebouncer | None = None,
@@ -438,6 +447,73 @@ hp_estimation: Any = None,
         #: 血量几何投影配置（``config.HpEstConfig``）。``None`` = 不做估算，
         #: ``PlayerInfo.hp_ratio`` 恒为 None —— **与接入之前行为完全一致**。
         self._hp_estimation = hp_estimation
+        #: E 技能就绪感知配置（``config.SkillCdConfig``）。``None`` = 不做，
+        #: ``PlayerInfo.party`` 恒为 ``()``，``e_ready()`` 恒 UNKNOWN ——
+        #: **与接入之前行为完全一致**。
+        self._skill_cd = skill_cd
+        #: ``skill_cd`` 是否**真的开着**。``tools/_stack.py`` 已经在装配期把
+        #: 关着的配置换成 None 了，但 builder 自己也查一遍 —— 与
+        #: :meth:`_estimate_hp` 同款。理由：直接 ``StateBuilder(...)`` 构造的
+        #: 调用方（单测、离线工具）不会经过 _stack，只查这里就会被
+        #: ``enabled=False`` 的配置偷偷绕过，**行为与默认不一致且不报错**。
+        self._skill_cd_on = bool(
+            skill_cd is not None and getattr(skill_cd, "enabled", False))
+        #: Q 大招就绪感知配置（``config.BurstCdConfig``）。``None`` =
+        #: 不做，``cd_ready`` 里没有 ``"burst"`` 这一把。
+        #:
+        #: ★ 刻意与 :attr:`_skill_cd_on` **分开**：两个信号可信度不同
+        #:   （key_e 阈值未标定且被背景主导，key_q 在 296 帧上量出了
+        #:   0.731 的间隔）。并成一个开关就等于强迫用户
+        #:   「两个都信」或「两个都不用」。
+        self._burst_cd = burst_cd
+        self._burst_cd_on = bool(
+            burst_cd is not None and getattr(burst_cd, "enabled", False))
+        #: 在场槽位记账器（``actuator.active_slot.ActiveSlotTracker``）。
+        #: ``None`` = 不记 -> 没有任何 ``PartyMember.active`` 为 True。
+        #:
+        #: ★ 这是 ``onfield()`` 从「恒 UNKNOWN」变成「能用」的唯一来源，
+        #:   而它**不需要标定**：引擎按了哪个数字键它自己知道，
+        #:   用户按了哪个数字键监听器知道。视觉路线已被
+        #:   ``detectors/character_detector.py`` 的模块文档用四条数据否掉。
+        self._active_slots = active_slots
+        #: 编队名册索引（``actuator.active_slot.CharSlotIndex``）。
+        #: 感知层是**唯一的写入方**，执行层读它做 ``char_id -> 数字键`` 翻译。
+        #: ``None`` = 不发布 -> ``SWITCH_CHARACTER`` 只能靠静态 ``[char_slots]``。
+        self._char_slot_index = char_slot_index
+        #: 队伍栏头像分类器（**降级路径**，默认 None）。
+        #:
+        #: ★ 实测真机 697 张头像上 top1 在随机水平（124 类任务），
+        #:   比一个「什么都不学的最近邻」还差，所以**默认不挂**。
+        #:   挂着它唯一的代价是可能报出**错误的**角色名 ——
+        #:   而 onfield() 会拿错名字去判连招。
+        self._avatar_classifier = avatar_classifier
+        #: 头像分类器的配置对象（读 ``min_confidence``）。``None`` 时用 0.35。
+        self._avatar_cfg = avatar_classifier_cfg
+        #: 队伍栏角色名识别配置（``config.CharacterIdConfig``）。``None`` =
+        #: 不做，``PartyMember.name`` 恒为 ``""``。
+        self._character_id = character_id
+        self._character_id_on = bool(
+            character_id is not None and getattr(character_id, "enabled", False))
+        #: 每几个 tick 读**一格**角色名。⚠️ 单次 OCR 实测 1.0~1.5 s，
+        #:    且**与图像大小无关**（是每次调用的固定开销，
+        #:    见 detectors/character_detector.py 的类文档）——
+        #:    200 ms tick 预算的 5~7 倍。所以必须轮转 + 节流，
+        #:    绝不能一帧读完 4 格。调小它会直接顶掉 tick 预算。
+        self._character_interval = max(
+            1, int(getattr(character_id, "interval_ticks", 25) or 25))
+        #: 角色名识别器。**懒构造** —— 它需要 ``self._ocr``，而 OCR 引擎
+        #: 在没注入时也是 None。
+        self._char_detector: Any = None
+        #: 上一次成功认出的 ``{slot: 角色名}``。读不到时沿用，理由见
+        #: :meth:`CharacterDetector.update`（切屏时整栏虚化，
+        #: 清缓存会让快照每帧闪烁）。
+        self.last_character_names: dict[int, str] = {}
+        self.last_character_age_ticks = 0
+        #: 角色名识别的独立 tick 计数器。**不复用** ``_tick_count`` ——
+        #: 那个由 ``_detect_entities`` 自增，而实体检测可能被
+        #: ``entity_detector=None`` 短路。两个功能各有各的节流节奏，
+        #: 共用一个计数器会让其中一个的间隔随另一个的配置漂移。
+        self._char_tick = 0
         #: 世界实体检测器（``WorldEntityDetector`` 或任何有
         #: ``should_run_for_scene(str)`` + ``detect(frame)`` 的对象）。
         #:
@@ -516,7 +592,7 @@ hp_estimation: Any = None,
         #:
         #: 🔴 **跨仓库硬依赖**（§28.5）：``SceneDetector`` 的默认判定器要动态
         #:    加载 ``coord_scene_tree.py``，默认在
-        #:    ``D:\\NEKO\\recognition\\exports\\benchmark\\scripts\\misc\\``，
+        #:    ``D:\\workspace\\N.E.K.O\\NEKO-genshin\\recognition\\exports\\benchmark\\scripts\\misc\\``，
         #:    可用环境变量 ``NEKO_SCENE_TREE`` 覆盖（也可调
         #:    :func:`scene_detector.set_classifier_module_path`）。
         #:    缺文件时 :meth:`SceneDetector.update` **抛 FileNotFoundError**，
@@ -556,6 +632,14 @@ hp_estimation: Any = None,
         self.last_world_entities: list | None = None
         #: 上一次世界实体检测的耗时（毫秒）。
         self.last_entity_ms: float = 0.0
+        #: 上一次 E 技能感知的平均饱和度（诊断用，见 ``detectors.key_e``）。
+        self.last_skill_cd_confidence: float = 0.0
+        #: 上一次 E 技能感知的来源（``"key_e"`` / ``"none"``）。
+        self.last_skill_cd_source: str = "none"
+        #: 上一次 Q 大招感知的环形青光占比（诊断用，见 ``detectors.key_q``）。
+        self.last_burst_confidence: float = 0.0
+        #: 上一次 Q 大招感知的来源（``"key_q"`` / ``"none"``）。
+        self.last_burst_source: str = "none"
 
         # ★ 必须放在 `_events` 建好之后 —— 降级事件要往里塞。
         self._emit_auto_event()
@@ -665,9 +749,11 @@ hp_estimation: Any = None,
 
         # ⑥ 玩家信息（v1 最小集：只填能从模板/几何直接拿到的）
         #    血量几何投影默认关闭（hp_estimation=None）；关着时 hp_ratio 恒 None。
+        #    E 技能就绪感知同样默认关闭（skill_cd=None）；
+        #    关着时 party 恒为 ()，e_ready() 恒 UNKNOWN。
         hp = self._estimate_hp(frame.image)
         player = self._build_player(scene["id"], region, matches, detections,
-                                    sv, hp=hp)
+                                    sv, hp=hp, frame=frame.image)
 
         # ⑦ 传送契约 ① SELECT（2026-10-15 接上）。
         #    **必须在 _locate 之前**：on_teleport_ocr 把状态机切进
@@ -1184,6 +1270,7 @@ hp_estimation: Any = None,
         detections: list[Detection],
         sv: int,
         hp: tuple[float | None, str] | None = None,
+        frame: np.ndarray | None = None,
     ) -> PlayerInfo:
         """v1 最小实现。
 
@@ -1193,19 +1280,301 @@ hp_estimation: Any = None,
 
         能量：**仍留空**。它要在角色**有能量**的帧里标定，
         现有参考帧（满血、无队友）里压根没有能量条可测。
+
+        E 技能就绪（2026-10-18）
+        ---------------------------------------------------------------------------
+        走 :meth:`_read_skill_cd`。``skill_cd`` 未注入（默认）时
+        ``party`` 仍只能靠 ``char:`` 标签 —— 而 bgi_world 的 7 类里
+        **没有 ``char``**，所以 ``active`` 恒为 None、``party`` 恒为 ``()``，
+        与接入之前完全一致。
         """
         active: tuple[str, str, int] | None = None
         for d in detections:
             if d.label.startswith("char:"):
                 active = (d.label[5:], d.label[5:], d.box[0])
                 break
-        party = ()
-        if active:
-            from ..contracts.state_packet import PartyMember
 
-            party = (PartyMember(slot=1, char_id=active[0], name=active[1], active=True),)
+        cd_ready: dict[str, bool | None] = {}
+        if self._skill_cd_on and frame is not None:
+            cd_ready.update(self._read_skill_cd(frame))
+        # ★ Q 单独一遍（2026-10-18）。开关独立，所以放在这里而不是
+        #   合并进 _read_skill_cd —— 那样 skill_cd=false 时会顺带
+        #   把大招也关掉，正好把「两个信号可信度不同」这件事抹掉。
+        if self._burst_cd_on and frame is not None:
+            cd_ready.update(self._read_burst_cd(frame))
+
+        # ★ 角色名（2026-10-18）。``{slot: 名字}``，只含认出来的槽位。
+        names: dict[int, str] = {}
+        if self._character_id_on and frame is not None:
+            names = self._read_character_names(frame)
+
+        #: ★ 在场槽位（2026-10-18）。来自切人记账器，**不是**从画面看的。
+        #:   ``None`` = 还没切过人（或记账器没接）-> 谁在场仍然 UNKNOWN。
+        active_slot = self._current_active_slot()
+
+        from ..contracts.state_packet import PartyMember
+
+        party: tuple = ()
+        if active:
+            party = (PartyMember(slot=1, char_id=active[0], name=active[1],
+                                 active=True, cd_ready=dict(cd_ready)),)
+        elif active_slot is not None:
+            # ★ 记账器知道谁在场（2026-10-18）。这是 ``onfield()`` 第一次
+            #   能答出「是/不是钟离」——而它**不需要任何标定**：
+            #   引擎按的哪个数字键它自己知道，用户按的监听器知道。
+            #
+            #   ⚠️ 槽位在场但名字还没 OCR 出来时（轮转一圈要 4×25 tick），
+            #     照样给他一个成员：`name=""`、`active=True`、带 cd_ready。
+            #     那不是编造 —— 「3 号位现在站着个人」这件事是**记账来的**
+            #     （引擎刚按了 3），「他叫什么」才需要 OCR。
+            #     少了他，`active_member` 就恒 None，`e_ready()`/`q_ready()`
+            #     全废 —— 那一整秒感知就白跑了。
+            members = [
+                PartyMember(
+                    slot=int(s), char_id="", name=n,
+                    active=(int(s) == active_slot),
+                    # ★ cd_ready 描述的是**在场角色**的技能栏，
+                    #   所以只挂在在场那个槽位上 —— 不再无条件挂 slot 1。
+                    cd_ready=dict(cd_ready) if int(s) == active_slot else {},
+                )
+                for s, n in sorted(names.items())
+            ]
+            if active_slot not in names:
+                members.append(PartyMember(slot=active_slot, char_id="",
+                                           name="", active=True,
+                                           cd_ready=dict(cd_ready)))
+            party = tuple(members)
+        elif names:
+            # ★ 每认出一个槽位就成一个 PartyMember。
+            #   `active` **恒 False** —— 记账器没接的时候，谁在场没人知道
+            #   （视觉判据已被 CharacterDetector 的模块文档用四条数据否掉）。
+            #   于是 `PlayerInfo.active_member` 恒 None、`onfield()` 恒
+            #   UNKNOWN —— 这是**已知且如实**的状态，不是接线断了。
+            party = tuple(
+                PartyMember(
+                    slot=int(s), char_id="", name=n,
+                    # ⚠️ cd_ready 只挂在 slot 1 上：那套逻辑读的是
+                    #   **右下角 E/Q 图标**，那是「当前在场角色」的，
+                    #   跟队伍栏第 1 格不是同一个概念。
+                    #   在能确定谁在场之前，**不能**把它挂到
+                    #   随便哪个有名字的槽位上 —— 那等于宣称
+                    #   「1 号是当前角色」，是编出来的。
+                    active=False,
+                    cd_ready=dict(cd_ready) if int(s) == 1 else {},
+                )
+                for s, n in sorted(names.items())
+            )
+        elif cd_ready:
+            # ⚠️ 没有角色身份，但**读到了 E 图标**。右下角那个图标一定是
+            #   当前在场角色的，所以「有个在场的角色、它的 E 是这个状态」
+            #   是**成立**的 —— char_id/name 留空是诚实（我们确实不知道
+            #   是谁），不该因此把已读到的 cd 一起丢掉。
+            #
+            #   ★ 为什么这层重要：e_ready() 走 active_member.cd_ready["skill"]，
+            #     不读 name/char_id。填了它规则就能用；不填则恒 UNKNOWN。
+            party = (PartyMember(slot=1, char_id="", name="", active=True,
+                                 cd_ready=cd_ready),)
+
         hp_ratio, hp_source = hp if hp else (None, "none")
         return PlayerInfo(hp_ratio=hp_ratio, hp_source=hp_source, party=party)
+
+    def _current_active_slot(self) -> int | None:
+        """问记账器「现在谁在场」。**任何异常都当没接**。
+
+        ★ 为什么 try/except 包住：记账器是执行层/监听层的东西，
+          它挂了不该让感知层整条 tick 崩 —— 崩了就退回「没人切过人」，
+          也就是接入之前的行为。
+        """
+        tracker = self._active_slots
+        if tracker is None:
+            return None
+        try:
+            slot = tracker.current()
+        except Exception:  # noqa: BLE001
+            logger.warning("在场槽位查询异常，本帧按「不知道谁在场」处理",
+                           exc_info=True)
+            return None
+        try:
+            slot = int(slot)
+        except (TypeError, ValueError):
+            return None
+        return slot if 1 <= slot <= 4 else None
+
+    def _read_skill_cd(self, frame: np.ndarray) -> dict[str, bool | None]:
+        """读在场角色的 E 是否就绪。
+
+        :returns: ``{"skill": True|False|None}``。**读不到时也返回字典**
+            （值是 ``None``），因为「确认在 CD」和「看不见」对规则是
+            两种不同的事实：前者 ``e_ready()==False``，后者 UNKNOWN，
+            两者都会让规则不触发，但只有后者能告诉人「感知挂了」。
+
+        ★ 失败必须响亮：这里**不吞**配置/接线错误（那属于编程错误），
+          只吞**逐帧**的识别抖动（那属于正常噪声，由 key_e 自己降级）。
+        """
+        if not self._skill_cd_on:
+            return {}
+        try:
+            ready, conf, source = read_skill_cd(frame)
+        except Exception:  # noqa: BLE001 - read_skill_cd 内部已兜底，这里是最后一道
+            logger.warning("E 技能感知异常，本帧按 UNKNOWN 处理", exc_info=True)
+            return {"skill": None}
+
+        self.last_skill_cd_confidence = conf
+        self.last_skill_cd_source = source
+        logger.debug("E 技能就绪=%s (饱和度 %.1f, 来源 %s)", ready, conf, source)
+        return {"skill": ready}
+
+    def _read_burst_cd(self, frame: np.ndarray) -> dict[str, bool | None]:
+        """读在场角色的 Q 是否就绪。
+
+        :returns: ``{"burst": True|None}``。**没有 False** ——
+            :func:`key_q.read_burst_cd` 判不出「在冷却」（296 帧素材里
+            零个冷却样本，见 detectors/key_q.py 的模块文档）。
+            「在冷却」「HUD 淡出了」「那儿压根不是按钮」三者在 UI 上
+            都是「没有亮青环」，当前素材分不开，于是统一报 UNKNOWN。
+
+            ★ 报 UNKNOWN 而不是 False **不影响规则**：``q_ready()``
+              两者都不触发。区别只在 ``EvalOutcome.unknowns`` 里会出现
+              ``cd``，让人一眼看出「大招读不出来」。
+
+        ★ 失败必须响亮：这里不吞配置/接线错误（那是编程错误），
+          只吞逐帧的识别抖动（那由 key_q 自己降级）。
+        """
+        if not self._burst_cd_on:
+            return {}
+        try:
+            ready, conf, source = read_burst_cd(frame)
+        except Exception:  # noqa: BLE001 - read_burst_cd 内部已兜底，这里是最后一道
+            logger.warning("Q 大招感知异常，本帧按 UNKNOWN 处理", exc_info=True)
+            return {"burst": None}
+
+        self.last_burst_confidence = conf
+        self.last_burst_source = source
+        logger.debug("Q 大招就绪=%s (环形青光占比 %.3f, 来源 %s)",
+                     ready, conf, source)
+        return {"burst": ready}
+
+    # ------------------------------------------------------- 角色名识别
+
+    def _avatar_fallback(self, frame: np.ndarray) -> dict[int, str]:
+        """头像分类器兜底。**没挂分类器就返回空字典**。
+
+        :returns: ``{slot: 角色名}``；没有 / 全都不置信时是 ``{}``。
+
+        ⚠️ 任何异常都吞成空结果 —— 它是**可选**的降级路径，
+          挂了不该让 OCR 那条（已经够用的那条）跟着一起失效。
+        """
+        if self._avatar_classifier is None or self._char_detector is None:
+            return {}
+        min_conf = float(getattr(self._avatar_cfg, "min_confidence", 0.35))
+        out: dict[int, str] = {}
+        for slot in range(1, 5):
+            try:
+                pred = self._char_detector.classify_slot(
+                    frame, slot, min_confidence=min_conf)
+            except Exception:  # noqa: BLE001
+                logger.warning("槽位 %d 头像分类异常，跳过", slot, exc_info=True)
+                continue
+            if pred.known:
+                out[slot] = pred.name
+        if out:
+            logger.info("头像分类器兜底识别出队伍：%s", out)
+        return out
+
+    def _publish_char_slots(self, names: dict[int, str]) -> None:
+        """★ 把 OCR 读到的「槽位 -> 角色名」发布给执行层（2026-10-18）。
+
+        这是**免配置切人**的最后一环：规则里写 ``char_id = "夜兰"``，
+        执行层要按的是数字键 —— 中间的翻译以前要用户手填
+        ``keymap.toml`` 的 ``[char_slots]``，现在由 OCR 自动建。
+
+        ⚠️ 只**新增/更新**，不因为「某一轮没读到」而删。
+           OCR 在切屏/开菜单时整栏读不到（实测 296 帧里空读 35.2%），
+           删掉会让执行层突然切不动人。名册宁可陈旧也不该清空。
+
+        ⚠️ 索引**挂了也不能掀翻感知** —— 它在切人路径上，
+           感知这条 tick 除了名字慢一拍什么都不会少。
+        """
+        index = self._char_slot_index
+        if index is None:
+            return
+        for slot, name in names.items():
+            try:
+                if index.note_name(slot, name):
+                    logger.debug("编队名册更新：%s 号位 = %s", slot, name)
+            except Exception:  # noqa: BLE001
+                logger.warning("编队名册更新失败（不影响本帧感知）",
+                               exc_info=True)
+                return
+
+    def _read_character_names(self, frame: np.ndarray) -> dict[int, str]:
+        """轮转读队伍栏角色名。
+
+        :returns: ``{slot: 角色名}``。**只含认出了名字的槽位** ——
+            认不出就是不在这份字典里，不是 ``""``。
+
+        ★ 为什么是「轮转 + 节流」而不是一帧读 4 格
+          单次 rapidocr 实测 **1.0~1.5 秒**（见
+          ``recognition/exports/benchmark/scripts/eval_party_ocr.py``），
+          4 格就是 4~6 秒，是 200 ms tick 预算的 **20~30 倍**。
+          队伍组成很少变，慢一点完全能接受；顶掉 20 帧则不行。
+
+        ⚠️ **没有 OCR 引擎就什么都不做**，不抛、不猜。
+        ⚠️ 读失败**沿用上次结果**而不是清空 —— 切屏/开菜单时整栏虚化，
+           清空会让 ``party`` 每帧闪烁，规则跟着抖。
+           代价是「刚换的队伍」最多滞后 :attr:`last_character_age_ticks`
+           个 tick —— 上层要看这个字段。
+        """
+        if not self._character_id_on or frame is None:
+            return {}
+        if self._ocr is None:
+            logger.debug("没注入 OCR 引擎，队伍栏角色名识别跳过")
+            return {}
+        self._char_tick += 1
+        self.last_character_age_ticks += 1
+        if self._char_detector is None:
+            from .detectors.character_detector import (  # noqa: PLC0415
+                CharacterDetector,
+            )
+            self._char_detector = CharacterDetector(
+                self._ocr, classifier=self._avatar_classifier)
+
+        if self._char_tick % self._character_interval != 0:
+            return dict(self.last_character_names)
+
+        t0 = time.perf_counter()
+        try:
+            found = self._char_detector.update(frame)
+        except Exception:  # noqa: BLE001 - 逐帧识别抖动不该掀翻整轮 tick
+            logger.warning("队伍栏角色名识别异常，沿用上次结果", exc_info=True)
+            return dict(self.last_character_names)
+
+        ms = (time.perf_counter() - t0) * 1000
+        names = {s: r.name for s, r in found.items() if r.known}
+        if names:
+            self.last_character_names = names
+            self.last_character_age_ticks = 0
+            self._publish_char_slots(names)
+        else:
+            # ★ OCR 这一轮一个名字都没读到 -> 试头像分类器兜底（2026-10-18）。
+            #   ⚠️ 诚实地说：这两条路**不是互补的**。OCR 读不到名字的典型原因是
+            #     切屏 / 开菜单 / 队伍栏虚化，那��头像**也跟着一起糊** ——
+            #     所以这条路真正能救的场景很窄（名字被遮挡但头像还在，
+            #     比如开着角色详情面板）。
+            #   ⚠️ 而且它默认是**关**的：实测真机 top1 在随机水平，
+            #     开着只会制造错名字，比读不到更糟。
+            names = self._avatar_fallback(frame)
+            if names:
+                self.last_character_names = names
+                self.last_character_age_ticks = 0
+                self._publish_char_slots(names)
+        logger.debug("队伍栏角色名 %s（读了 %d 格，%.0f ms）",
+                     names, self._char_detector.last_read_count, ms)
+        if ms > 200.0:
+            logger.warning(
+                "角色名 OCR %.0f ms，超过 200 ms 的 tick 预算（间隔 %d tick）",
+                ms, self._character_interval)
+        return dict(self.last_character_names)
 
 
 # --------------------------------------------------------------------------
